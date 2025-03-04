@@ -51,6 +51,15 @@ const Booking = () => {
         
         setTableHeaders(headers)
         
+        // Calculate today's date for comparison
+        const today = new Date()
+        const todayMonth = today.getMonth() // JS months are 0-indexed (0-11)
+        const todayDay = today.getDate()
+        const todayYear = today.getFullYear()
+        today.setHours(0, 0, 0, 0) // Reset time for accurate date comparison
+        
+        console.log(`Today is ${todayMonth+1}/${todayDay}/${todayYear} (m/d/yyyy format)`)
+        
         // Extract and transform data rows with safer handling
         const rowsData = data.table.rows.map(row => {
           const rowData = {}
@@ -100,46 +109,25 @@ const Booking = () => {
           return rowData
         }).filter(row => Object.keys(row).length > 1) // Filter out empty rows (more than just _id)
         
-        setAppointments(rowsData)
+        // Column G (index 6) is the date column we need to check
+        // We'll directly use the index for column G
+        const columnG = 6
+        const dateColumnId = headers[columnG]?.id
         
-        // Calculate statistics for dashboard cards
-        const today = new Date()
-        const todayMonth = today.getMonth() + 1 // JS months are 0-indexed
-        const todayDay = today.getDate()
-        const todayYear = today.getFullYear()
+        console.log("Using date column G with id:", dateColumnId)
         
-        console.log(`Today is ${todayMonth}/${todayDay}/${todayYear} (m/d/yyyy format)`)
-        
-        // In your sheet, "Slot Date" is in column G
-        // First try to find the column that contains "Slot Date" in its label
-        let dateColumn = headers.find(h => 
-          h.label && h.label.toLowerCase().includes('slot date')
-        )?.id
-        
-        // If not found by name, use index 6 (column G)
-        if (!dateColumn) {
-          const dateColumnIndex = 6 // This corresponds to column G (0-indexed)
-          dateColumn = headers[dateColumnIndex]?.id
+        if (!dateColumnId) {
+          console.error("Column G not found in headers")
         }
         
-        // If still not found, try to find any date column
-        if (!dateColumn) {
-          dateColumn = headers.find(h => 
-            h.type === 'date' || 
-            h.label.toLowerCase().includes('date')
-          )?.id
-        }
-        
-        console.log("Using date column:", dateColumn)
-        
-        // Count today's appointments (only those where column G has today's date)
-        const todaysAppts = rowsData.filter(row => {
+        // Filter out past appointments - ONLY keep today and future appointments from column G
+        const filteredRowsData = rowsData.filter(row => {
           try {
-            if (!dateColumn || !row[dateColumn]) return false
+            // Skip if no date column found or no value in the cell
+            if (!dateColumnId || !row[dateColumnId]) return false
             
-            // Get the date value from the row
-            const dateValue = row[dateColumn]
-            console.log("Checking date value:", dateValue, typeof dateValue)
+            // Get the date value from column G
+            const dateValue = row[dateColumnId]
             
             // Handle Google Sheets date format: Date(year,month,day)
             if (typeof dateValue === 'string' && dateValue.startsWith('Date(')) {
@@ -150,15 +138,53 @@ const Booking = () => {
                 const month = parseInt(match[2], 10) // Month is 0-indexed in JS Date
                 const day = parseInt(match[3], 10)
                 
-                console.log(`Extracted date: year=${year}, month=${month}, day=${day}`)
-                console.log(`Today: year=${todayYear}, month=${todayMonth-1}, day=${todayDay}`)
+                // Create appointment date object and reset time for comparison
+                const appointmentDate = new Date(year, month, day)
+                appointmentDate.setHours(0, 0, 0, 0)
                 
-                // Check if it's today - note month comparison adjustment (API uses 0-indexed months)
-                const isToday = day === todayDay && month === (todayMonth-1) && year === todayYear
+                // Keep this appointment if it's today or in the future
+                const isCurrentOrFutureDate = appointmentDate >= today
                 
-                if (isToday) {
-                  console.log("TODAY MATCH FOUND!")
+                if (isCurrentOrFutureDate) {
+                  console.log(`Keeping appointment date: ${month+1}/${day}/${year}`)
+                } else {
+                  console.log(`Filtering out past date: ${month+1}/${day}/${year}`)
                 }
+                
+                return isCurrentOrFutureDate
+              }
+            }
+            
+            return false
+          } catch (error) {
+            console.log("Date comparison error:", error)
+            return false
+          }
+        })
+        
+        // Set the filtered appointments (only today and future dates from column G)
+        setAppointments(filteredRowsData)
+        
+        // Count today's appointments (only those where column G has today's date)
+        const todaysAppts = filteredRowsData.filter(row => {
+          try {
+            // Fixed: changed dateColumn to dateColumnId
+            if (!dateColumnId || !row[dateColumnId]) return false
+            
+            // Get the date value from the row
+            const dateValue = row[dateColumnId]
+            
+            // Handle Google Sheets date format: Date(year,month,day)
+            if (typeof dateValue === 'string' && dateValue.startsWith('Date(')) {
+              // Extract the year, month, day using regex
+              const match = /Date\((\d+),(\d+),(\d+)\)/.exec(dateValue)
+              if (match) {
+                const year = parseInt(match[1], 10)
+                const month = parseInt(match[2], 10) // Month is 0-indexed in JS Date
+                const day = parseInt(match[3], 10)
+                
+                // Check if it's today - fixed comparison (removed unnecessary adjustment)
+                const isToday = day === todayDay && month === todayMonth && year === todayYear
                 
                 return isToday
               }
@@ -172,12 +198,13 @@ const Booking = () => {
         }).length
         
         // Count upcoming appointments (dates after today)
-        const upcomingAppts = rowsData.filter(row => {
+        const upcomingAppts = filteredRowsData.filter(row => {
           try {
-            if (!dateColumn || !row[dateColumn]) return false
+            // Fixed: changed dateColumn to dateColumnId
+            if (!dateColumnId || !row[dateColumnId]) return false
             
             // Get the date value
-            const dateValue = row[dateColumn]
+            const dateValue = row[dateColumnId]
             
             // Handle Google Sheets date format: Date(year,month,day)
             if (typeof dateValue === 'string' && dateValue.startsWith('Date(')) {
@@ -190,7 +217,8 @@ const Booking = () => {
                 
                 // Create date objects for comparison
                 const appointmentDate = new Date(year, month, day)
-                const todayDate = new Date(todayYear, todayMonth - 1, todayDay)
+                // Fixed: removed unnecessary adjustment to todayMonth
+                const todayDate = new Date(todayYear, todayMonth, todayDay)
                 
                 // Reset time parts for accurate date comparison
                 appointmentDate.setHours(0, 0, 0, 0)
@@ -198,10 +226,6 @@ const Booking = () => {
                 
                 // Is this date in the future?
                 const isFuture = appointmentDate > todayDate
-                
-                if (isFuture) {
-                  console.log(`FUTURE DATE FOUND: ${month+1}/${day}/${year}`)
-                }
                 
                 return isFuture
               }
@@ -214,7 +238,7 @@ const Booking = () => {
           }
         }).length
         
-        // Total clients count (total number of rows)
+        // Total clients count (total number of rows including past appointments)
         const totalClients = rowsData.length
         
         setStats({
@@ -397,6 +421,19 @@ const Booking = () => {
                                     {appointment[header.id] || '—'}
                                   </div>
                                 </div>
+                              </div>
+                            </td>
+                          );
+                        }
+                        
+                        // For Service Price column, add rupee sign (₹)
+                        if (header.label.toLowerCase().includes('service price') || 
+                            header.label.toLowerCase().includes('price')) {
+                          const price = appointment[header.id];
+                          return (
+                            <td key={header.id} className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-green-600">
+                                {price ? `₹${price}` : '—'}
                               </div>
                             </td>
                           );

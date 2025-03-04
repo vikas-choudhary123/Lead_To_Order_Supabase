@@ -179,7 +179,7 @@ const DailyEntry = () => {
           </div>
           <div>
             <p className="text-sm text-gray-500">Total Revenue</p>
-            <p className="text-2xl font-bold text-gray-800">${stats.totalRevenue.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-gray-800">₹{stats.totalRevenue.toFixed(2)}</p>
           </div>
         </div>
         <div className="bg-white rounded-lg shadow p-4 flex items-center">
@@ -197,7 +197,7 @@ const DailyEntry = () => {
           </div>
           <div>
             <p className="text-sm text-gray-500">Card Payments</p>
-            <p className="text-2xl font-bold text-gray-800">${stats.cardPayments.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-gray-800">₹{stats.cardPayments.toFixed(2)}</p>
           </div>
         </div>
         <div className="bg-white rounded-lg shadow p-4 flex items-center">
@@ -206,7 +206,7 @@ const DailyEntry = () => {
           </div>
           <div>
             <p className="text-sm text-gray-500">Average Sale</p>
-            <p className="text-2xl font-bold text-gray-800">${stats.averageSale.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-gray-800">₹{stats.averageSale.toFixed(2)}</p>
           </div>
         </div>
       </div>
@@ -245,20 +245,25 @@ const DailyEntry = () => {
                   transactions.map((transaction) => (
                     <tr key={transaction._id}>
                       {tableHeaders.map((header) => {
-                        // Special handling for amount fields
-                        if (header.label.toLowerCase().includes('amount') || 
-                            header.label.toLowerCase().includes('price') || 
-                            header.type === 'number') {
+                        // Special handling for price/amount fields (but NOT serial numbers)
+                        if ((header.label.toLowerCase().includes('amount') || 
+                             header.label.toLowerCase().includes('price') || 
+                             header.label.toLowerCase().includes('commission') || 
+                             header.label.toLowerCase().includes('total')) && 
+                             !header.label.toLowerCase().includes('serial') && 
+                             !header.label.toLowerCase().includes('sr') && 
+                             !header.label.toLowerCase().includes('no') && 
+                             header.type !== 'string') {
                           const value = transaction[header.id]
                           let displayValue = value
                           
                           if (!isNaN(parseFloat(value))) {
-                            displayValue = '$' + parseFloat(value).toFixed(2)
+                            displayValue = '₹' + parseFloat(value).toFixed(2)
                           }
                           
                           return (
                             <td key={header.id} className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">{displayValue || '—'}</div>
+                              <div className="text-sm font-medium text-green-600">{displayValue || '—'}</div>
                             </td>
                           )
                         }
@@ -308,7 +313,7 @@ const DailyEntry = () => {
                           )
                         }
                         
-                        // Default rendering for other columns
+                        // Default rendering for other columns (including serial numbers)
                         return (
                           <td key={header.id} className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">{transaction[header.id] || '—'}</div>
@@ -407,7 +412,7 @@ const RevenueChart = ({ transactions, tableHeaders }) => {
       return (
         <div className="bg-white p-3 border border-gray-200 shadow-lg rounded">
           <p className="font-bold">{label}</p>
-          <p className="text-green-600">${payload[0].value.toFixed(2)} revenue</p>
+          <p className="text-green-600">₹{payload[0].value.toFixed(2)} revenue</p>
           <p className="text-gray-600">{payload[1].value} services</p>
         </div>
       )
@@ -428,7 +433,7 @@ const RevenueChart = ({ transactions, tableHeaders }) => {
           <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
           <Tooltip content={<CustomTooltip />} />
           <Legend />
-          <Bar yAxisId="left" dataKey="revenue" name="Revenue ($)" fill="#8884d8" />
+          <Bar yAxisId="left" dataKey="revenue" name="Revenue (₹)" fill="#8884d8" />
           <Bar yAxisId="right" dataKey="count" name="Number of Services" fill="#82ca9d" />
         </BarChart>
       </ResponsiveContainer>

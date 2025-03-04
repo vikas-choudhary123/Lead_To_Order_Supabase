@@ -74,7 +74,7 @@ const Sidebar = ({ activeTab, setActiveTab, isMobileMenuOpen, setIsMobileMenuOpe
       {/* Mobile Sidebar */}
       <div className={`fixed inset-0 z-40 md:hidden ${isMobileMenuOpen ? "block" : "hidden"}`}>
         <div
-          className="fixed inset-0 bg-blue-600 bg-opacity-75 transition-opacity"
+          className="fixed inset-0 bg-opacity-75"
           onClick={() => setIsMobileMenuOpen(false)}
         ></div>
         <div className="fixed inset-y-0 left-0 flex flex-col w-full max-w-xs bg-white shadow-xl transition-transform duration-300 ease-in-out">
