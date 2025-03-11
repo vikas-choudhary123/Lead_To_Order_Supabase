@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calendar, DollarSign, TrendingUp, BarChart2, CreditCard, Scissors } from "lucide-react"
+import { Calendar, IndianRupee, TrendingUp, BarChart2, CreditCard, Scissors } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 const DailyEntry = () => {
@@ -175,7 +175,7 @@ const DailyEntry = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg shadow p-4 flex items-center">
           <div className="rounded-full bg-green-100 p-3 mr-4">
-            <DollarSign size={24} className="text-green-600" />
+          <IndianRupee size={24} className="text-green-600" />
           </div>
           <div>
             <p className="text-sm text-gray-500">Total Revenue</p>
