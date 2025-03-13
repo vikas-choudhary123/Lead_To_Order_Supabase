@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Lock, ArrowLeft } from 'lucide-react';
-import { useAuth } from './Context/AuthContext';
+import { useAuth } from './Context/AuthContext.jsx';
 
 const AccessDenied = () => {
   const navigate = useNavigate();

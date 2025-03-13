@@ -1419,12 +1419,14 @@ const handleNewAppointmentClick = async () => {
                       {header.label}
                     </th>
                   ))}
+                  {!hideHistoryButton && (
                   <th
                     scope="col"
                     className="px-6 py-3 text-left text-xs font-medium text-blue-500 uppercase tracking-wider"
                   >
                     Actions
                   </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-blue-200">
@@ -1561,6 +1563,7 @@ const handleNewAppointmentClick = async () => {
                     })}
                     
                     {/* Actions column */}
+                    {!hideHistoryButton && (
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button 
                         onClick={() => handleEditClick(appointment)}
@@ -1572,6 +1575,7 @@ const handleNewAppointmentClick = async () => {
                         Cancel
                       </a>
                     </td>
+                    )}
                   </motion.tr>
                 ))
               ) : (

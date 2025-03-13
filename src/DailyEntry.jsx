@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calendar, IndianRupee, TrendingUp, BarChart2, CreditCard, Scissors, History, X, Search } from "lucide-react"
+import { Calendar, IndianRupee, TrendingUp, BarChart2, CreditCard, Scissors, History, X, Search, Edit, Save } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 const DailyEntry = ({ hideHistoryButton = false }) => {
@@ -19,16 +19,29 @@ const DailyEntry = ({ hideHistoryButton = false }) => {
     cardPayments: 0,
     averageSale: 0
   })
+  
+  // Add state for edit functionality
+  const [showEditForm, setShowEditForm] = useState(false)
+  const [editingTransaction, setEditingTransaction] = useState({})
+  const [submitting, setSubmitting] = useState(false)
+  const [notification, setNotification] = useState({
+    show: false,
+    message: "",
+    type: ""
+  })
+
+  // Google Sheet Details
+  const sheetId = '1Kb-fhC1yiFJCyPO7TJDqnu-lQ1n1H6mLErlkSPc6yHc'
+  const sheetName = 'Daily Entry'
+  
+  // Google Apps Script Web App URL (you would need to create this)
+  const scriptUrl = 'https://script.google.com/macros/s/AKfycbyhmDsXWRThVsJCfAirTsI3o9EGE-oCcw2HKz1ERe4qxNWfcVoxMUr3sGa6yHJm-ckt/exec'
 
   useEffect(() => {
     const fetchGoogleSheetData = async () => {
       try {
         setLoading(true)
         console.log("Starting to fetch Google Sheet data...")
-        
-        // Google Sheet Details - same sheet ID, different sheet name
-        const sheetId = '1Kb-fhC1yiFJCyPO7TJDqnu-lQ1n1H6mLErlkSPc6yHc'
-        const sheetName = 'Daily Entry'
         
         // Create URL to fetch the sheet in JSON format (this method works for public sheets)
         const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`
@@ -48,8 +61,8 @@ const DailyEntry = ({ hideHistoryButton = false }) => {
         const data = JSON.parse(jsonString)
         
         // Extract headers from cols
-        const headers = data.table.cols.map(col => ({
-          id: col.id,
+        const headers = data.table.cols.map((col, index) => ({
+          id: `col${index}`,
           label: col.label || col.id,
           type: col.type
         })).filter(header => header.label) // Filter out empty headers
@@ -57,11 +70,12 @@ const DailyEntry = ({ hideHistoryButton = false }) => {
         setTableHeaders(headers)
         
         // Extract and transform data rows with safer handling
-        const rowsData = data.table.rows.map(row => {
+        const rowsData = data.table.rows.map((row, rowIndex) => {
           const rowData = {}
           
-          // Add an internal unique ID
+          // Add an internal unique ID and row index for updates
           rowData._id = Math.random().toString(36).substring(2, 15)
+          rowData._rowIndex = rowIndex + 2 // +2 for header row and 1-indexing
           
           // Process each cell carefully
           row.c && row.c.forEach((cell, index) => {
@@ -215,6 +229,213 @@ const DailyEntry = ({ hideHistoryButton = false }) => {
     fetchGoogleSheetData()
   }, [date]) // Reload when date changes
 
+  // Handle Edit Click
+  const handleEditClick = (transaction) => {
+    setEditingTransaction(transaction)
+    setShowEditForm(true)
+  }
+  
+  // Handle Input Change for Edit Form
+  const handleEditInputChange = (e) => {
+    const { name, value } = e.target
+    setEditingTransaction(prev => ({
+      ...prev,
+      [name]: value
+    }))
+  }
+  
+  // Handle Edit Form Submit
+  const handleEditSubmit = async (e) => {
+    e.preventDefault()
+    setSubmitting(true)
+    
+    try {
+      const rowIndex = editingTransaction._rowIndex
+      
+      if (!rowIndex) {
+        throw new Error("Could not determine the row index for updating this transaction")
+      }
+      
+      const rowData = tableHeaders.map(header => 
+        editingTransaction[header.id] || ''
+      )
+      
+      const formData = new FormData()
+      formData.append('sheetName', sheetName)
+      formData.append('rowData', JSON.stringify(rowData))
+      formData.append('rowIndex', rowIndex)
+      formData.append('action', 'update')
+      
+      const response = await fetch(scriptUrl, {
+        method: 'POST',
+        mode: 'no-cors', 
+        body: formData
+      })
+      
+      console.log("Update submitted successfully")
+      
+      // Update transactions in state
+      setTransactions(prev => 
+        prev.map(transaction => 
+          transaction._id === editingTransaction._id ? editingTransaction : transaction  
+        )
+      )
+      
+      // Update transaction in allTransactions
+      setAllTransactions(prev =>
+        prev.map(transaction =>
+          transaction._id === editingTransaction._id ? editingTransaction : transaction
+        )
+      )
+      
+      // Recalculate stats if needed
+      const amountField = tableHeaders.find(h => 
+        h.label && (h.label.toLowerCase().includes('amount') || 
+                    h.label.toLowerCase().includes('price') || 
+                    h.label.toLowerCase().includes('revenue'))
+      )?.id
+      
+      if (amountField) {
+        let totalAmount = 0
+        let cardPayments = 0
+        
+        const paymentMethodField = tableHeaders.find(h => 
+          h.label && (h.label.toLowerCase().includes('payment') || 
+                     h.label.toLowerCase().includes('method'))
+        )?.id
+        
+        const updatedTransactions = transactions.map(transaction => 
+          transaction._id === editingTransaction._id ? editingTransaction : transaction
+        )
+        
+        updatedTransactions.forEach(row => {
+          if (row[amountField] && !isNaN(parseFloat(row[amountField]))) {
+            const amount = parseFloat(row[amountField])
+            totalAmount += amount
+            
+            // Check for card payments
+            if (paymentMethodField) {
+              const paymentMethod = row[paymentMethodField]?.toString().toLowerCase() || ''
+              if (paymentMethod.includes('card') || 
+                  paymentMethod.includes('credit') || 
+                  paymentMethod.includes('debit')) {
+                cardPayments += amount
+              }
+            }
+          }
+        })
+        
+        setStats({
+          totalRevenue: totalAmount,
+          services: updatedTransactions.length,
+          cardPayments: cardPayments,
+          averageSale: updatedTransactions.length > 0 ? totalAmount / updatedTransactions.length : 0
+        })
+      }
+      
+      setShowEditForm(false)
+      
+      setNotification({
+        show: true,
+        message: "Transaction updated successfully!",
+        type: "success"
+      })
+      setTimeout(() => {
+        setNotification({ show: false, message: "", type: "" })
+      }, 3000)
+    } catch (error) {
+      console.error("Error updating transaction:", error)
+        
+      setNotification({
+        show: true,
+        message: `Failed to update transaction: ${error.message}`,
+        type: "error" 
+      })
+      setTimeout(() => {
+        setNotification({ show: false, message: "", type: "" })
+      }, 5000)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+  
+  // Function to render appropriate form field based on header type
+  const renderFormField = (header) => {
+    // Date fields
+    if (header.type === 'date' || header.label.toLowerCase().includes('date')) {
+      // Convert the date format if needed (DD/MM/YYYY) to YYYY-MM-DD for the date input
+      let dateValue = editingTransaction[header.id] || '';
+      if (dateValue && typeof dateValue === 'string' && dateValue.includes('/')) {
+        const parts = dateValue.split('/');
+        if (parts.length === 3) {
+          // Assuming it's in DD/MM/YYYY format
+          dateValue = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+      }
+      
+      return (
+        <input
+          type="date"
+          id={`edit-${header.id}`}
+          name={header.id}
+          value={dateValue}
+          onChange={handleEditInputChange}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500"
+        />
+      );
+    }
+    
+    // Amount/Price fields
+    if (header.label.toLowerCase().includes('amount') || 
+        header.label.toLowerCase().includes('price') || 
+        header.label.toLowerCase().includes('revenue')) {
+      return (
+        <input 
+          type="number"
+          id={`edit-${header.id}`} 
+          name={header.id}
+          value={editingTransaction[header.id] || ''}
+          onChange={handleEditInputChange}
+          min={0}
+          step="0.01"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500" 
+        />
+      )
+    }
+    
+    // Payment method field with common options
+    if (header.label.toLowerCase().includes('payment') || 
+        header.label.toLowerCase().includes('method')) {
+      return (
+        <select
+          id={`edit-${header.id}`}
+          name={header.id}
+          value={editingTransaction[header.id] || ''}
+          onChange={handleEditInputChange}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500"
+        >
+          <option value="">Select Payment Method</option>
+          <option value="Cash">Cash</option>
+          <option value="Card">Card</option>
+          <option value="UPI">UPI</option>
+          <option value="Online">Online</option>
+        </select>
+      )
+    }
+    
+    // Default text input for all other fields
+    return (
+      <input
+        type="text"
+        id={`edit-${header.id}`}
+        name={header.id} 
+        value={editingTransaction[header.id] || ''}
+        onChange={handleEditInputChange}
+        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500"
+      />
+    )
+  }
+
   // Open history modal
   const handleHistoryClick = () => {
     setHistorySearchTerm("")
@@ -326,6 +547,15 @@ const DailyEntry = ({ hideHistoryButton = false }) => {
                       {header.label}
                     </th>
                   ))}
+                  {/* Add Actions column */}
+                  {!hideHistoryButton && (
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Actions
+                  </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -408,11 +638,23 @@ const DailyEntry = ({ hideHistoryButton = false }) => {
                           </td>
                         )
                       })}
+                      {/* Add Edit button */}
+                      {!hideHistoryButton && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button 
+                          className="text-pink-600 hover:text-pink-900" 
+                          onClick={() => handleEditClick(transaction)}
+                        >
+                          <Edit size={16} className="inline mr-1" />
+                          Edit
+                        </button>
+                      </td>
+                      )}
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={tableHeaders.length} className="px-6 py-4 text-center text-gray-500">
+                    <td colSpan={tableHeaders.length + 1} className="px-6 py-4 text-center text-gray-500">
                       No transactions found for this date
                     </td>
                   </tr>
@@ -423,6 +665,7 @@ const DailyEntry = ({ hideHistoryButton = false }) => {
         </div>
       )}
 
+{!hideHistoryButton && (
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-medium text-gray-800 mb-4">Revenue Breakdown</h3>
         {loading ? (
@@ -442,6 +685,67 @@ const DailyEntry = ({ hideHistoryButton = false }) => {
           <RevenueChart transactions={transactions} tableHeaders={tableHeaders} />
         )}
       </div>
+)}
+      
+      {/* Edit Transaction Modal */}
+      {showEditForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-pink-600">Edit Transaction</h3>
+                <button 
+                  className="text-gray-500 hover:text-gray-700"
+                  onClick={() => setShowEditForm(false)}
+                >
+                  <X size={24} />
+                </button>
+              </div>
+      
+              <form onSubmit={handleEditSubmit} className="space-y-6"> 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {tableHeaders.map((header) => (
+                    <div key={`edit-${header.id}`}>
+                      <label htmlFor={`edit-${header.id}`} className="block text-sm font-medium text-pink-700">
+                        {header.label}
+                      </label>
+                      {renderFormField(header)}  
+                    </div>
+                  ))}
+                </div>
+          
+                <div className="flex justify-end space-x-3 pt-4 border-t border-pink-100">
+                  <button
+                    type="button"
+                    className="px-4 py-2 border border-pink-300 rounded-md shadow-sm text-pink-700 bg-white hover:bg-pink-50 focus:outline-none focus:ring-2 focus:ring-pink-500"
+                    onClick={() => setShowEditForm(false)}
+                    disabled={submitting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-pink-600 text-white rounded-md shadow-sm hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 transition-all duration-300 flex items-center"
+                    disabled={submitting}
+                  >
+                    {submitting ? (
+                      <>
+                        <div className="h-4 w-4 border-t-2 border-b-2 border-white rounded-full animate-spin mr-2"></div>
+                        Updating...
+                      </>
+                    ) : (
+                      <>  
+                        <Save size={18} className="mr-2" />
+                        Update Transaction
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* History Modal - Shows All Transaction Data */}
       {showHistoryModal && (
@@ -484,6 +788,13 @@ const DailyEntry = ({ hideHistoryButton = false }) => {
                           {header.label}
                         </th>
                       ))}
+                      <th
+                        key="history-actions"
+                        scope="col"
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -566,11 +877,24 @@ const DailyEntry = ({ hideHistoryButton = false }) => {
                               </td>
                             )
                           })}
+                          {/* Add Edit button to history items */}
+                          <td key="history-actions-cell" className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button 
+                              className="text-pink-600 hover:text-pink-900"
+                              onClick={() => {
+                                handleEditClick(transaction);
+                                setShowHistoryModal(false);
+                              }}
+                            >
+                              <Edit size={16} className="inline mr-1" />
+                              Edit
+                            </button>
+                          </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={tableHeaders.length} className="px-6 py-4 text-center text-gray-500">
+                        <td colSpan={tableHeaders.length + 1} className="px-6 py-4 text-center text-gray-500">
                           {historySearchTerm ? "No transactions matching your search" : "No transaction history found"}
                         </td>
                       </tr>
@@ -590,6 +914,17 @@ const DailyEntry = ({ hideHistoryButton = false }) => {
               </div>
             </div>
           </div>
+        </div>
+      )}
+      
+      {/* Notification popup */}
+      {notification.show && (
+        <div
+          className={`fixed top-4 right-4 px-6 py-4 rounded-lg shadow-lg z-50 ${
+            notification.type === "success" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"  
+          }`}
+        >
+          <p className="font-medium">{notification.message}</p>
         </div>
       )}
     </div>

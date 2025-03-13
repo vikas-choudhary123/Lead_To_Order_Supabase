@@ -1,5 +1,5 @@
 import { Navigate, Outlet } from 'react-router-dom';
-import { useAuth } from '../Context/AuthContext';
+import { useAuth } from '../Context/AuthContext.jsx';
 
 // Protected route component that only checks for authentication
 const ProtectedRoute = ({ 

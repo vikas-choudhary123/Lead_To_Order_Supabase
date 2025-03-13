@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { useAuth } from "../Context/AuthContext"
+import { useAuth } from "../Context/AuthContext.jsx"
 import { 
   Calendar, 
   ClipboardCheck, 

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { Eye, EyeOff, User, Lock, AlertCircle, X, Scissors, Calendar, ChevronRight } from "lucide-react"
-import { useAuth } from "../Context/AuthContext"
+import { useAuth } from "../Context/AuthContext.jsx"
 
 const LoginPage = () => {
   const navigate = useNavigate()

@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Menu, Bell, LogOut } from "lucide-react";
-import { useAuth } from '../Context/AuthContext'; // Import the auth context
+import { useAuth } from '../Context/AuthContext.jsx'; // Import the auth context
 import { useNavigate } from 'react-router-dom'; // Import navigate hook
 
 const Navbar = ({ isMobileMenuOpen, setIsMobileMenuOpen }) => {

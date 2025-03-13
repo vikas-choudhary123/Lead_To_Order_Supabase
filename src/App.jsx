@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { AuthProvider } from "./Context/AuthContext.jsx";
-import Dashboard from "./Components/Dashboard.jsx";
+import Dashboard from "./components/Dashboard.jsx";
 import ProtectedRoute from "./Routes/ProtectedRoute.jsx";
 import LoginPage from "./Pages/LoginPage.jsx";
 import "./index.css";
