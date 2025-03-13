@@ -3,8 +3,8 @@ import { AnimatePresence } from "framer-motion";
 import { AuthProvider } from "./Context/AuthContext";
 import Dashboard from "./Components/Dashboard";
 import ProtectedRoute from "./Routes/ProtectedRoute";
-import "./index.css";
 import LoginPage from "./Pages/LoginPage";
+import "./index.css";
 
 function App() {
   return (
@@ -12,18 +12,15 @@ function App() {
       <AuthProvider>
         <AnimatePresence>
           <Routes>
-            <Route path="/login" element={<LoginPage/>} />
-            <Route path="/admin-dashboard" element={
-              <ProtectedRoute role="admin">
-                <Dashboard />
-              </ProtectedRoute>
-            } />
-            {/* Add a regular dashboard route without role restriction for testing */}
-            <Route path="/dashboard" element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            } />
+            {/* Public routes */}
+            <Route path="/login" element={<LoginPage />} />
+            
+            {/* Single dashboard route that handles all authenticated users */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/admin-dashboard" element={<Dashboard />} />
+            </Route>
+            
+            {/* Redirects */}
             <Route path="/" element={<Navigate to="/login" />} />
             <Route path="*" element={<Navigate to="/login" />} />
           </Routes>

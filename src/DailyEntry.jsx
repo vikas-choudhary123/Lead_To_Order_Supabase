@@ -1,15 +1,18 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calendar, IndianRupee, TrendingUp, BarChart2, CreditCard, Scissors } from "lucide-react"
+import { Calendar, IndianRupee, TrendingUp, BarChart2, CreditCard, Scissors, History, X, Search } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
-const DailyEntry = () => {
+const DailyEntry = ({ hideHistoryButton = false }) => {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [tableHeaders, setTableHeaders] = useState([])
   const [transactions, setTransactions] = useState([])
+  const [allTransactions, setAllTransactions] = useState([])
+  const [showHistoryModal, setShowHistoryModal] = useState(false)
+  const [historySearchTerm, setHistorySearchTerm] = useState("")
   const [stats, setStats] = useState({
     totalRevenue: 0,
     services: 0,
@@ -102,7 +105,64 @@ const DailyEntry = () => {
           return rowData
         }).filter(row => Object.keys(row).length > 1) // Filter out empty rows (more than just _id)
         
-        setTransactions(rowsData)
+        // Save all transactions for history view
+        setAllTransactions(rowsData)
+        
+        // Filter transactions for the selected date
+        const dateField = headers.find(h => h.label && h.label.toLowerCase().includes('date'))?.id
+        
+        const filteredTransactions = dateField 
+          ? rowsData.filter(row => {
+              if (!row[dateField]) return false
+              
+              // Try to match the date in different formats
+              const rowDate = row[dateField]
+              
+              // Check formatted date
+              if (row[`${dateField}_formatted`]) {
+                const formattedDate = new Date(row[`${dateField}_formatted`])
+                if (!isNaN(formattedDate.getTime())) {
+                  const formattedDateStr = formattedDate.toISOString().split('T')[0]
+                  if (formattedDateStr === date) return true
+                }
+              }
+              
+              // For Google Sheets date format: Date(year,month,day)
+              if (typeof rowDate === 'string' && rowDate.startsWith('Date(')) {
+                const match = /Date\((\d+),(\d+),(\d+)\)/.exec(rowDate)
+                if (match) {
+                  const year = parseInt(match[1], 10)
+                  const month = parseInt(match[2], 10) // 0-indexed
+                  const day = parseInt(match[3], 10)
+                  
+                  const sheetDate = new Date(year, month, day)
+                  const selectedDate = new Date(date)
+                  
+                  // Compare year, month, and day
+                  if (sheetDate.getFullYear() === selectedDate.getFullYear() &&
+                      sheetDate.getMonth() === selectedDate.getMonth() &&
+                      sheetDate.getDate() === selectedDate.getDate()) {
+                    return true
+                  }
+                }
+              }
+              
+              // Try direct comparison
+              try {
+                const rowDateObj = new Date(rowDate)
+                if (!isNaN(rowDateObj.getTime())) {
+                  const rowDateStr = rowDateObj.toISOString().split('T')[0]
+                  return rowDateStr === date
+                }
+              } catch (e) {
+                console.log("Date comparison error:", e)
+              }
+              
+              return false
+            })
+          : rowsData
+        
+        setTransactions(filteredTransactions)
         
         // Calculate statistics for dashboard cards
         let totalAmount = 0
@@ -121,7 +181,7 @@ const DailyEntry = () => {
         )?.id || 'paymentMethod'
         
         // Calculate totals
-        rowsData.forEach(row => {
+        filteredTransactions.forEach(row => {
           if (row[amountField] && !isNaN(parseFloat(row[amountField]))) {
             const amount = parseFloat(row[amountField])
             totalAmount += amount
@@ -139,9 +199,9 @@ const DailyEntry = () => {
         // Update the stats
         setStats({
           totalRevenue: totalAmount,
-          services: rowsData.length,
+          services: filteredTransactions.length,
           cardPayments: cardPayments,
-          averageSale: rowsData.length > 0 ? totalAmount / rowsData.length : 0
+          averageSale: filteredTransactions.length > 0 ? totalAmount / filteredTransactions.length : 0
         })
         
         setLoading(false)
@@ -155,12 +215,27 @@ const DailyEntry = () => {
     fetchGoogleSheetData()
   }, [date]) // Reload when date changes
 
+  // Open history modal
+  const handleHistoryClick = () => {
+    setHistorySearchTerm("")
+    setShowHistoryModal(true)
+  }
+  
+  // Function to filter history transactions
+  const filteredHistoryTransactions = historySearchTerm
+    ? allTransactions.filter(transaction => 
+        Object.values(transaction).some(
+          value => value && value.toString().toLowerCase().includes(historySearchTerm.toLowerCase())
+        )
+      )
+    : allTransactions
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <h2 className="text-2xl font-bold text-gray-800">Daily Entry</h2>
         <div className="mt-4 md:mt-0 flex items-center">
-          <div className="relative">
+          <div className="relative mr-4">
             <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
             <input
               type="date"
@@ -169,6 +244,17 @@ const DailyEntry = () => {
               className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
             />
           </div>
+          
+          {/* Only show history button if not hidden */}
+          {!hideHistoryButton && (
+            <button
+              onClick={handleHistoryClick}
+              className="flex items-center px-4 py-2 bg-pink-600 text-white rounded-md hover:bg-pink-700 transition-colors"
+            >
+              <History size={18} className="mr-2" />
+              History
+            </button>
+          )}
         </div>
       </div>
 
@@ -222,8 +308,10 @@ const DailyEntry = () => {
         </div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-800">Today's Transactions</h3>
+          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <h3 className="text-lg font-medium text-gray-800">
+              Today's Transactions
+            </h3>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -354,6 +442,156 @@ const DailyEntry = () => {
           <RevenueChart transactions={transactions} tableHeaders={tableHeaders} />
         )}
       </div>
+      
+      {/* History Modal - Shows All Transaction Data */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-gray-800">Transaction History</h3>
+                <button 
+                  className="text-gray-500 hover:text-gray-700"
+                  onClick={() => setShowHistoryModal(false)}
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="mb-6">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                  <input
+                    type="text"
+                    placeholder="Search all transactions..."
+                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent w-full"
+                    value={historySearchTerm}
+                    onChange={(e) => setHistorySearchTerm(e.target.value)}
+                  />
+                </div>
+              </div>
+              
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      {tableHeaders.map((header) => (
+                        <th
+                          key={`history-${header.id}`}
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          {header.label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredHistoryTransactions.length > 0 ? (
+                      filteredHistoryTransactions.map((transaction) => (
+                        <tr key={`history-row-${transaction._id}`} className="hover:bg-gray-50">
+                          {tableHeaders.map((header) => {
+                            // Special handling for price/amount fields
+                            if ((header.label.toLowerCase().includes('amount') || 
+                                 header.label.toLowerCase().includes('price') || 
+                                 header.label.toLowerCase().includes('commission') || 
+                                 header.label.toLowerCase().includes('total')) && 
+                                 !header.label.toLowerCase().includes('serial') && 
+                                 !header.label.toLowerCase().includes('sr') && 
+                                 !header.label.toLowerCase().includes('no') && 
+                                 header.type !== 'string') {
+                              const value = transaction[header.id]
+                              let displayValue = value
+                              
+                              if (!isNaN(parseFloat(value))) {
+                                displayValue = '₹' + parseFloat(value).toFixed(2)
+                              }
+                              
+                              return (
+                                <td key={`history-cell-${header.id}`} className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm font-medium text-green-600">{displayValue || '—'}</div>
+                                </td>
+                              )
+                            }
+                            
+                            // For date fields
+                            if (header.type === 'date' || header.label.toLowerCase().includes('date')) {
+                              let displayDate = '—'
+                              
+                              // Use the pre-formatted date if available
+                              if (transaction[`${header.id}_formatted`]) {
+                                displayDate = transaction[`${header.id}_formatted`]
+                              } 
+                              // For Google Sheets date format: Date(year,month,day)
+                              else if (typeof transaction[header.id] === 'string' && 
+                                      transaction[header.id].startsWith('Date(')) {
+                                const match = /Date\((\d+),(\d+),(\d+)\)/.exec(transaction[header.id])
+                                if (match) {
+                                  const year = parseInt(match[1], 10)
+                                  const month = parseInt(match[2], 10) // 0-indexed
+                                  const day = parseInt(match[3], 10)
+                                  
+                                  // Format as MM/DD/YYYY
+                                  displayDate = `${month+1}/${day}/${year}`
+                                } else {
+                                  displayDate = transaction[header.id].toString()
+                                }
+                              }
+                              // Otherwise try to format it safely
+                              else if (transaction[header.id]) {
+                                try {
+                                  const dateObj = new Date(transaction[header.id])
+                                  if (!isNaN(dateObj.getTime())) {
+                                    displayDate = dateObj.toLocaleDateString()
+                                  } else {
+                                    displayDate = transaction[header.id].toString()
+                                  }
+                                } catch (e) {
+                                  // If date parsing fails, just show the raw value
+                                  displayDate = transaction[header.id].toString()
+                                }
+                              }
+                              
+                              return (
+                                <td key={`history-cell-${header.id}`} className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900">{displayDate}</div>
+                                </td>
+                              )
+                            }
+                            
+                            // Default rendering for other columns
+                            return (
+                              <td key={`history-cell-${header.id}`} className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{transaction[header.id] || '—'}</div>
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={tableHeaders.length} className="px-6 py-4 text-center text-gray-500">
+                          {historySearchTerm ? "No transactions matching your search" : "No transaction history found"}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              
+              <div className="flex justify-end mt-6">
+                <button
+                  type="button"
+                  className="px-4 py-2 bg-pink-600 text-white rounded-md shadow-sm hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2"
+                  onClick={() => setShowHistoryModal(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

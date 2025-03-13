@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from "framer-motion"
-import { Package, Trash2, Search, AlertTriangle, ShoppingCart, Plus, Filter, Edit, X, Save } from "lucide-react"
+import { Package, Trash2, Search, AlertTriangle, ShoppingCart, Plus, Filter, Edit, X, Save, History } from "lucide-react"
 
-const Inventory = () => {
+const Inventory = ({ hideHistoryButton = false }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [tableHeaders, setTableHeaders] = useState([])
   const [products, setProducts] = useState([])
+  const [allProducts, setAllProducts] = useState([]) // Store all products for history
   const [stats, setStats] = useState({
     totalProducts: 0,
     lowStockItems: 0,
@@ -27,6 +28,11 @@ const Inventory = () => {
   // Add state for delete confirmation modal
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [productToDelete, setProductToDelete] = useState(null)
+  // Add state for history modal
+  const [showHistoryModal, setShowHistoryModal] = useState(false)
+  const [historySearchTerm, setHistorySearchTerm] = useState("")
+  // Function to handle search
+  const [searchTerm, setSearchTerm] = useState("")
 
   // Google Sheet Details
   const sheetId = '1Kb-fhC1yiFJCyPO7TJDqnu-lQ1n1H6mLErlkSPc6yHc'
@@ -35,6 +41,7 @@ const Inventory = () => {
   // Google Apps Script Web App URL
   const scriptUrl = 'https://script.google.com/macros/s/AKfycbyhmDsXWRThVsJCfAirTsI3o9EGE-oCcw2HKz1ERe4qxNWfcVoxMUr3sGa6yHJm-ckt/exec'
 
+  // Fetch Google Sheet data when component mounts
   useEffect(() => {
     const fetchGoogleSheetData = async () => {
       try {
@@ -63,18 +70,25 @@ const Inventory = () => {
         let headers = []
         let allRows = data.table.rows || []
 
+        // Exclude the delete column (column H)
+        const deleteColumnIndex = 7; // H is the 8th column (0-indexed)
+
         if (data.table.cols && data.table.cols.some(col => col.label)) {
-          headers = data.table.cols.map((col, index) => ({
-            id: `col${index}`,
-            label: col.label || `Column ${index + 1}`,
-            type: col.type || 'string'
-          }))
+          headers = data.table.cols
+            .filter((_, index) => index !== deleteColumnIndex)
+            .map((col, index) => ({
+              id: `col${index}`,
+              label: col.label || `Column ${index + 1}`,
+              type: col.type || 'string'
+            }))
         } else if (allRows.length > 0 && allRows[0].c && allRows[0].c.some(cell => cell && cell.v)) {
-          headers = allRows[0].c.map((cell, index) => ({
-            id: `col${index}`,
-            label: cell && cell.v ? String(cell.v) : `Column ${index + 1}`,
-            type: data.table.cols[index]?.type || 'string'
-          }))
+          headers = allRows[0].c
+            .filter((_, index) => index !== deleteColumnIndex)
+            .map((cell, index) => ({
+              id: `col${index}`,
+              label: cell && cell.v ? String(cell.v) : `Column ${index + 1}`,
+              type: data.table.cols[index]?.type || 'string'
+            }))
           allRows = allRows.slice(1)
         }
 
@@ -87,53 +101,57 @@ const Inventory = () => {
         })
         setNewProduct(emptyProduct)
 
-        const productsData = allRows
+        // Process all rows from the sheet
+        const allProductsData = allRows
           .filter((row) => row.c && row.c.some((cell) => cell && cell.v))
           .map((row, rowIndex) => {
             const productData = {
               _id: Math.random().toString(36).substring(2, 15),
-              _rowIndex: rowIndex + 2,
+              _rowIndex: rowIndex + 2, // +2 for header row and 1-indexing
             }
 
-            row.c &&
-  row.c.forEach((cell, index) => {
-    if (index < headers.length) {
-      const header = headers[index]
-      
-      // Handle date values
-      if (cell && cell.v && cell.v.toString().indexOf('Date') === 0) {
-        // Parse the date string: Date(2025,2,10)
-        const dateString = cell.v.toString();
-        const dateParts = dateString.substring(5, dateString.length - 1).split(',');
-        
-        if (dateParts.length >= 3) {
-          const year = parseInt(dateParts[0]);
-          // Month is 0-based in JavaScript Date objects, so add 1
-          const month = parseInt(dateParts[1]) + 1;
-          const day = parseInt(dateParts[2]);
-          
-          // Format as DD/MM/YYYY
-          productData[header.id] = `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
-        } else {
-          productData[header.id] = cell.v;
-        }
-      } else {
-        // Handle non-date values
-        productData[header.id] = cell ? cell.v : '';
-        
-        if (header.type === 'number' && !isNaN(productData[header.id])) {
-          productData[header.id] = Number(productData[header.id]).toLocaleString();
-        }
-      }
-    }
-  })
+            row.c && row.c.forEach((cell, index) => {
+              // Skip the delete column 
+              if (index === deleteColumnIndex) return;
+
+              const adjustedIndex = index < deleteColumnIndex ? index : index - 1;
+              const header = headers[adjustedIndex]
+              
+              // Handle date values
+              if (cell && cell.v && cell.v.toString().indexOf('Date') === 0) {
+                const dateString = cell.v.toString();
+                const dateParts = dateString.substring(5, dateString.length - 1).split(',');
+                
+                if (dateParts.length >= 3) {
+                  const year = parseInt(dateParts[0]);
+                  // Month is 0-based in JavaScript Date objects, so add 1
+                  const month = parseInt(dateParts[1]) + 1;
+                  const day = parseInt(dateParts[2]);
+                  
+                  // Format as DD/MM/YYYY
+                  productData[header.id] = `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
+                } else {
+                  productData[header.id] = cell.v;
+                }
+              } else {
+                // Handle non-date values
+                productData[header.id] = cell ? cell.v : '';
+                
+                if (header.type === 'number' && !isNaN(productData[header.id])) {
+                  productData[header.id] = Number(productData[header.id]).toLocaleString();
+                }
+              }
+            })
 
             return productData
           })
 
-        setProducts(productsData)
+        // Store all products for history
+        setAllProducts(allProductsData)
+        
+        setProducts(allProductsData)
 
-        const lowStockItems = productsData.filter((product) => {
+        const lowStockItems = allProductsData.filter((product) => {
           const stockField = headers.find(
             (h) =>
               h.label.toLowerCase().includes('stock') ||
@@ -147,7 +165,7 @@ const Inventory = () => {
           return false
         }).length
 
-        const outOfStockItems = productsData.filter((product) => {
+        const outOfStockItems = allProductsData.filter((product) => {
           const stockField = headers.find(
             (h) =>
               h.label.toLowerCase().includes('stock') ||
@@ -162,7 +180,7 @@ const Inventory = () => {
         }).length
 
         setStats({
-          totalProducts: productsData.length,
+          totalProducts: allProductsData.length,
           lowStockItems,
           outOfStock: outOfStockItems
         })
@@ -178,8 +196,8 @@ const Inventory = () => {
     fetchGoogleSheetData()
   }, [])
 
-  // Function to handle search
-  const [searchTerm, setSearchTerm] = useState("")
+
+  // Filter products by search term
   const filteredProducts = searchTerm
     ? products.filter(product => 
         Object.values(product).some(value => 
@@ -187,6 +205,15 @@ const Inventory = () => {
         )
       )
     : products
+
+  // Function to filter history products
+  const filteredHistoryProducts = historySearchTerm
+    ? allProducts.filter(product => 
+        Object.values(product).some(value => 
+          value && value.toString().toLowerCase().includes(historySearchTerm.toLowerCase())
+        )
+      )
+    : allProducts
 
   // Handle input change for new product form 
   const handleInputChange = (e) => {
@@ -218,7 +245,13 @@ const Inventory = () => {
     setShowDeleteModal(true)
   }
 
-  // Function to confirm and actually delete a product
+  // Function to open history modal
+  const handleHistoryClick = () => {
+    setHistorySearchTerm("")
+    setShowHistoryModal(true)
+  }
+
+  // Function to confirm and "soft delete" a product by marking column H as "Yes"
   const confirmDelete = async () => {
     try {
       setSubmitting(true)
@@ -226,13 +259,18 @@ const Inventory = () => {
       const rowIndex = product._rowIndex
       
       if (!rowIndex) {
-        throw new Error("Could not determine the row index for deleting this product")
+        throw new Error("Could not determine the row index for marking this product as deleted")
       }
+      
+      // Use column index 8 (column H) for Inventory
+      const deleteColumnIndex = 8; // H is the 8th column (1-indexed)
       
       const formData = new FormData()
       formData.append('sheetName', sheetName)
       formData.append('rowIndex', rowIndex)
-      formData.append('action', 'delete')
+      formData.append('action', 'markDeleted')
+      formData.append('columnIndex', deleteColumnIndex)
+      formData.append('value', 'Yes')
       
       const response = await fetch(scriptUrl, {
         method: 'POST',
@@ -240,9 +278,9 @@ const Inventory = () => {
         body: formData
       })
       
-      console.log("Delete submitted successfully")
+      console.log("Mark as deleted submitted successfully")
       
-      // Update products state
+      // Update products state - remove from UI
       setProducts(prev => prev.filter(p => p._id !== product._id))
       
       // Update stats
@@ -268,20 +306,27 @@ const Inventory = () => {
         }))
       }
       
+      // Update the product in allProducts to reflect it's been deleted (col7 is column H in 0-indexed array)
+      setAllProducts(prev => 
+        prev.map(p => 
+          p._id === product._id ? { ...p, col7: 'Yes' } : p
+        )
+      )
+      
       setNotification({
         show: true,
-        message: "Product deleted successfully!",
+        message: "Product removed successfully!",
         type: "success"
       })
       setTimeout(() => {
         setNotification({ show: false, message: "", type: "" })
       }, 3000)
     } catch (error) {
-      console.error("Error deleting product:", error)
+      console.error("Error marking product as deleted:", error)
         
       setNotification({
         show: true,
-        message: `Failed to delete product: ${error.message}`,
+        message: `Failed to remove product: ${error.message}`,
         type: "error" 
       })
       setTimeout(() => {
@@ -376,6 +421,7 @@ const Inventory = () => {
       }
       
       setProducts(prev => [newProductWithId, ...prev])
+      setAllProducts(prev => [newProductWithId, ...prev])
       
       // Update stats
       setStats(prev => ({
@@ -487,7 +533,6 @@ const Inventory = () => {
   }
 
   // Generate appropriate input field based on header type
-  // Modify the renderFormField function to handle stock status with a dropdown
   const renderFormField = (header, isEdit = false) => {
     const handleChange = isEdit ? handleEditInputChange : handleInputChange
     const formData = isEdit ? editingProduct : newProduct
@@ -597,6 +642,7 @@ const Inventory = () => {
     )
   }
   
+  // Rest of the component (render section) remains unchanged
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -613,13 +659,25 @@ const Inventory = () => {
               onChange={(e) => setSearchTerm(e.target.value)}  
             />
           </div>
-          <button 
-            className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            onClick={handleNewProductClick}
-          >
-            <Plus size={18} className="mr-2" />
-            Add Product
-          </button>
+          <div className="flex space-x-2">
+            <button 
+              className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              onClick={handleNewProductClick}
+            >
+              <Plus size={18} className="mr-2" />
+              Add Product
+            </button>
+             {/* Only show history button if not hidden */}
+          {!hideHistoryButton && (
+            <button 
+              className="flex items-center px-4 py-2 bg-pink-600 text-white rounded-md hover:bg-indigo-700"
+              onClick={() => setShowHistoryModal(true)}
+            >
+              <History size={18} className="mr-2" />
+              View History
+            </button>
+          )}
+          </div>
         </div>
       </div>
 
@@ -675,55 +733,55 @@ const Inventory = () => {
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  {tableHeaders.map((header) => (
-                    <th
-                      key={header.id}
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      {header.label}
-                    </th>
-                  ))}
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  >
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              {filteredProducts.length > 0 ? (
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredProducts.map((product) => (
-                    <tr key={product._id}>
-                      {tableHeaders.map((header) => (
-                        <td key={header.id} className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{product[header.id]}</div>
-                        </td>
-                      ))}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button 
-                          className="text-blue-600 hover:text-blue-900 mr-3" 
-                          onClick={() => handleEditClick(product)}
-                        >
-                          <Edit size={16} className="inline mr-1" />
-                        </button>
-                        <button 
-                          className="text-red-600 hover:text-red-900"
-                          onClick={() => handleDeleteClick(product)}
-                        >
-                          <Trash2 size={16} className="inline mr-1" />
-                        </button>
-                      </td>
-                    </tr>
+            <thead className="bg-gray-50">
+    <tr>
+      {tableHeaders.map((header) => (
+        <th
+          key={header.id}
+          scope="col"
+          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+        >
+          {header.label}
+        </th>
+      ))}
+      <th
+        scope="col"
+        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+      >
+        Actions
+      </th>
+    </tr>
+  </thead>
+  {filteredProducts.length > 0 ? (
+    <tbody className="bg-white divide-y divide-gray-200">
+      {filteredProducts.map((product) => (
+        <tr key={product._id}>
+          {tableHeaders.map((header) => (
+            <td key={header.id} className="px-6 py-4 whitespace-nowrap">
+              <div className="text-sm text-gray-900">{product[header.id]}</div>
+            </td>
+          ))}
+          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+            <button 
+              className="text-blue-600 hover:text-blue-900 mr-3" 
+              onClick={() => handleEditClick(product)}
+            >
+              <Edit size={16} className="inline mr-1" />
+            </button>
+            <button 
+              className="text-red-600 hover:text-red-900"
+              onClick={() => handleDeleteClick(product)}
+            >
+              <Trash2 size={16} className="inline mr-1" />
+            </button>
+          </td>
+        </tr>
                   ))}
                 </tbody>
               ) : (
                 <tbody>
                   <tr>
-                    <td colSpan={tableHeaders.length + 1} className="px-6 py-10 text-center text-gray-500">
+                  <td colSpan={tableHeaders.length + 1} className="px-6 py-10 text-center text-gray-500">
                       No products found matching the search
                     </td>
                   </tr>
@@ -752,7 +810,7 @@ const Inventory = () => {
             >
               <div className="p-6">
                 <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold text-blue-800">Add New Product</h3>
+                  <h3 className="text-xl font-bold text-pink-600">Add New Product</h3>
                   <button 
                     className="text-gray-500 hover:text-gray-700"
                     onClick={() => setShowNewProductForm(false)}
@@ -762,10 +820,10 @@ const Inventory = () => {
                 </div>
         
                 <form onSubmit={handleSubmit} className="space-y-6"> 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {tableHeaders.map((header) => (
                       <div key={header.id}>
-                        <label htmlFor={header.id} className="block text-sm font-medium text-blue-700">
+                        <label htmlFor={header.id} className="block text-sm font-medium text-pink-700">
                           {header.label}
                         </label>
                         {renderFormField(header)}  
@@ -939,6 +997,98 @@ const Inventory = () => {
                         Delete Product
                       </>
                     )}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* History Modal - Shows All Products */}
+      <AnimatePresence>
+        {showHistoryModal && (
+          <motion.div
+            key="historyModal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-auto"
+            >
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-bold text-gray-800">Inventory History</h3>
+                  <button 
+                    className="text-gray-500 hover:text-gray-700"
+                    onClick={() => setShowHistoryModal(false)}
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+                
+                <div className="mb-6">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                    <input
+                      type="text"
+                      placeholder="Search all products..."
+                      className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full"
+                      value={historySearchTerm}
+                      onChange={(e) => setHistorySearchTerm(e.target.value)}
+                    />
+                  </div>
+                </div>
+                
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        {tableHeaders.map((header) => (
+                          <th
+                            key={`history-${header.id}`}
+                            scope="col"
+                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                          >
+                            {header.label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {filteredHistoryProducts.length > 0 ? (
+                        filteredHistoryProducts.map((product) => (
+                          <tr key={`history-${product._id}`} className="hover:bg-gray-50">
+                            {tableHeaders.map((header) => (
+                              <td key={`history-${product._id}-${header.id}`} className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{product[header.id]}</div>
+                              </td>
+                            ))}
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={tableHeaders.length} className="px-6 py-4 text-center text-gray-500">
+                            {historySearchTerm ? "No products matching your search" : "No product history found"}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                
+                <div className="flex justify-end mt-6">
+                  <button
+                    type="button"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                    onClick={() => setShowHistoryModal(false)}
+                  >
+                    Close
                   </button>
                 </div>
               </div>

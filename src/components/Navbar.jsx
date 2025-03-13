@@ -48,7 +48,7 @@ const Navbar = ({ isMobileMenuOpen, setIsMobileMenuOpen }) => {
             </button>
             {/* Logout Button */}
             <button
-              className="flex items-center space-x-1 px-3 py-1.5 rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-300"
+              className="flex items-center space-x-1 px-3 py-1.5 rounded-md text-white bg-red-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-300"
               onClick={handleLogout}
             >
               <LogOut size={16} />

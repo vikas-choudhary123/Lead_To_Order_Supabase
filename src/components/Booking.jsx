@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from "framer-motion"
 import { Calendar, Clock, User, Search, Plus, X, Save, Edit, CheckCircle2, AlertCircle, History } from "lucide-react"
 
-const Booking = () => {
+const Booking = ({ hideHistoryButton = false }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [tableHeaders, setTableHeaders] = useState([])
@@ -1310,36 +1310,40 @@ const handleNewAppointmentClick = async () => {
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-          <h2 className="text-2xl font-bold text-blue-800">Appointments</h2>
-          <div className="mt-4 md:mt-0 flex flex-col sm:flex-row gap-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-400" size={18} />
-              <input
-                type="text"
-                placeholder="Search appointments..."
-                className="pl-10 pr-4 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full transition-all duration-300"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <div className="flex space-x-2">
+        <h2 className="text-2xl font-bold text-blue-800">Appointments</h2>
+        <div className="mt-4 md:mt-0 flex flex-col sm:flex-row gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-400" size={18} />
+            <input
+              type="text"
+              placeholder="Search appointments..."
+              className="pl-10 pr-4 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full transition-all duration-300"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex space-x-2">
+            <button 
+              className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-300"
+              onClick={handleNewAppointmentClick}
+            >
+              <Plus size={18} className="mr-2" />
+              New Appointment
+            </button>
+            
+            {/* Only show history button if not hidden */}
+            {!hideHistoryButton && (
               <button 
-                className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-300"
-                onClick={handleNewAppointmentClick}
-              >
-                <Plus size={18} className="mr-2" />
-                New Appointment
-              </button>
-              <button 
-                className="flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-300"
+                className="flex items-center justify-center px-4 py-2 bg-pink-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-300"
                 onClick={handleHistoryClick}
               >
                 <History size={18} className="mr-2" />
                 History
               </button>
-            </div>
+            )}
           </div>
         </div>
+      </div>
   
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <motion.div
@@ -1600,7 +1604,7 @@ const handleNewAppointmentClick = async () => {
             >
               <div className="p-6">
                 <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold text-blue-800">Add New Appointment</h3>
+                  <h3 className="text-xl font-bold text-pink-600">Add New Appointment</h3>
                   <button 
                     className="text-gray-500 hover:text-gray-700"
                     onClick={() => setShowNewAppointmentForm(false)}
@@ -1613,7 +1617,7 @@ const handleNewAppointmentClick = async () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {tableHeaders.map((header) => (
                       <div key={header.id}>
-                        <label htmlFor={header.id} className="block text-sm font-medium text-blue-700">
+                        <label htmlFor={header.id} className="block text-sm font-medium text-pink-700">
                           {header.label}
                         </label>
                         {renderFormField(header)}
@@ -1624,7 +1628,7 @@ const handleNewAppointmentClick = async () => {
                   <div className="flex justify-end space-x-3 pt-4 border-t border-blue-100">
                     <button
                       type="button"
-                      className="px-4 py-2 border border-blue-300 rounded-md shadow-sm text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="px-4 py-2 border border-blue-300 rounded-md shadow-sm text-pink-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-pink-500"
                       onClick={() => setShowNewAppointmentForm(false)}
                       disabled={submitting}
                     >
@@ -1632,7 +1636,7 @@ const handleNewAppointmentClick = async () => {
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-300 flex items-center"
+                      className="px-4 py-2 bg-pink-600 text-white rounded-md shadow-sm hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 transition-all duration-300 flex items-center"
                       disabled={submitting}
                     >
                       {submitting ? (

@@ -51,6 +51,16 @@ export const AuthProvider = ({ children }) => {
     return user && user.role === role;
   };
 
+  // Check if user is an admin
+  const isAdmin = () => {
+    return user && user.role === "admin";
+  };
+
+  // Check if user is staff
+  const isStaff = () => {
+    return user && user.role === "staff";
+  };
+
   // Value to be provided by the context
   const value = {
     user,
@@ -58,7 +68,9 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     isAuthenticated,
-    hasRole
+    hasRole,
+    isAdmin,
+    isStaff
   };
 
   return (
@@ -67,3 +79,5 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
+
+export default AuthContext;

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calendar, CheckCircle, XCircle, Users, X, Save, Edit, AlertCircle, CheckCircle2 } from "lucide-react"
+import { Calendar, CheckCircle, XCircle, Users, X, Save, Edit, AlertCircle, CheckCircle2, History, Search } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
 const StaffAttendance = () => {
@@ -10,6 +10,7 @@ const StaffAttendance = () => {
   const [error, setError] = useState(null)
   const [tableHeaders, setTableHeaders] = useState([])
   const [tableData, setTableData] = useState([])
+  const [allAttendanceData, setAllAttendanceData] = useState([])
   const [stats, setStats] = useState({
     total: 0,
     present: 0,
@@ -23,6 +24,8 @@ const StaffAttendance = () => {
     message: "",
     type: "" // "success" or "error"
   })
+  const [showHistoryModal, setShowHistoryModal] = useState(false)
+  const [historySearchTerm, setHistorySearchTerm] = useState("")
 
   // Google Sheet Details
   const sheetId = '1Kb-fhC1yiFJCyPO7TJDqnu-lQ1n1H6mLErlkSPc6yHc'
@@ -62,8 +65,6 @@ const StaffAttendance = () => {
             type: col.type
           }))
           .filter(header => header.label) // Filter out empty headers
-
-          
         
         setTableHeaders(headers)
         
@@ -99,7 +100,96 @@ const StaffAttendance = () => {
           return rowData
         }).filter(row => Object.keys(row).length > 1) // Filter out rows with no useful data
         
-        setTableData(rowsData)
+        // Store all attendance data
+        setAllAttendanceData(rowsData)
+        
+        // Find date column to filter records for the selected date
+        const dateColumnIndex = headers.findIndex(header => 
+          header.label.toLowerCase().includes('date')
+        );
+        
+        if (dateColumnIndex !== -1) {
+          const dateColumnId = headers[dateColumnIndex].id;
+          
+          // Filter data for the current date
+          const filteredData = rowsData.filter(row => {
+            if (!row[dateColumnId]) return false;
+            
+            try {
+              // Try to match the date in different formats
+              const rowDate = row[dateColumnId];
+              
+              // If there's a formatted date, try to use that
+              if (row[`${dateColumnId}_formatted`]) {
+                const formattedDate = new Date(row[`${dateColumnId}_formatted`]);
+                if (!isNaN(formattedDate.getTime())) {
+                  const formattedDateStr = formattedDate.toISOString().split('T')[0];
+                  if (formattedDateStr === date) return true;
+                }
+              }
+              
+              // Handle DD/MM/YYYY format
+              if (typeof rowDate === 'string' && rowDate.includes('/')) {
+                const dateParts = rowDate.split('/');
+                if (dateParts.length === 3) {
+                  // Assuming date format is DD/MM/YYYY
+                  const day = parseInt(dateParts[0], 10);
+                  const month = parseInt(dateParts[1], 10) - 1; // Convert to 0-indexed month
+                  const year = parseInt(dateParts[2], 10);
+                  
+                  const rowDateObj = new Date(year, month, day);
+                  const selectedDate = new Date(date);
+                  
+                  if (rowDateObj.getFullYear() === selectedDate.getFullYear() &&
+                      rowDateObj.getMonth() === selectedDate.getMonth() &&
+                      rowDateObj.getDate() === selectedDate.getDate()) {
+                    return true;
+                  }
+                }
+              }
+              
+              // Google Sheets date format: Date(year,month,day)
+              if (typeof rowDate === 'string' && rowDate.startsWith('Date(')) {
+                const match = /Date\((\d+),(\d+),(\d+)\)/.exec(rowDate);
+                if (match) {
+                  const year = parseInt(match[1], 10);
+                  const month = parseInt(match[2], 10); // 0-indexed in Google Sheets format
+                  const day = parseInt(match[3], 10);
+                  
+                  const rowDateObj = new Date(year, month, day);
+                  const selectedDate = new Date(date);
+                  
+                  if (rowDateObj.getFullYear() === selectedDate.getFullYear() &&
+                      rowDateObj.getMonth() === selectedDate.getMonth() &&
+                      rowDateObj.getDate() === selectedDate.getDate()) {
+                    return true;
+                  }
+                }
+              }
+              
+              // Direct comparison attempt
+              try {
+                const rowDateObj = new Date(rowDate);
+                if (!isNaN(rowDateObj.getTime())) {
+                  const rowDateStr = rowDateObj.toISOString().split('T')[0];
+                  return rowDateStr === date;
+                }
+              } catch (e) {
+                console.log("Date comparison error:", e);
+              }
+              
+              return false;
+            } catch (error) {
+              console.error("Error filtering by date:", error);
+              return false;
+            }
+          });
+          
+          setTableData(filteredData);
+        } else {
+          // If no date column found, use all data
+          setTableData(rowsData);
+        }
         
         // Find attendance column - look for a column with "attendance" in its label
         const attendanceColumnIndex = headers.findIndex(header => 
@@ -538,13 +628,27 @@ const StaffAttendance = () => {
     );
   };
   
+  // Open history modal
+  const handleHistoryClick = () => {
+    setHistorySearchTerm("")
+    setShowHistoryModal(true)
+  }
+  
+  // Function to filter history records
+  const filteredHistoryData = historySearchTerm
+    ? allAttendanceData.filter(record => 
+        Object.values(record).some(
+          value => value && value.toString().toLowerCase().includes(historySearchTerm.toLowerCase())
+        )
+      )
+    : allAttendanceData
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <h2 className="text-2xl font-bold text-gray-800">Staff Attendance</h2>
         <div className="mt-4 md:mt-0 flex items-center">
-          <div className="relative">
+          <div className="relative mr-4">
             <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
             <input
               type="date"
@@ -553,6 +657,13 @@ const StaffAttendance = () => {
               className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
             />
           </div>
+          {/* <button
+            onClick={handleHistoryClick}
+            className="flex items-center px-4 py-2 bg-pink-600 text-white rounded-md hover:bg-pink-700 transition-colors"
+          >
+            <History size={18} className="mr-2" />
+            History
+          </button> */}
         </div>
       </div>
 
@@ -784,6 +895,143 @@ const StaffAttendance = () => {
           </motion.div>
         )}
       </AnimatePresence>
+      
+      {/* History Modal - Shows All Attendance Data */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-gray-800">Attendance History</h3>
+                <button 
+                  className="text-gray-500 hover:text-gray-700"
+                  onClick={() => setShowHistoryModal(false)}
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="mb-6">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                  <input
+                    type="text"
+                    placeholder="Search all attendance records..."
+                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent w-full"
+                    value={historySearchTerm}
+                    onChange={(e) => setHistorySearchTerm(e.target.value)}
+                  />
+                </div>
+              </div>
+              
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      {tableHeaders.map((header) => (
+                        <th
+                          key={`history-${header.id}`}
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          {header.label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredHistoryData.length > 0 ? (
+                      filteredHistoryData.map((row) => (
+                        <tr key={`history-row-${row.id}`} className="hover:bg-gray-50">
+                          {tableHeaders.map((header) => {
+                            // Special handling for status column
+                            if (header.label.toLowerCase().includes('status') || 
+                                header.label.toLowerCase().includes('attendance')) {
+                              // Get status from either raw or formatted value
+                              const status = row[`${header.id}_formatted`] || row[header.id];
+                              let statusClass = 'bg-gray-100 text-gray-800';
+                              
+                              if (status) {
+                                const statusLower = status.toString().toLowerCase();
+                                if (statusLower === 'present') {
+                                  statusClass = 'bg-green-100 text-green-800';
+                                } else if (statusLower === 'absent') {
+                                  statusClass = 'bg-red-100 text-red-800';
+                                }
+                              }
+                              
+                              return (
+                                <td key={`history-cell-${header.id}`} className="px-6 py-4 whitespace-nowrap">
+                                  <span
+                                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}`}
+                                  >
+                                    {status || 'Unknown'}
+                                  </span>
+                                </td>
+                              );
+                            }
+                            
+                            // For staff member/name columns that might include an image
+                            if (header.label.toLowerCase().includes('name') || 
+                                header.label.toLowerCase().includes('staff')) {
+                              return (
+                                <td key={`history-cell-${header.id}`} className="px-6 py-4 whitespace-nowrap">
+                                  <div className="flex items-center">
+                                    {/* Render image container only if an image exists */}
+                                    {row.imageUrl && (
+                                      <div className="h-10 w-10 rounded-full overflow-hidden">
+                                        <img
+                                          src={row.imageUrl}
+                                          alt={row[header.id] || 'Staff'}
+                                          className="h-full w-full object-cover"
+                                        />
+                                      </div>
+                                    )}
+                                    <div className={row.imageUrl ? "ml-4" : ""}>
+                                      <div className="text-sm font-medium text-gray-900">
+                                        {row[header.id] || ''}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                              );
+                            }
+                            
+                            // Default cell rendering - Use formatted value if available (especially for dates)
+                            return (
+                              <td key={`history-cell-${header.id}`} className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">
+                                  {row[`${header.id}_formatted`] || row[header.id] || ''}
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={tableHeaders.length} className="px-6 py-4 text-center text-gray-500">
+                          {historySearchTerm ? "No records matching your search" : "No attendance history found"}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              
+              <div className="flex justify-end mt-6">
+                <button
+                  type="button"
+                  className="px-4 py-2 bg-pink-600 text-white rounded-md shadow-sm hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2"
+                  onClick={() => setShowHistoryModal(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Notification popup */}
       <AnimatePresence>

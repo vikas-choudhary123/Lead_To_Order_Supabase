@@ -14,13 +14,7 @@ const Services = () => {
   const [error, setError] = useState(null)
   const [showAddServiceForm, setShowAddServiceForm] = useState(false)
   const [showEditServiceForm, setShowEditServiceForm] = useState(false)
-  const [newService, setNewService] = useState({
-    name: "",
-    category: "",
-    duration: "",
-    price: "",
-    description: ""
-  })
+  const [newService, setNewService] = useState({})
   const [editingService, setEditingService] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [notification, setNotification] = useState({
@@ -34,41 +28,52 @@ const Services = () => {
     avgPrice: 0,
     mostPopular: ""
   })
-  // Add state for delete confirmation modal
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [serviceToDelete, setServiceToDelete] = useState(null)
 
   // Google Sheet Details
-  const sheetId = '1Kb-fhC1yiFJCyPO7TJDqnu-lQ1n1H6mLErlkSPc6yHc' // Replace with your actual sheet ID
+  const sheetId = '1Kb-fhC1yiFJCyPO7TJDqnu-lQ1n1H6mLErlkSPc6yHc'
   const sheetName = 'Service DB'
 
   // Google Apps Script Web App URL
-  const scriptUrl = 'https://script.google.com/macros/s/AKfycbyhmDsXWRThVsJCfAirTsI3o9EGE-oCcw2HKz1ERe4qxNWfcVoxMUr3sGa6yHJm-ckt/exec' // Replace with your actual script URL
+  const scriptUrl = 'https://script.google.com/macros/s/AKfycbyhmDsXWRThVsJCfAirTsI3o9EGE-oCcw2HKz1ERe4qxNWfcVoxMUr3sGa6yHJm-ckt/exec'
 
   useEffect(() => {
     fetchServiceData()
   }, [])
   
-  // Function to reorder headers to ensure ID is first
-  const reorderHeaders = (headers) => {
-    // Find the ID header
-    const idHeaderIndex = headers.findIndex(header => 
-      header.label.toLowerCase().includes('id') || 
-      header.label.toLowerCase() === 'service id'
-    )
+  // Modified function to process headers
+  const processHeaders = (headers) => {
+    // Remove the delete column (assuming it's the last column)
+    const processedHeaders = headers.slice(0, -1)
     
-    // If ID header exists and is not already first, move it to the front
-    if (idHeaderIndex > 0) {
-      const idHeader = headers[idHeaderIndex]
-      const reorderedHeaders = [
-        idHeader,
-        ...headers.slice(0, idHeaderIndex),
-        ...headers.slice(idHeaderIndex + 1)
-      ]
-      return reorderedHeaders
-    }
+    // Custom sorting to ensure Serial No. is first, then Service ID
+    processedHeaders.sort((a, b) => {
+      const serialNoPatterns = ['serial no', 'serial', 'sno', 'sr no', 'sr.no']
+      const serviceIdPatterns = ['service id', 'serviceid', 'service_id']
+      
+      const aLower = a.label.toLowerCase()
+      const bLower = b.label.toLowerCase()
+      
+      const aIsSerialNo = serialNoPatterns.some(pattern => aLower.includes(pattern))
+      const bIsSerialNo = serialNoPatterns.some(pattern => bLower.includes(pattern))
+      
+      const aIsServiceId = serviceIdPatterns.some(pattern => aLower.includes(pattern))
+      const bIsServiceId = serviceIdPatterns.some(pattern => bLower.includes(pattern))
+      
+      // Prioritize Serial No. to be first
+      if (aIsSerialNo) return -1
+      if (bIsSerialNo) return 1
+      
+      // Then prioritize Service ID
+      if (aIsServiceId) return -1
+      if (bIsServiceId) return 1
+      
+      // Maintain original order for other columns
+      return 0
+    })
     
-    return headers
+    return processedHeaders
   }
 
   const fetchServiceData = async () => {
@@ -113,13 +118,13 @@ const Services = () => {
         allRows = allRows.slice(1)
       }
 
-      // Reorder headers to ensure ID is first
-      const orderedHeaders = reorderHeaders(headers)
-      setTableHeaders(orderedHeaders)
+      // Process and order headers
+      const processedHeaders = processHeaders(headers)
+      setTableHeaders(processedHeaders)
 
       // Initialize new service with empty values for all headers
       const emptyService = {}
-      orderedHeaders.forEach(header => {
+      processedHeaders.forEach(header => {
         emptyService[header.id] = ''
       })
       setNewService(emptyService)
@@ -132,15 +137,13 @@ const Services = () => {
             _rowIndex: rowIndex + 2, // +2 accounts for header row and 1-indexing in spreadsheets
           }
 
-          row.c && row.c.forEach((cell, index) => {
-            if (index < headers.length) {
-              const header = headers[index]
-              serviceData[header.id] = cell ? cell.v : ''
-              
-              // Handle numeric formatting for prices
-              if (header.type === 'number' && !isNaN(serviceData[header.id])) {
-                serviceData[header.id] = Number(serviceData[header.id]).toLocaleString()
-              }
+          row.c && row.c.slice(0, -1).forEach((cell, index) => { // Exclude last column
+            const header = headers[index]
+            serviceData[header.id] = cell ? cell.v : ''
+            
+            // Handle numeric formatting for prices
+            if (header.type === 'number' && !isNaN(serviceData[header.id])) {
+              serviceData[header.id] = Number(serviceData[header.id]).toLocaleString()
             }
           })
 
@@ -152,7 +155,7 @@ const Services = () => {
       // Extract categories from services
       const categorySet = new Set()
       servicesData.forEach(service => {
-        const categoryHeader = headers.find(h => h.label.toLowerCase().includes('category'))
+        const categoryHeader = processedHeaders.find(h => h.label.toLowerCase().includes('category'))
         if (categoryHeader && service[categoryHeader.id]) {
           categorySet.add(service[categoryHeader.id])
         }
@@ -161,7 +164,7 @@ const Services = () => {
       const categoryArray = Array.from(categorySet)
       const categoriesWithCount = categoryArray.map((categoryName, index) => {
         const count = servicesData.filter(service => {
-          const categoryHeader = headers.find(h => h.label.toLowerCase().includes('category'))
+          const categoryHeader = processedHeaders.find(h => h.label.toLowerCase().includes('category'))
           return categoryHeader && service[categoryHeader.id] === categoryName
         }).length
 
@@ -175,7 +178,7 @@ const Services = () => {
       setCategories(categoriesWithCount)
 
       // Calculate statistics
-      const priceHeader = headers.find(h => h.label.toLowerCase().includes('price'))
+      const priceHeader = processedHeaders.find(h => h.label.toLowerCase().includes('price'))
       let avgPrice = 0
       if (priceHeader) {
         const totalPrice = servicesData.reduce((sum, service) => {
@@ -247,37 +250,42 @@ const Services = () => {
     setShowEditServiceForm(true);
   }
 
-  // Add new service
   const handleAddServiceClick = () => {
     const emptyService = {}
     tableHeaders.forEach(header => {
       emptyService[header.id] = ''
     })
-
-    // Auto-generate ID if applicable
-    const idHeader = tableHeaders.find(header => 
-      header.label.toLowerCase().includes('id') || 
-      header.label.toLowerCase() === 'service id'
+  
+    // Find the Serial No. column
+    const serialNoHeader = tableHeaders.find(header => 
+      ['serial no', 'serial', 'sno', 'sr no', 'sr.no'].some(pattern => 
+        header.label.toLowerCase().includes(pattern)
+      )
     )
     
-    if (idHeader) {
-      const serviceIds = services
-        .map(s => s[idHeader.id])
+    if (serialNoHeader) {
+      // Get all existing Serial Nos from the current services
+      const serialNos = services
+        .map(s => s[serialNoHeader.id])
         .filter(id => id && typeof id === 'string')
       
+      // Find the maximum existing Serial No
       let maxId = 0
-      serviceIds.forEach(id => {
+      serialNos.forEach(id => {
+        // Use regex to extract the numeric part of the Serial No
         const match = id.toString().match(/(\d+)/)
         if (match) {
+          // Convert the matched number to an integer
           const num = parseInt(match[1], 10)
+          // Update maxId if this number is larger
           if (num > maxId) maxId = num
         }
       })
       
-      // Use SD- prefix instead of SRV-
-      emptyService[idHeader.id] = `SD-${(maxId + 1).toString().padStart(3, '0')}`
+      // Generate a new Serial No with SD- prefix and padded to 3 digits
+      emptyService[serialNoHeader.id] = `SD-${(maxId + 1).toString().padStart(3, '0')}`
     }
-
+  
     setNewService(emptyService)
     setShowAddServiceForm(true)
   }
@@ -521,8 +529,8 @@ const Services = () => {
     const handleChange = isEdit ? handleEditInputChange : handleInputChange
     const formData = isEdit ? editingService : newService
     
-    const isId = header.label.toLowerCase().includes('id') || 
-      header.label.toLowerCase() === 'service id';
+    const isId = header.label.toLowerCase().includes('no') || 
+      header.label.toLowerCase() === 'serial no';
     
     // For read-only ID fields
     if (isId) {
@@ -771,12 +779,6 @@ const Services = () => {
                       {header.label}
                     </th>
                   ))}
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  >
-                    Actions
-                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -792,34 +794,20 @@ const Services = () => {
                           )}
                         </td>
                       ))}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button 
-                          className="text-pink-600 hover:text-pink-900 mr-3"
-                          onClick={() => handleEditClick(service)}
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                        <button 
-                          className="text-red-600 hover:text-red-900"
-                          onClick={() => handleDeleteClick(service)}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
                     </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={tableHeaders.length + 1} className="px-6 py-10 text-center text-gray-500">
-                        No services found matching your criteria
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={tableHeaders.length} className="px-6 py-10 text-center text-gray-500">
+                      No services found matching your criteria
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
   
         {/* Modal for adding new service */}
         <AnimatePresence>
