@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { useAuth } from "../Context/AuthContext";
-import Navbar from "./Navbar";
-import Sidebar from "./Sidebar";
-import Booking from "./Booking";
-import DailyEntry from "../DailyEntry";
-import StaffAttendance from "../StaffAttendance";
-import Inventory from "../Inventory";
-import Services from "../Services";
-import StaffDB from "../StaffDb";
-import StaffHistory from "../StaffHistory";
+import { useAuth } from "../Context/AuthContext.jsx";
+import Navbar from "./Navbar.jsx";
+import Sidebar from "./Sidebar.jsx";
+import Booking from "./Booking.jsx";
+import DailyEntry from "../DailyEntry.jsx";
+import StaffAttendance from "../StaffAttendance.jsx";
+import Inventory from "../Inventory.jsx";
+import Services from "../Services.jsx";
+import StaffDB from "../StaffDb.jsx";
+import StaffHistory from "../StaffHistory.jsx";
 
 const Dashboard = () => {
   const { user, isAuthenticated } = useAuth();
