@@ -61,6 +61,11 @@ export const AuthProvider = ({ children }) => {
     return user && user.role === "staff";
   };
 
+  // Get staff name
+  const getStaffName = () => {
+    return user && user.staffName ? user.staffName : "";
+  };
+
   // Value to be provided by the context
   const value = {
     user,
@@ -70,7 +75,8 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated,
     hasRole,
     isAdmin,
-    isStaff
+    isStaff,
+    getStaffName
   };
 
   return (

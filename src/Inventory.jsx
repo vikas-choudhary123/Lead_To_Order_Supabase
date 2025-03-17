@@ -151,39 +151,59 @@ const Inventory = ({ hideHistoryButton = false }) => {
         
         setProducts(allProductsData)
 
-        const lowStockItems = allProductsData.filter((product) => {
-          const stockField = headers.find(
-            (h) =>
-              h.label.toLowerCase().includes('stock') ||
-              h.label.toLowerCase().includes('quantity')
-          )
+        // Modify the stock tracking logic in the useEffect
+// Modified stock tracking logic
+const stockField = headers.find(
+  (h) =>
+    h.label.toLowerCase().includes('stock') ||
+    h.label.toLowerCase().includes('quantity')
+)
 
-          if (stockField) {
-            const stock = parseInt(product[stockField.id].replace(/,/g, ''))
-            return !isNaN(stock) && stock > 0 && stock <= 10 
-          }
-          return false
-        }).length
+const statusField = headers.find(
+  (h) =>
+    h.label.toLowerCase().includes('stock status') ||
+    h.label.toLowerCase().includes('stockstatus')
+)
 
-        const outOfStockItems = allProductsData.filter((product) => {
-          const stockField = headers.find(
-            (h) =>
-              h.label.toLowerCase().includes('stock') ||
-              h.label.toLowerCase().includes('quantity')
-          )
+const lowStockItems = allProductsData.filter((product) => {
+  if (statusField) {
+    // First, check the stock status field if it exists
+    const status = (product[statusField.id] || '').toString().toLowerCase()
+    return status === 'low'
+  }
 
-          if (stockField) {
-            const stock = parseInt(product[stockField.id].replace(/,/g, ''))
-            return !isNaN(stock) && stock === 0
-          }
-          return false
-        }).length
+  // Fallback to stock number calculation
+  if (stockField) {
+    // Remove commas and parse the stock value
+    const stock = parseInt(product[stockField.id].replace(/,/g, ''), 10)
+    return !isNaN(stock) && stock > 0 && stock <= 10 
+  }
+  
+  return false
+}).length
 
-        setStats({
-          totalProducts: allProductsData.length,
-          lowStockItems,
-          outOfStock: outOfStockItems
-        })
+const outOfStockItems = allProductsData.filter((product) => {
+  if (statusField) {
+    // First, check the stock status field if it exists
+    const status = (product[statusField.id] || '').toString().toLowerCase()
+    return status === 'out of stock'
+  }
+
+  // Fallback to stock number calculation
+  if (stockField) {
+    // Remove commas and parse the stock value
+    const stock = parseInt(product[stockField.id].replace(/,/g, ''), 10)
+    return !isNaN(stock) && stock === 0
+  }
+  
+  return false
+}).length
+
+setStats({
+  totalProducts: allProductsData.length,
+  lowStockItems,
+  outOfStock: outOfStockItems
+})
 
         setLoading(false)
       } catch (error) {
@@ -336,6 +356,20 @@ const Inventory = ({ hideHistoryButton = false }) => {
       setSubmitting(false)
       setShowDeleteModal(false)
       setProductToDelete(null)
+    }
+  }
+
+  const getStockStatusColor = (status) => {
+    const lowercaseStatus = status ? status.toString().toLowerCase() : '';
+    switch(lowercaseStatus) {
+      case 'out of stock':
+        return 'bg-red-100 text-red-800';
+      case 'low':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'normal':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   }
 
@@ -754,13 +788,26 @@ const Inventory = ({ hideHistoryButton = false }) => {
   </thead>
   {filteredProducts.length > 0 ? (
     <tbody className="bg-white divide-y divide-gray-200">
-      {filteredProducts.map((product) => (
-        <tr key={product._id}>
-          {tableHeaders.map((header) => (
-            <td key={header.id} className="px-6 py-4 whitespace-nowrap">
-              <div className="text-sm text-gray-900">{product[header.id]}</div>
-            </td>
-          ))}
+       {filteredProducts.map((product) => (
+            <tr key={product._id}>
+              {tableHeaders.map((header) => {
+                // Check if this is the stock status column
+                const isStockStatusColumn = 
+                  header.label.toLowerCase().includes('stock status') || 
+                  header.label.toLowerCase().includes('stockstatus');
+                
+                return (
+                  <td key={header.id} className="px-6 py-4 whitespace-nowrap">
+                    {isStockStatusColumn ? (
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStockStatusColor(product[header.id])}`}>
+                        {product[header.id]}
+                      </span>
+                    ) : (
+                      <div className="text-sm text-gray-900">{product[header.id]}</div>
+                    )}
+                  </td>
+                );
+              })}
           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
             <button 
               className="text-blue-600 hover:text-blue-900 mr-3" 
@@ -1061,24 +1108,29 @@ const Inventory = ({ hideHistoryButton = false }) => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredHistoryProducts.length > 0 ? (
-                        filteredHistoryProducts.map((product) => (
-                          <tr key={`history-${product._id}`} className="hover:bg-gray-50">
-                            {tableHeaders.map((header) => (
-                              <td key={`history-${product._id}-${header.id}`} className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">{product[header.id]}</div>
-                              </td>
-                            ))}
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={tableHeaders.length} className="px-6 py-4 text-center text-gray-500">
-                            {historySearchTerm ? "No products matching your search" : "No product history found"}
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
+              {filteredHistoryProducts.map((product) => (
+                <tr key={`history-${product._id}`} className="hover:bg-gray-50">
+                  {tableHeaders.map((header) => {
+                    // Check if this is the stock status column
+                    const isStockStatusColumn = 
+                      header.label.toLowerCase().includes('stock status') || 
+                      header.label.toLowerCase().includes('stockstatus');
+                    
+                    return (
+                      <td key={`history-${product._id}-${header.id}`} className="px-6 py-4 whitespace-nowrap">
+                        {isStockStatusColumn ? (
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStockStatusColor(product[header.id])}`}>
+                            {product[header.id]}
+                          </span>
+                        ) : (
+                          <div className="text-sm text-gray-900">{product[header.id]}</div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
                   </table>
                 </div>
                 

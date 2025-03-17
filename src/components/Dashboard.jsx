@@ -68,7 +68,8 @@ const Dashboard = () => {
       case "inventory":
         return <Inventory hideHistoryButton={user?.role === "staff"} />;
       case "services":
-        return <Services />;
+        // Pass isAdmin prop based on user role
+        return <Services isAdmin={user?.role === "admin"} />;
       default:
         return <Booking hideHistoryButton={user?.role === "staff"} />;
     }

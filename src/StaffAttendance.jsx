@@ -393,6 +393,23 @@ const StaffAttendance = () => {
     }
   };
 
+  const getStatusColor = (status) => {
+    if (!status) return 'bg-gray-100 text-gray-800';
+    
+    const statusLower = status.toString().toLowerCase().trim();
+    
+    switch(statusLower) {
+      case 'present':
+        return 'bg-green-100 text-green-800';
+      case 'absent':
+        return 'bg-red-100 text-red-800';
+      case 'late':
+        return 'bg-yellow-100 text-yellow-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   // Handle edit form submission
   const handleEditSubmit = async (e) => {
     e.preventDefault();
@@ -734,34 +751,25 @@ const StaffAttendance = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
               {tableData.length > 0 ? (
-                tableData.map((row) => (
-                  <tr key={row.id}>
-                    {tableHeaders.map((header) => {
-                      // Special handling for status column
-                      if (header.label.toLowerCase().includes('status')) {
-                        // Get status from either raw or formatted value
-                        const status = row[`${header.id}_formatted`] || row[header.id];
-                        let statusClass = 'bg-gray-100 text-gray-800';
-                        
-                        if (status) {
-                          const statusLower = status.toString().toLowerCase();
-                          if (statusLower === 'present') {
-                            statusClass = 'bg-green-100 text-green-800';
-                          } else if (statusLower === 'absent') {
-                            statusClass = 'bg-red-100 text-red-800';
-                          }
-                        }
-                        
-                        return (
-                          <td key={header.id} className="px-6 py-4 whitespace-nowrap">
-                            <span
-                              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}`}
-                            >
-                              {status || 'Unknown'}
-                            </span>
-                          </td>
-                        );
-                      }
+              tableData.map((row) => (
+                <tr key={row.id}>
+                  {tableHeaders.map((header) => {
+                    // Special handling for status column
+                    if (header.label.toLowerCase().includes('status') || 
+                        header.label.toLowerCase().includes('attendance')) {
+                      // Get status from either raw or formatted value
+                      const status = row[`${header.id}_formatted`] || row[header.id];
+                      
+                      return (
+                        <td key={header.id} className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(status)}`}
+                          >
+                            {status || 'Unknown'}
+                          </span>
+                        </td>
+                      );
+                    }
                       
                       // For staff member/name columns that might include an image
                       if (header.label.toLowerCase().includes('name') || 

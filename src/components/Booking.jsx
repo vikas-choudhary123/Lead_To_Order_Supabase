@@ -3,8 +3,11 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from "framer-motion"
 import { Calendar, Clock, User, Search, Plus, X, Save, Edit, CheckCircle2, AlertCircle, History } from "lucide-react"
+import { useAuth } from "../Context/AuthContext.jsx" // Import the useAuth hook
 
 const Booking = ({ hideHistoryButton = false }) => {
+  const { user } = useAuth(); // Get the user data from AuthContext
+  
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [tableHeaders, setTableHeaders] = useState([])
@@ -26,6 +29,7 @@ const Booking = ({ hideHistoryButton = false }) => {
     message: "",
     type: "" // "success" or "error"
   })
+  const [searchTerm, setSearchTerm] = useState("")
   const [historySearchTerm, setHistorySearchTerm] = useState("") // Search term for history modal
 
   // Google Sheet Details
@@ -38,305 +42,396 @@ const Booking = ({ hideHistoryButton = false }) => {
   useEffect(() => {
     const fetchGoogleSheetData = async () => {
       try {
-        setLoading(true)
-        console.log("Starting to fetch Google Sheet data...")
+        setLoading(true);
+        console.log("Starting to fetch Google Sheet data...");
+        console.log("Current user data:", user); // Debug: Log user data
         
         // Create URL to fetch the sheet in JSON format (this method works for public sheets)
-        const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`
-        console.log("Fetching from URL:", url)
+        const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
+        console.log("Fetching from URL:", url);
         
-        const response = await fetch(url)
+        const response = await fetch(url);
         if (!response.ok) {
-          throw new Error(`Failed to fetch data: ${response.status}`)
+          throw new Error(`Failed to fetch data: ${response.status}`);
         }
         
         // Extract the JSON part from the response (Google returns a weird format)
-        const text = await response.text()
+        const text = await response.text();
         // The response is like: google.visualization.Query.setResponse({...})
-        const jsonStart = text.indexOf('{')
-        const jsonEnd = text.lastIndexOf('}')
-        const jsonString = text.substring(jsonStart, jsonEnd + 1)
-        const data = JSON.parse(jsonString)
+        const jsonStart = text.indexOf('{');
+        const jsonEnd = text.lastIndexOf('}');
+        const jsonString = text.substring(jsonStart, jsonEnd + 1);
+        const data = JSON.parse(jsonString);
         
         // Extract headers from cols
         const headers = data.table.cols.map(col => ({
           id: col.id,
           label: col.label || col.id,
           type: col.type
-        })).filter(header => header.label) // Filter out empty headers
+        })).filter(header => header.label); // Filter out empty headers
         
-        setTableHeaders(headers)
+        setTableHeaders(headers);
         
         // Initialize new appointment object with empty values for all headers
-        const emptyAppointment = {}
+        const emptyAppointment = {};
         headers.forEach(header => {
-          emptyAppointment[header.id] = ''
-        })
-        setNewAppointment(emptyAppointment)
+          emptyAppointment[header.id] = '';
+        });
+        setNewAppointment(emptyAppointment);
         
         // Calculate today's date for comparison
-        const today = new Date()
-        const todayMonth = today.getMonth() // JS months are 0-indexed (0-11)
-        const todayDay = today.getDate()
-        const todayYear = today.getFullYear()
-        today.setHours(0, 0, 0, 0) // Reset time for accurate date comparison
+        const today = new Date();
+        const todayMonth = today.getMonth(); // JS months are 0-indexed (0-11)
+        const todayDay = today.getDate();
+        const todayYear = today.getFullYear();
+        today.setHours(0, 0, 0, 0); // Reset time for accurate date comparison
         
-        console.log(`Today is ${todayDay}/${todayMonth+1}/${todayYear} (d/m/yyyy format)`)
+        console.log(`Today is ${todayDay}/${todayMonth+1}/${todayYear} (d/m/yyyy format)`);
         
         // Extract and transform data rows with safer handling
         const rowsData = data.table.rows.map((row, rowIndex) => {
-          const rowData = {}
+          const rowData = {};
           
           // Add an internal unique ID
-          rowData._id = Math.random().toString(36).substring(2, 15)
+          rowData._id = Math.random().toString(36).substring(2, 15);
           
           // Store the row index from the Google Sheet for update operations
-          rowData._rowIndex = rowIndex + 2 // +2 because Google Sheets is 1-indexed and we have a header row
+          rowData._rowIndex = rowIndex + 2; // +2 because Google Sheets is 1-indexed and we have a header row
           
           // Process each cell carefully
           row.c && row.c.forEach((cell, index) => {
             if (index < headers.length) {
-              const header = headers[index]
+              const header = headers[index];
               
               // Handle null or undefined cell
               if (!cell) {
-                rowData[header.id] = ''
-                return
+                rowData[header.id] = '';
+                return;
               }
               
               // Get the value, with fallbacks
-              const value = cell.v !== undefined && cell.v !== null ? cell.v : ''
-              rowData[header.id] = value
+              const value = cell.v !== undefined && cell.v !== null ? cell.v : '';
+              rowData[header.id] = value;
               
               // Store formatted version if available
               if (cell.f) {
-                rowData[`${header.id}_formatted`] = cell.f
+                rowData[`${header.id}_formatted`] = cell.f;
               }
               
               // Special handling for dates
               if (header.type === 'date' || header.label.toLowerCase().includes('date')) {
                 if (cell.f) {
                   // Use the formatted date string if available
-                  rowData[`${header.id}_formatted`] = cell.f
+                  rowData[`${header.id}_formatted`] = cell.f;
                 } else if (value) {
                   try {
                     // Try to format the date value
-                    const dateObj = new Date(value)
+                    const dateObj = new Date(value);
                     if (!isNaN(dateObj.getTime())) {
-                      rowData[`${header.id}_formatted`] = dateObj.toLocaleDateString()
+                      rowData[`${header.id}_formatted`] = dateObj.toLocaleDateString();
                     }
                   } catch (e) {
-                    console.log("Date formatting error:", e)
+                    console.log("Date formatting error:", e);
                   }
                 }
               }
             }
-          })
-          return rowData
-        }).filter(row => Object.keys(row).length > 1) // Filter out empty rows (more than just _id)
+          });
+          return rowData;
+        }).filter(row => Object.keys(row).length > 1); // Filter out empty rows (more than just _id)
         
         // Store all appointments including past ones
-        setAllAppointments(rowsData)
+        setAllAppointments(rowsData);
         
-        // Changed: Column F (index 5) is the date column we need to check
-        const columnF = 5
-        const dateColumnId = headers[columnF]?.id
+        // Column F (index 5) is the date column we need to check
+        const columnF = 5;
+        const dateColumnId = headers[columnF]?.id;
         
-        console.log("Using date column F with id:", dateColumnId)
+        console.log("Using date column F with id:", dateColumnId);
         
         if (!dateColumnId) {
-          console.error("Column F not found in headers")
+          console.error("Column F not found in headers");
         }
         
-        // Filter out past appointments - ONLY keep today and future appointments from column F
+        // Find the staff name column index (column I - index 8)
+        const staffNameColumnIndex = 8;
+        const staffNameColumnId = headers[staffNameColumnIndex]?.id;
+        
+        console.log("Using staff name column I with id:", staffNameColumnId);
+        
+        // Debug: Log staff names in the data
+        if (user?.role === "staff") {
+          const staffNames = rowsData.map(row => row[staffNameColumnId] || "").filter(Boolean);
+          console.log("All staff names in data:", [...new Set(staffNames)]);
+          console.log("User's staff name:", user.staffName);
+        }
+        if (user) {
+          console.log("Dashboard - Current user:", user);
+          console.log("Is admin?", user.role === "admin");
+          console.log("Is staff?", user.role === "staff");
+          console.log("Staff name:", user.staffName);
+        }
+        
+        // Filter out past appointments and if user is staff, only show their appointments
         const filteredRowsData = rowsData.filter(row => {
           try {
             // Skip if no date column found or no value in the cell
-            if (!dateColumnId || !row[dateColumnId]) return false
+            if (!dateColumnId || !row[dateColumnId]) return false;
             
             // Get the date value from column F
-            const dateValue = row[dateColumnId]
+            const dateValue = row[dateColumnId];
             
             // Handle DD/MM/YYYY format (like 8/3/2025)
             if (typeof dateValue === 'string') {
               // Try parsing with regex to handle various formats
-              const dateParts = dateValue.split('/')
+              const dateParts = dateValue.split('/');
               if (dateParts.length === 3) {
                 // Format: DD/MM/YYYY
-                const day = parseInt(dateParts[0], 10)
-                const month = parseInt(dateParts[1], 10) - 1 // Convert to 0-indexed month
-                const year = parseInt(dateParts[2], 10)
+                const day = parseInt(dateParts[0], 10);
+                const month = parseInt(dateParts[1], 10) - 1; // Convert to 0-indexed month
+                const year = parseInt(dateParts[2], 10);
                 
                 // Create appointment date object and reset time for comparison
-                const appointmentDate = new Date(year, month, day)
-                appointmentDate.setHours(0, 0, 0, 0)
+                const appointmentDate = new Date(year, month, day);
+                appointmentDate.setHours(0, 0, 0, 0);
                 
                 // Keep this appointment if it's today or in the future
-                const isCurrentOrFutureDate = appointmentDate >= today
+                const isCurrentOrFutureDate = appointmentDate >= today;
                 
-                if (isCurrentOrFutureDate) {
-                  console.log(`Keeping appointment date: ${day}/${month+1}/${year}`)
-                } else {
-                  console.log(`Filtering out past date: ${day}/${month+1}/${year}`)
-                }
+                // In your filtering logic in Booking.jsx
+
+// For staff users, only show their own appointments
+// Find this section in Booking.jsx and replace it with this improved comparison code
+// This should be around line 190-200
+
+// Find this section in Booking.jsx and replace it with this improved comparison code
+// This should be around line 190-200 in your Booking.jsx file
+
+// Replace this section in your Booking.jsx file (around line 190-200)
+
+// Replace this section in your Booking.jsx file (around line 190-200)
+
+// For staff users, only show their own appointments
+// For admin users, show ALL appointments
+if (user?.role === "staff") {
+  // Only apply staff filtering for staff members (not admins)
+  // Appointment staff name from the booking sheet column I
+  const staffNameInAppointment = (row[staffNameColumnId] || "").toString().trim().toLowerCase();
+  
+  // User identifiers from login data
+  const userStaffName = (user.staffName || "").toString().trim().toLowerCase();
+  const userName = (user.name || "").toString().trim().toLowerCase();
+  const userEmail = (user.email || "").toString().trim().toLowerCase();
+  
+  // Debug output for tracking staff name matching
+  console.log(`Comparing appointment staff: "${staffNameInAppointment}" with:`, {
+    staffName: userStaffName,
+    userId: userName,
+    userEmail: userEmail
+  });
+  
+  // Simple exact matching with case-insensitivity
+  // This matches either the staffName (from column C), userId (from column A), or email
+  const isMatch = 
+    staffNameInAppointment === userStaffName ||
+    staffNameInAppointment === userName ||
+    staffNameInAppointment === userEmail;
+  
+  if (isMatch) {
+    console.log(`✓ MATCH FOUND for appointment with staff: "${staffNameInAppointment}"`);
+  } else {
+    console.log(`✗ NO MATCH for appointment with staff: "${staffNameInAppointment}"`);
+  }
+  
+  // Only keep appointments for this staff member that are current or future
+  return isCurrentOrFutureDate && isMatch;
+} else {
+  // For admin users, show all current or future appointments
+  // No staff filtering - return all appointments that meet the date criteria
+  return isCurrentOrFutureDate;
+}
                 
-                return isCurrentOrFutureDate
+                // For admin users, show all current or future appointments
+                return isCurrentOrFutureDate;
               }
             }
             
             // Fallback to original Google Sheets date format check
             if (typeof dateValue === 'string' && dateValue.startsWith('Date(')) {
               // Extract the year, month, day using regex
-              const match = /Date\((\d+),(\d+),(\d+)\)/.exec(dateValue)
+              const match = /Date\((\d+),(\d+),(\d+)\)/.exec(dateValue);
               if (match) {
-                const year = parseInt(match[1], 10)
-                const month = parseInt(match[2], 10) // Month is 0-indexed in JS Date
-                const day = parseInt(match[3], 10)
+                const year = parseInt(match[1], 10);
+                const month = parseInt(match[2], 10); // Month is 0-indexed in JS Date
+                const day = parseInt(match[3], 10);
                 
                 // Create appointment date object and reset time for comparison
-                const appointmentDate = new Date(year, month, day)
-                appointmentDate.setHours(0, 0, 0, 0)
+                const appointmentDate = new Date(year, month, day);
+                appointmentDate.setHours(0, 0, 0, 0);
                 
                 // Keep this appointment if it's today or in the future
-                return appointmentDate >= today
+                const isCurrentOrFutureDate = appointmentDate >= today;
+                
+                // For staff users, only show their own appointments
+                if (user?.role === "staff" && staffNameColumnId) {
+                  const staffName = (row[staffNameColumnId] || "").toString().trim();
+                  const userStaffName = (user.staffName || "").toString().trim();
+                  
+                  // Try flexible matching
+                  const exactMatch = staffName.toLowerCase() === userStaffName.toLowerCase();
+                  const containsMatch = staffName.toLowerCase().includes(userStaffName.toLowerCase()) || 
+                                       userStaffName.toLowerCase().includes(staffName.toLowerCase());
+                  
+                  const isStaffAppointment = exactMatch || containsMatch;
+                  
+                  // Only keep appointments for this staff member that are current or future
+                  return isCurrentOrFutureDate && isStaffAppointment;
+                }
+                
+                // For admin users, show all current or future appointments
+                return isCurrentOrFutureDate;
               }
             }
             
-            return false
+            return false;
           } catch (error) {
-            console.log("Date comparison error:", error)
-            return false
+            console.log("Date comparison error:", error);
+            return false;
           }
-        })
+        });
         
-        // Set the filtered appointments (only today and future dates from column F)
-        setAppointments(filteredRowsData)
+        console.log(`After filtering: ${filteredRowsData.length} appointments will be displayed`);
+        
+        // Set the filtered appointments
+        setAppointments(filteredRowsData);
         
         // Count today's appointments (only those where column F has today's date)
         const todaysAppts = filteredRowsData.filter(row => {
           try {
-            if (!dateColumnId || !row[dateColumnId]) return false
+            if (!dateColumnId || !row[dateColumnId]) return false;
             
             // Get the date value from the row
-            const dateValue = row[dateColumnId]
+            const dateValue = row[dateColumnId];
             
             // Handle DD/MM/YYYY format
             if (typeof dateValue === 'string') {
-              const dateParts = dateValue.split('/')
+              const dateParts = dateValue.split('/');
               if (dateParts.length === 3) {
-                const day = parseInt(dateParts[0], 10)
-                const month = parseInt(dateParts[1], 10) - 1 // Convert to 0-indexed month
-                const year = parseInt(dateParts[2], 10)
+                const day = parseInt(dateParts[0], 10);
+                const month = parseInt(dateParts[1], 10) - 1; // Convert to 0-indexed month
+                const year = parseInt(dateParts[2], 10);
                 
                 // Check if it's today
-                const isToday = day === todayDay && month === todayMonth && year === todayYear
+                const isToday = day === todayDay && month === todayMonth && year === todayYear;
                 
-                return isToday
+                return isToday;
               }
             }
             
             // Fallback to Google Sheets date format
             if (typeof dateValue === 'string' && dateValue.startsWith('Date(')) {
-              const match = /Date\((\d+),(\d+),(\d+)\)/.exec(dateValue)
+              const match = /Date\((\d+),(\d+),(\d+)\)/.exec(dateValue);
               if (match) {
-                const year = parseInt(match[1], 10)
-                const month = parseInt(match[2], 10) // Month is 0-indexed in JS Date
-                const day = parseInt(match[3], 10)
+                const year = parseInt(match[1], 10);
+                const month = parseInt(match[2], 10); // Month is 0-indexed in JS Date
+                const day = parseInt(match[3], 10);
                 
                 // Check if it's today
-                const isToday = day === todayDay && month === todayMonth && year === todayYear
+                const isToday = day === todayDay && month === todayMonth && year === todayYear;
                 
-                return isToday
+                return isToday;
               }
             }
             
-            return false
+            return false;
           } catch (error) {
-            console.log("Date comparison error:", error)
-            return false
+            console.log("Date comparison error:", error);
+            return false;
           }
-        }).length
+        }).length;
         
         // Count upcoming appointments (dates after today)
         const upcomingAppts = filteredRowsData.filter(row => {
           try {
-            if (!dateColumnId || !row[dateColumnId]) return false
+            if (!dateColumnId || !row[dateColumnId]) return false;
             
             // Get the date value
-            const dateValue = row[dateColumnId]
+            const dateValue = row[dateColumnId];
             
             // Handle DD/MM/YYYY format
             if (typeof dateValue === 'string') {
-              const dateParts = dateValue.split('/')
+              const dateParts = dateValue.split('/');
               if (dateParts.length === 3) {
-                const day = parseInt(dateParts[0], 10)
-                const month = parseInt(dateParts[1], 10) - 1 // Convert to 0-indexed month
-                const year = parseInt(dateParts[2], 10)
+                const day = parseInt(dateParts[0], 10);
+                const month = parseInt(dateParts[1], 10) - 1; // Convert to 0-indexed month
+                const year = parseInt(dateParts[2], 10);
                 
                 // Create date objects for comparison
-                const appointmentDate = new Date(year, month, day)
-                const todayDate = new Date(todayYear, todayMonth, todayDay)
+                const appointmentDate = new Date(year, month, day);
+                const todayDate = new Date(todayYear, todayMonth, todayDay);
                 
                 // Reset time parts for accurate date comparison
-                appointmentDate.setHours(0, 0, 0, 0)
-                todayDate.setHours(0, 0, 0, 0)
+                appointmentDate.setHours(0, 0, 0, 0);
+                todayDate.setHours(0, 0, 0, 0);
                 
                 // Is this date in the future?
-                const isFuture = appointmentDate > todayDate
+                const isFuture = appointmentDate > todayDate;
                 
-                return isFuture
+                return isFuture;
               }
             }
             
             // Fallback to Google Sheets date format
             if (typeof dateValue === 'string' && dateValue.startsWith('Date(')) {
-              const match = /Date\((\d+),(\d+),(\d+)\)/.exec(dateValue)
+              const match = /Date\((\d+),(\d+),(\d+)\)/.exec(dateValue);
               if (match) {
-                const year = parseInt(match[1], 10)
-                const month = parseInt(match[2], 10) // Month is 0-indexed in JS Date
-                const day = parseInt(match[3], 10)
+                const year = parseInt(match[1], 10);
+                const month = parseInt(match[2], 10); // Month is 0-indexed in JS Date
+                const day = parseInt(match[3], 10);
                 
                 // Create date objects for comparison
-                const appointmentDate = new Date(year, month, day)
-                const todayDate = new Date(todayYear, todayMonth, todayDay)
+                const appointmentDate = new Date(year, month, day);
+                const todayDate = new Date(todayYear, todayMonth, todayDay);
                 
                 // Reset time parts for accurate date comparison
-                appointmentDate.setHours(0, 0, 0, 0)
-                todayDate.setHours(0, 0, 0, 0)
+                appointmentDate.setHours(0, 0, 0, 0);
+                todayDate.setHours(0, 0, 0, 0);
                 
                 // Is this date in the future?
-                const isFuture = appointmentDate > todayDate
+                const isFuture = appointmentDate > todayDate;
                 
-                return isFuture
+                return isFuture;
               }
             }
             
-            return false
+            return false;
           } catch (error) {
-            console.log("Date comparison error:", error)
-            return false
+            console.log("Date comparison error:", error);
+            return false;
           }
-        }).length
+        }).length;
         
-        // Total clients count (total number of rows including past appointments)
-        const totalClients = rowsData.length
+        // Total clients count (for staff, only count their clients)
+        const totalClients = user?.role === "staff" 
+          ? filteredRowsData.length  // For staff, count only their filtered appointments
+          : rowsData.length;         // For admin, count all appointments
         
         setStats({
           today: todaysAppts,
           upcoming: upcomingAppts,
           totalClients: totalClients
-        })
+        });
         
-        setLoading(false)
+        setLoading(false);
       } catch (error) {
-        console.error("Error fetching Google Sheet data:", error)
-        setError("Failed to load appointment data")
-        setLoading(false)
+        console.error("Error fetching Google Sheet data:", error);
+        setError("Failed to load appointment data");
+        setLoading(false);
       }
-    }
-
-    fetchGoogleSheetData()
-  }, [])
+    };
+  
+    fetchGoogleSheetData();
+  }, [user]); // Add user to dependency array so it refetches when user changes
 
 
   // Modify the handleInputChange function to handle the 'New Appointment' button click
@@ -363,6 +458,16 @@ const handleNewAppointmentClick = async () => {
   const serialNoHeader = tableHeaders.find(header => 
     header.label.toLowerCase().includes('serial')
   );
+
+  // Find the staff name field
+  const staffNameHeader = tableHeaders.find(header => 
+    (header.label.toLowerCase().includes('staff') && header.label.toLowerCase().includes('name'))
+  );
+  
+  // For staff users, pre-fill their name in the staff name field
+  if (staffNameHeader && user?.role === "staff" && user?.staffName) {
+    emptyAppointment[staffNameHeader.id] = user.staffName;
+  }
   
   // Set today's date in the timestamp field if found
   if (timestampHeader) {
@@ -552,7 +657,6 @@ const handleNewAppointmentClick = async () => {
 };
 
   // Function to handle search
-  const [searchTerm, setSearchTerm] = useState("")
   const filteredAppointments = searchTerm
     ? appointments.filter(appointment => 
         Object.values(appointment).some(
@@ -561,14 +665,43 @@ const handleNewAppointmentClick = async () => {
       )
     : appointments
 
-  // Function to filter history appointments
-  const filteredHistoryAppointments = historySearchTerm
-    ? allAppointments.filter(appointment => 
-        Object.values(appointment).some(
-          value => value && value.toString().toLowerCase().includes(historySearchTerm.toLowerCase())
-        )
+  // Function to filter history appointments - modified to filter by staff for staff users
+const filteredHistoryAppointments = (() => {
+  // First filter by staff for staff users
+  let roleFilteredAppointments = allAppointments;
+  
+  if (user?.role === "staff" && user?.staffName) {
+    // Find staff name column
+    const staffNameHeader = tableHeaders.find(header => 
+      (header.label.toLowerCase().includes('staff') && header.label.toLowerCase().includes('name'))
+    );
+    
+    if (staffNameHeader) {
+      roleFilteredAppointments = allAppointments.filter(appointment => {
+        const appointmentStaffName = (appointment[staffNameHeader.id] || "").toString().trim();
+        const userStaffName = (user.staffName || "").toString().trim();
+        
+        // Use the same flexible matching as in the main filter
+        const exactMatch = appointmentStaffName.toLowerCase() === userStaffName.toLowerCase();
+        const containsMatch = appointmentStaffName.toLowerCase().includes(userStaffName.toLowerCase()) || 
+                             userStaffName.toLowerCase().includes(appointmentStaffName.toLowerCase());
+        
+        return exactMatch || containsMatch;
+      });
+    }
+  }
+  
+  // Then apply search filter
+  if (historySearchTerm) {
+    return roleFilteredAppointments.filter(appointment => 
+      Object.values(appointment).some(
+        value => value && value.toString().toLowerCase().includes(historySearchTerm.toLowerCase())
       )
-    : allAppointments
+    );
+  }
+  
+  return roleFilteredAppointments;
+})();
 
   // Handle input change for new appointment form
   const handleInputChange = (e) => {
@@ -1259,23 +1392,29 @@ const handleNewAppointmentClick = async () => {
       }
       
       // For status field - dropdown
-      if (header.id === 'status' || header.label.toLowerCase() === 'status') {
-        return (
-          <select
-            id={`${isEdit ? 'edit-' : ''}${header.id}`}
-            name={header.id}
-            value={formData[header.id] || ''}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-blue-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
-            required
-          >
-            <option value="">Select Status</option>
-            <option value="Confirmed">Confirmed</option>
-            <option value="Pending">Pending</option>
-            <option value="Canceled">Canceled</option>
-          </select>
-        )
-      }
+      // Find this function in your code and replace it with this updated version
+// This adds the "Complete" option to the status dropdown
+
+// For status field - dropdown
+if (header.id === 'status' || header.label.toLowerCase() === 'status' || 
+header.label.toLowerCase().includes('booking status')) {
+return (
+<select
+  id={`${isEdit ? 'edit-' : ''}${header.id}`}
+  name={header.id}
+  value={formData[header.id] || ''}
+  onChange={handleChange}
+  className="mt-1 block w-full rounded-md border-blue-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+  required
+>
+  <option value="">Select Status</option>
+  <option value="Confirmed">Confirmed</option>
+  <option value="Complete">Complete</option>
+  <option value="Pending">Pending</option>
+  <option value="Canceled">Canceled</option>
+</select>
+)
+}
       
       // For price fields
       if (header.label.toLowerCase().includes('price')) {
@@ -1292,6 +1431,25 @@ const handleNewAppointmentClick = async () => {
           />
         )
       }
+      
+      // For staff name field
+      if (header.label.toLowerCase().includes('staff') && header.label.toLowerCase().includes('name')) {
+        // If user is staff, make the field read-only with their name
+        if (user?.role === "staff" && user?.staffName && !isEdit) {
+          return (
+            <input
+              type="text"
+              id={`${isEdit ? 'edit-' : ''}${header.id}`}
+              name={header.id}
+              value={user.staffName}
+              readOnly
+              className="mt-1 block w-full rounded-md border-blue-300 bg-gray-100 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+            />
+          );
+        }
+      }
+
+      
       
       // Default to text input for all other fields
       return (
@@ -1334,644 +1492,675 @@ const handleNewAppointmentClick = async () => {
             {/* Only show history button if not hidden */}
             {!hideHistoryButton && (
               <button 
-                className="flex items-center justify-center px-4 py-2 bg-pink-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-300"
-                onClick={handleHistoryClick}
-              >
-                <History size={18} className="mr-2" />
-                History
-              </button>
-            )}
-          </div>
+              className="flex items-center justify-center px-4 py-2 bg-pink-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-300"
+              onClick={handleHistoryClick}
+            >
+              <History size={18} className="mr-2" />
+              History
+            </button>
+          )}
         </div>
       </div>
-  
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-white rounded-lg shadow-md p-4 flex items-center hover:scale-105 transition-transform duration-300"
-          >
-            <div className="rounded-full bg-blue-100 p-3 mr-4">
-              <Calendar size={24} className="text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-blue-500">Today's Appointments</p>
-              <p className="text-2xl font-bold text-blue-800">{stats.today}</p>
-            </div>
-          </motion.div>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-white rounded-lg shadow-md p-4 flex items-center hover:scale-105 transition-transform duration-300"
-          >
-            <div className="rounded-full bg-indigo-100 p-3 mr-4">
-              <Clock size={24} className="text-indigo-600" />
-            </div>
-            <div>
-              <p className="text-sm text-indigo-500">Upcoming</p>
-              <p className="text-2xl font-bold text-indigo-800">{stats.upcoming}</p>
-            </div>
-          </motion.div>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-white rounded-lg shadow-md p-4 flex items-center hover:scale-105 transition-transform duration-300"
-          >
-            <div className="rounded-full bg-purple-100 p-3 mr-4">
-              <User size={24} className="text-purple-600" />
-            </div>
-            <div>
-              <p className="text-sm text-purple-500">Total Clients</p>
-              <p className="text-2xl font-bold text-purple-800">{stats.totalClients}</p>
-            </div>
-          </motion.div>
-        </div>
+    </div>
 
-        {loading ? (
-        <div className="text-center py-10">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-4"></div>
-          <p className="text-blue-600">Loading appointment data...</p>
-        </div>
-      ) : error ? (
-        <div className="bg-red-50 p-4 rounded-md text-red-800 text-center">
-          {error} <button className="underline ml-2" onClick={() => window.location.reload()}>Try again</button>
-        </div>
-      ) : (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="bg-white rounded-lg shadow-md overflow-hidden"
+          transition={{ delay: 0.1 }}
+          className="bg-white rounded-lg shadow-md p-4 flex items-center hover:scale-105 transition-transform duration-300"
         >
-         <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-blue-200">
-              <thead className="bg-blue-50">
-                <tr>
-                  {tableHeaders.map((header) => (
-                    <th
-                      key={header.id}
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-blue-500 uppercase tracking-wider"
-                    >
-                      {header.label}
-                    </th>
-                  ))}
-                  {!hideHistoryButton && (
+          <div className="rounded-full bg-blue-100 p-3 mr-4">
+            <Calendar size={24} className="text-blue-600" />
+          </div>
+          <div>
+            <p className="text-sm text-blue-500">Today's Appointments</p>
+            <p className="text-2xl font-bold text-blue-800">{stats.today}</p>
+          </div>
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="bg-white rounded-lg shadow-md p-4 flex items-center hover:scale-105 transition-transform duration-300"
+        >
+          <div className="rounded-full bg-indigo-100 p-3 mr-4">
+            <Clock size={24} className="text-indigo-600" />
+          </div>
+          <div>
+            <p className="text-sm text-indigo-500">Upcoming</p>
+            <p className="text-2xl font-bold text-indigo-800">{stats.upcoming}</p>
+          </div>
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-white rounded-lg shadow-md p-4 flex items-center hover:scale-105 transition-transform duration-300"
+        >
+          <div className="rounded-full bg-purple-100 p-3 mr-4">
+            <User size={24} className="text-purple-600" />
+          </div>
+          <div>
+            <p className="text-sm text-purple-500">Total Clients</p>
+            <p className="text-2xl font-bold text-purple-800">{stats.totalClients}</p>
+          </div>
+        </motion.div>
+      </div>
+
+      {loading ? (
+      <div className="text-center py-10">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+        <p className="text-blue-600">Loading appointment data...</p>
+      </div>
+    ) : error ? (
+      <div className="bg-red-50 p-4 rounded-md text-red-800 text-center">
+        {error} <button className="underline ml-2" onClick={() => window.location.reload()}>Try again</button>
+      </div>
+    ) : (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        className="bg-white rounded-lg shadow-md overflow-hidden"
+      >
+       <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-blue-200">
+            <thead className="bg-blue-50">
+              <tr>
+                {tableHeaders.map((header) => (
                   <th
+                    key={header.id}
                     scope="col"
                     className="px-6 py-3 text-left text-xs font-medium text-blue-500 uppercase tracking-wider"
                   >
-                    Actions
+                    {header.label}
                   </th>
-                  )}
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-blue-200">
-                {filteredAppointments.length > 0 ? (
-                  filteredAppointments.map((appointment, index) => (
-                    <motion.tr
-                    key={appointment._id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                    className="hover:bg-blue-50 transition-colors duration-300"
-                  >
-                    {tableHeaders.map((header) => {
-                      // Handle special rendering for different column types
-                      if (header.id === 'status' || header.label.toLowerCase() === 'status') {
-                        const status = appointment[header.id];
-                        let statusClass = 'bg-gray-100 text-gray-800';
-                        
-                        if (status) {
-                          if (status.toLowerCase().includes('confirm')) {
-                            statusClass = 'bg-green-100 text-green-800';
-                          } else if (status.toLowerCase().includes('pend')) {
-                            statusClass = 'bg-yellow-100 text-yellow-800';
-                          } else if (status.toLowerCase().includes('cancel')) {
-                            statusClass = 'bg-red-100 text-red-800';
-                          }
-                        }
-                        
-                        return (
-                          <td key={header.id} className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}`}>
-                              {status || '—'}
-                            </span>
-                          </td>
-                        );
-                      }
-                      
-                      // For client/name columns, use avatar style
-                      if (header.label.toLowerCase().includes('client') || 
-                          header.label.toLowerCase().includes('name')) {
-                        return (
-                          <td key={header.id} className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                <User size={16} className="text-blue-600" />
-                              </div>
-                              <div className="ml-4">
-                                <div className="text-sm font-medium text-blue-900">
-                                  {appointment[header.id] || '—'}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                        );
-                      }
-                      
-                      // For Service Price column, add rupee sign (₹)
-                      if (header.label.toLowerCase().includes('service price') || 
-                          header.label.toLowerCase().includes('price')) {
-                        const price = appointment[header.id];
-                        return (
-                          <td key={header.id} className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-green-600">
-                              {price ? `₹${price}` : '—'}
-                            </div>
-                          </td>
-                        );
-                      }
-                      
-                      // For date & time, special formatting with safer handling
-                      if (header.type === 'date' || 
-                          header.label.toLowerCase().includes('date')) {
-                        let displayDate = '—'
-                        
-                        // Use the pre-formatted date if available
-                        if (appointment[`${header.id}_formatted`]) {
-                          displayDate = appointment[`${header.id}_formatted`]
-                        } 
-                        // For Google Sheets date format: Date(year,month,day)
-                        else if (typeof appointment[header.id] === 'string' && 
-                                appointment[header.id].startsWith('Date(')) {
-                          const match = /Date\((\d+),(\d+),(\d+)\)/.exec(appointment[header.id])
-                          if (match) {
-                            const year = parseInt(match[1], 10)
-                            const month = parseInt(match[2], 10) // 0-indexed
-                            const day = parseInt(match[3], 10)
-                            
-                            // Format as MM/DD/YYYY
-                            displayDate = `${month+1}/${day}/${year}`
-                          } else {
-                            displayDate = appointment[header.id].toString()
-                          }
-                        }
-                        // Otherwise try to format it safely as before
-                        else if (appointment[header.id]) {
-                          try {
-                            const dateObj = new Date(appointment[header.id])
-                            if (!isNaN(dateObj.getTime())) {
-                              displayDate = dateObj.toLocaleDateString()
-                            } else {
-                              displayDate = appointment[header.id].toString()
-                            }
-                          } catch (e) {
-                            // If date parsing fails, just show the raw value
-                            displayDate = appointment[header.id].toString()
-                          }
-                        }
-                        
-                        return (
-                          <td key={header.id} className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-blue-900">{displayDate}</div>
-                          </td>
-                        );
-                      }
-                      
-                      if (header.label.toLowerCase().includes('time')) {
-                        return (
-                          <td key={header.id} className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-blue-500">
-                              {formatTimeFromGoogleSheets(appointment[header.id])}
-                            </div>
-                          </td>
-                        );
-                      }
-                      
-                      // Default rendering for other columns
+                ))}
+                {!hideHistoryButton && (
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-blue-500 uppercase tracking-wider"
+                >
+                  Actions
+                </th>
+                )}
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-blue-200">
+              {filteredAppointments.length > 0 ? (
+                filteredAppointments.map((appointment, index) => (
+                  <motion.tr
+                  key={appointment._id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                  className="hover:bg-blue-50 transition-colors duration-300"
+                >
+                  {tableHeaders.map((header) => {
+                    // Handle special rendering for different column types
+                    // Also improve the status display in the table to include the "Complete" status
+// Find the section in your code that handles the status display in the table cells
+// and update it to include the "Complete" status with a distinctive color
+
+// For example, in the main table rendering code:
+if (header.id === 'status' || header.label.toLowerCase() === 'status' || header.label.toLowerCase().includes('status')) {
+  const status = appointment[header.id];
+  let statusClass = 'bg-gray-100 text-gray-800';
+  
+  if (status) {
+    if (status.toLowerCase().includes('confirm')) {
+      statusClass = 'bg-green-100 text-green-800';
+    } else if (status.toLowerCase().includes('pend')) {
+      statusClass = 'bg-yellow-100 text-yellow-800';
+    } else if (status.toLowerCase().includes('cancel')) {
+      statusClass = 'bg-red-100 text-red-800';
+    } else if (status.toLowerCase().includes('complete')) {
+      statusClass = 'bg-blue-100 text-blue-800'; // Different color for "Complete" status
+    }
+  }
+  
+  return (
+    <td key={header.id} className="px-6 py-4 whitespace-nowrap">
+      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}`}>
+        {status || '—'}
+      </span>
+    </td>
+  );
+}
+
+// Also update the same logic in the history modal section
+// For example, in the history table cell rendering code:
+if (header.id === 'status' || header.label.toLowerCase() === 'status' || header.label.toLowerCase().includes('status')) {
+  const status = appointment[header.id];
+  let statusClass = 'bg-gray-100 text-gray-800';
+  
+  if (status) {
+    if (status.toLowerCase().includes('confirm')) {
+      statusClass = 'bg-green-100 text-green-800';
+    } else if (status.toLowerCase().includes('pend')) {
+      statusClass = 'bg-yellow-100 text-yellow-800';
+    } else if (status.toLowerCase().includes('cancel')) {
+      statusClass = 'bg-red-100 text-red-800';
+    } else if (status.toLowerCase().includes('complete')) {
+      statusClass = 'bg-blue-100 text-blue-800'; // Same color scheme for consistency
+    }
+  }
+  
+  return (
+    <td key={`history-cell-${header.id}-${index}`} className="px-6 py-4 whitespace-nowrap">
+      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}`}>
+        {status || '—'}
+      </span>
+    </td>
+  );
+}
+                    
+                    // For client/name columns, use avatar style
+                    if (header.label.toLowerCase().includes('client') || 
+                        header.label.toLowerCase().includes('name')) {
                       return (
                         <td key={header.id} className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-blue-700">
-                            {appointment[header.id] || '—'}
+                          <div className="flex items-center">
+                            <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                              <User size={16} className="text-black-600" />
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-blue-900">
+                                {appointment[header.id] || '—'}
+                              </div>
+                            </div>
                           </div>
                         </td>
                       );
-                    })}
+                    }
                     
-                    {/* Actions column */}
-                    {!hideHistoryButton && (
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button 
-                        onClick={() => handleEditClick(appointment)}
-                        className="text-blue-600 hover:text-blue-900 mr-3 transition-colors duration-300"
-                      >
-                        Edit
-                      </button>
-                      <a href="#" className="text-red-600 hover:text-red-900 transition-colors duration-300">
-                        Cancel
-                      </a>
-                    </td>
+                    // For Service Price column, add rupee sign (₹)
+                    if (header.label.toLowerCase().includes('service price') || 
+                        header.label.toLowerCase().includes('price')) {
+                      const price = appointment[header.id];
+                      return (
+                        <td key={header.id} className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-green-600">
+                            {price ? `₹${price}` : '—'}
+                          </div>
+                        </td>
+                      );
+                    }
+                    
+                    // For date & time, special formatting with safer handling
+                    if (header.type === 'date' || 
+                        header.label.toLowerCase().includes('date')) {
+                      let displayDate = '—'
+                      
+                      // Use the pre-formatted date if available
+                      if (appointment[`${header.id}_formatted`]) {
+                        displayDate = appointment[`${header.id}_formatted`]
+                      } 
+                      // For Google Sheets date format: Date(year,month,day)
+                      else if (typeof appointment[header.id] === 'string' && 
+                              appointment[header.id].startsWith('Date(')) {
+                        const match = /Date\((\d+),(\d+),(\d+)\)/.exec(appointment[header.id])
+                        if (match) {
+                          const year = parseInt(match[1], 10)
+                          const month = parseInt(match[2], 10) // 0-indexed
+                          const day = parseInt(match[3], 10)
+                          
+                          // Format as MM/DD/YYYY
+                          displayDate = `${month+1}/${day}/${year}`
+                        } else {
+                          displayDate = appointment[header.id].toString()
+                        }
+                      }
+                      // Otherwise try to format it safely as before
+                      else if (appointment[header.id]) {
+                        try {
+                          const dateObj = new Date(appointment[header.id])
+                          if (!isNaN(dateObj.getTime())) {
+                            displayDate = dateObj.toLocaleDateString()
+                          } else {
+                            displayDate = appointment[header.id].toString()
+                          }
+                        } catch (e) {
+                          // If date parsing fails, just show the raw value
+                          displayDate = appointment[header.id].toString()
+                        }
+                      }
+                      
+                      return (
+                        <td key={header.id} className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-black-500">{displayDate}</div>
+                        </td>
+                      );
+                    }
+                    
+                    if (header.label.toLowerCase().includes('time')) {
+                      return (
+                        <td key={header.id} className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-black-500">
+                            {formatTimeFromGoogleSheets(appointment[header.id])}
+                          </div>
+                        </td>
+                      );
+                    }
+                    
+                    // Default rendering for other columns
+                    return (
+                      <td key={header.id} className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-black-500">
+                          {appointment[header.id] || '—'}
+                        </div>
+                      </td>
+                    );
+                  })}
+                  
+                  {/* Actions column */}
+                  {!hideHistoryButton && (
+  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+    <button 
+      className="text-pink-600 hover:text-pink-900" 
+      onClick={() => handleEditClick(appointment)}
+    >
+      <Edit size={16} className="inline mr-1" />
+    </button>
+  </td>
+)}
+                </motion.tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={tableHeaders.length + 1} className="px-6 py-4 text-center text-gray-500">
+                  {searchTerm ? "No appointments matching your search" : "No appointments found"}
+                </td>
+              </tr>
+            )}
+            </tbody>
+          </table>
+        </div>
+      </motion.div>
+    )}
+    
+    {/* Modal for adding new appointment */}
+    <AnimatePresence>
+      {showNewAppointmentForm && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+        >
+          <motion.div
+            initial={{ scale: 0.9, y: 20 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.9, y: 20 }}
+            className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-auto"
+          >
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-pink-600">Add New Appointment</h3>
+                <button 
+                  className="text-gray-500 hover:text-gray-700"
+                  onClick={() => setShowNewAppointmentForm(false)}
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {tableHeaders.map((header) => (
+                    <div key={header.id}>
+                      <label htmlFor={header.id} className="block text-sm font-medium text-pink-700">
+                        {header.label}
+                      </label>
+                      {renderFormField(header)}
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="flex justify-end space-x-3 pt-4 border-t border-blue-100">
+                  <button
+                    type="button"
+                    className="px-4 py-2 border border-blue-300 rounded-md shadow-sm text-pink-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-pink-500"
+                    onClick={() => setShowNewAppointmentForm(false)}
+                    disabled={submitting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-pink-600 text-white rounded-md shadow-sm hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 transition-all duration-300 flex items-center"
+                    disabled={submitting}
+                  >
+                    {submitting ? (
+                      <>
+                        <div className="h-4 w-4 border-t-2 border-b-2 border-white rounded-full animate-spin mr-2"></div>
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save size={18} className="mr-2" />
+                        Save Appointment
+                      </>
                     )}
-                  </motion.tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={tableHeaders.length + 1} className="px-6 py-4 text-center text-gray-500">
-                    {searchTerm ? "No appointments matching your search" : "No appointments found"}
-                  </td>
-                </tr>
-              )}
-              </tbody>
-            </table>
-          </div>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </motion.div>
         </motion.div>
       )}
-      
-      {/* Modal for adding new appointment */}
-      <AnimatePresence>
-        {showNewAppointmentForm && (
+    </AnimatePresence>
+            
+    {/* Modal for editing appointment */}
+    <AnimatePresence>
+      {showEditAppointmentForm && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+        >
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+            initial={{ scale: 0.9, y: 20 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.9, y: 20 }}
+            className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-auto"
           >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-auto"
-            >
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold text-pink-600">Add New Appointment</h3>
-                  <button 
-                    className="text-gray-500 hover:text-gray-700"
-                    onClick={() => setShowNewAppointmentForm(false)}
-                  >
-                    <X size={24} />
-                  </button>
-                </div>
-                
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {tableHeaders.map((header) => (
-                      <div key={header.id}>
-                        <label htmlFor={header.id} className="block text-sm font-medium text-pink-700">
-                          {header.label}
-                        </label>
-                        {renderFormField(header)}
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <div className="flex justify-end space-x-3 pt-4 border-t border-blue-100">
-                    <button
-                      type="button"
-                      className="px-4 py-2 border border-blue-300 rounded-md shadow-sm text-pink-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-pink-500"
-                      onClick={() => setShowNewAppointmentForm(false)}
-                      disabled={submitting}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-4 py-2 bg-pink-600 text-white rounded-md shadow-sm hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 transition-all duration-300 flex items-center"
-                      disabled={submitting}
-                    >
-                      {submitting ? (
-                        <>
-                          <div className="h-4 w-4 border-t-2 border-b-2 border-white rounded-full animate-spin mr-2"></div>
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save size={18} className="mr-2" />
-                          Save Appointment
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-blue-800">Edit Appointment</h3>
+                <button 
+                  className="text-gray-500 hover:text-gray-700"
+                  onClick={() => setShowEditAppointmentForm(false)}
+                >
+                  <X size={24} />
+                </button>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
               
-      {/* Modal for editing appointment */}
-      <AnimatePresence>
-        {showEditAppointmentForm && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-auto"
-            >
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold text-blue-800">Edit Appointment</h3>
-                  <button 
-                    className="text-gray-500 hover:text-gray-700"
+              <form onSubmit={handleEditSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {tableHeaders.map((header) => (
+                    <div key={`edit-${header.id}`}>
+                      <label htmlFor={`edit-${header.id}`} className="block text-sm font-medium text-blue-700">
+                        {header.label}
+                      </label>
+                      {renderFormField(header, true)}
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="flex justify-end space-x-3 pt-4 border-t border-blue-100">
+                  <button
+                    type="button"
+                    className="px-4 py-2 border border-blue-300 rounded-md shadow-sm text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     onClick={() => setShowEditAppointmentForm(false)}
+                    disabled={submitting}
                   >
-                    <X size={24} />
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-300 flex items-center"
+                    disabled={submitting}
+                  >
+                    {submitting ? (
+                      <>
+                        <div className="h-4 w-4 border-t-2 border-b-2 border-white rounded-full animate-spin mr-2"></div>
+                        Updating...
+                      </>
+                    ) : (
+                      <>
+                        <Save size={18} className="mr-2" />
+                        Update Appointment
+                      </>
+                    )}
                   </button>
                 </div>
-                
-                <form onSubmit={handleEditSubmit} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {tableHeaders.map((header) => (
-                      <div key={`edit-${header.id}`}>
-                        <label htmlFor={`edit-${header.id}`} className="block text-sm font-medium text-blue-700">
-                          {header.label}
-                        </label>
-                        {renderFormField(header, true)}
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <div className="flex justify-end space-x-3 pt-4 border-t border-blue-100">
-                    <button
-                      type="button"
-                      className="px-4 py-2 border border-blue-300 rounded-md shadow-sm text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      onClick={() => setShowEditAppointmentForm(false)}
-                      disabled={submitting}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-300 flex items-center"
-                      disabled={submitting}
-                    >
-                      {submitting ? (
-                        <>
-                          <div className="h-4 w-4 border-t-2 border-b-2 border-white rounded-full animate-spin mr-2"></div>
-                          Updating...
-                        </>
-                      ) : (
-                        <>
-                          <Save size={18} className="mr-2" />
-                          Update Appointment
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </motion.div>
+              </form>
+            </div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </motion.div>
+      )}
+    </AnimatePresence>
 
-      {/* History Modal - Shows All Booking Data */}
-      <AnimatePresence>
-        {showHistoryModal && (
+    {/* History Modal - Shows All Booking Data */}
+    <AnimatePresence>
+      {showHistoryModal && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+        >
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+            initial={{ scale: 0.9, y: 20 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.9, y: 20 }}
+            className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-auto"
           >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-auto"
-            >
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold text-indigo-800">Booking History</h3>
-                  <button 
-                    className="text-gray-500 hover:text-gray-700"
-                    onClick={() => setShowHistoryModal(false)}
-                  >
-                    <X size={24} />
-                  </button>
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-indigo-800">Booking History</h3>
+                <button 
+                  className="text-gray-500 hover:text-gray-700"
+                  onClick={() => setShowHistoryModal(false)}
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="mb-6">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-indigo-400" size={18} />
+                  <input
+                    type="text"
+                    placeholder="Search all appointments..."
+                    className="pl-10 pr-4 py-2 border border-indigo-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-full transition-all duration-300"
+                    value={historySearchTerm}
+                    onChange={(e) => setHistorySearchTerm(e.target.value)}
+                  />
                 </div>
-                
-                <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-indigo-400" size={18} />
-                    <input
-                      type="text"
-                      placeholder="Search all appointments..."
-                      className="pl-10 pr-4 py-2 border border-indigo-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-full transition-all duration-300"
-                      value={historySearchTerm}
-                      onChange={(e) => setHistorySearchTerm(e.target.value)}
-                    />
-                  </div>
-                </div>
-                
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-indigo-200">
-                    <thead className="bg-indigo-50">
-                      <tr>
-                        {tableHeaders.map((header) => (
-                          <th
-                            key={`history-${header.id}`}
-                            scope="col"
-                            className="px-6 py-3 text-left text-xs font-medium text-indigo-500 uppercase tracking-wider"
-                          >
-                            {header.label}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-indigo-200">
-                      {filteredHistoryAppointments.length > 0 ? (
-                        filteredHistoryAppointments.map((appointment, index) => (
-                          <tr 
-                            key={`history-row-${appointment._id}`}
-                            className="hover:bg-indigo-50 transition-colors duration-300"
-                          >
-                            {tableHeaders.map((header) => {
-                              // Handle special rendering for different column types
-                              if (header.id === 'status' || header.label.toLowerCase() === 'status') {
-                                const status = appointment[header.id];
-                                let statusClass = 'bg-gray-100 text-gray-800';
-                                
-                                if (status) {
-                                  if (status.toLowerCase().includes('confirm')) {
-                                    statusClass = 'bg-green-100 text-green-800';
-                                  } else if (status.toLowerCase().includes('pend')) {
-                                    statusClass = 'bg-yellow-100 text-yellow-800';
-                                  } else if (status.toLowerCase().includes('cancel')) {
-                                    statusClass = 'bg-red-100 text-red-800';
-                                  }
+              </div>
+              
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-indigo-200">
+                  <thead className="bg-indigo-50">
+                    <tr>
+                      {tableHeaders.map((header) => (
+                        <th
+                          key={`history-${header.id}`}
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-indigo-500 uppercase tracking-wider"
+                        >
+                          {header.label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-indigo-200">
+                    {filteredHistoryAppointments.length > 0 ? (
+                      filteredHistoryAppointments.map((appointment, index) => (
+                        <tr 
+                          key={`history-row-${appointment._id}`}
+                          className="hover:bg-indigo-50 transition-colors duration-300"
+                        >
+                          {tableHeaders.map((header) => {
+                            // Handle special rendering for different column types
+                            if (header.id === 'status' || header.label.toLowerCase() === 'status') {
+                              const status = appointment[header.id];
+                              let statusClass = 'bg-gray-100 text-gray-800';
+                              
+                              if (status) {
+                                if (status.toLowerCase().includes('confirm')) {
+                                  statusClass = 'bg-green-100 text-green-800';
+                                } else if (status.toLowerCase().includes('pend')) {
+                                  statusClass = 'bg-yellow-100 text-yellow-800';
+                                } else if (status.toLowerCase().includes('cancel')) {
+                                  statusClass = 'bg-red-100 text-red-800';
                                 }
-                                
-                                return (
-                                  <td key={`history-cell-${header.id}-${index}`} className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}`}>
-                                      {status || '—'}
-                                    </span>
-                                  </td>
-                                );
                               }
                               
-                              // For client/name columns
-                              if (header.label.toLowerCase().includes('client') || 
-                                  header.label.toLowerCase().includes('name')) {
-                                return (
-                                  <td key={`history-cell-${header.id}-${index}`} className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm font-medium text-indigo-900">
-                                      {appointment[header.id] || '—'}
-                                    </div>
-                                  </td>
-                                );
-                              }
-                              
-                              // For Service Price column, add rupee sign (₹)
-                              if (header.label.toLowerCase().includes('service price') || 
-                                  header.label.toLowerCase().includes('price')) {
-                                const price = appointment[header.id];
-                                return (
-                                  <td key={`history-cell-${header.id}-${index}`} className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm font-medium text-green-600">
-                                      {price ? `₹${price}` : '—'}
-                                    </div>
-                                  </td>
-                                );
-                              }
-                              
-                              // For date & time, special formatting with safer handling
-                              if (header.type === 'date' || 
-                                  header.label.toLowerCase().includes('date')) {
-                                let displayDate = '—'
-                                
-                                // Use the pre-formatted date if available
-                                if (appointment[`${header.id}_formatted`]) {
-                                  displayDate = appointment[`${header.id}_formatted`]
-                                } 
-                                // For Google Sheets date format: Date(year,month,day)
-                                else if (typeof appointment[header.id] === 'string' && 
-                                        appointment[header.id].startsWith('Date(')) {
-                                  const match = /Date\((\d+),(\d+),(\d+)\)/.exec(appointment[header.id])
-                                  if (match) {
-                                    const year = parseInt(match[1], 10)
-                                    const month = parseInt(match[2], 10) // 0-indexed
-                                    const day = parseInt(match[3], 10)
-                                    
-                                    // Format as MM/DD/YYYY
-                                    displayDate = `${month+1}/${day}/${year}`
-                                  } else {
-                                    displayDate = appointment[header.id].toString()
-                                  }
-                                }
-                                // Otherwise try to format it safely as before
-                                else if (appointment[header.id]) {
-                                  try {
-                                    const dateObj = new Date(appointment[header.id])
-                                    if (!isNaN(dateObj.getTime())) {
-                                      displayDate = dateObj.toLocaleDateString()
-                                    } else {
-                                      displayDate = appointment[header.id].toString()
-                                    }
-                                  } catch (e) {
-                                    // If date parsing fails, just show the raw value
-                                    displayDate = appointment[header.id].toString()
-                                  }
-                                }
-                                
-                                return (
-                                  <td key={`history-cell-${header.id}-${index}`} className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm text-indigo-900">{displayDate}</div>
-                                  </td>
-                                );
-                              }
-                              
-                              if (header.label.toLowerCase().includes('time')) {
-                                return (
-                                  <td key={`history-cell-${header.id}-${index}`} className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm text-indigo-500">
-                                      {formatTimeFromGoogleSheets(appointment[header.id])}
-                                    </div>
-                                  </td>
-                                );
-                              }
-                              
-                              // Default rendering for other columns
                               return (
                                 <td key={`history-cell-${header.id}-${index}`} className="px-6 py-4 whitespace-nowrap">
-                                  <div className="text-sm text-indigo-700">
+                                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}`}>
+                                    {status || '—'}
+                                  </span>
+                                </td>
+                              );
+                            }
+                            
+                            // For client/name columns
+                            if (header.label.toLowerCase().includes('client') || 
+                                header.label.toLowerCase().includes('name')) {
+                              return (
+                                <td key={`history-cell-${header.id}-${index}`} className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm font-medium text-indigo-900">
                                     {appointment[header.id] || '—'}
                                   </div>
                                 </td>
                               );
-                            })}
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={tableHeaders.length} className="px-6 py-4 text-center text-gray-500">
-                            {historySearchTerm ? "No appointments matching your search" : "No appointments found"}
-                          </td>
+                            }
+                            
+                            // For Service Price column, add rupee sign (₹)
+                            if (header.label.toLowerCase().includes('service price') || 
+                                header.label.toLowerCase().includes('price')) {
+                              const price = appointment[header.id];
+                              return (
+                                <td key={`history-cell-${header.id}-${index}`} className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm font-medium text-green-600">
+                                    {price ? `₹${price}` : '—'}
+                                  </div>
+                                </td>
+                              );
+                            }
+                            
+                            // For date & time, special formatting with safer handling
+                            if (header.type === 'date' || 
+                                header.label.toLowerCase().includes('date')) {
+                              let displayDate = '—'
+                              
+                              // Use the pre-formatted date if available
+                              if (appointment[`${header.id}_formatted`]) {
+                                displayDate = appointment[`${header.id}_formatted`]
+                              } 
+                              // For Google Sheets date format: Date(year,month,day)
+                              else if (typeof appointment[header.id] === 'string' && 
+                                      appointment[header.id].startsWith('Date(')) {
+                                const match = /Date\((\d+),(\d+),(\d+)\)/.exec(appointment[header.id])
+                                if (match) {
+                                  const year = parseInt(match[1], 10)
+                                  const month = parseInt(match[2], 10) // 0-indexed
+                                  const day = parseInt(match[3], 10)
+                                  
+                                  // Format as MM/DD/YYYY
+                                  displayDate = `${month+1}/${day}/${year}`
+                                } else {
+                                  displayDate = appointment[header.id].toString()
+                                }
+                              }
+                              // Otherwise try to format it safely as before
+                              else if (appointment[header.id]) {
+                                try {
+                                  const dateObj = new Date(appointment[header.id])
+                                  if (!isNaN(dateObj.getTime())) {
+                                    displayDate = dateObj.toLocaleDateString()
+                                  } else {
+                                    displayDate = appointment[header.id].toString()
+                                  }
+                                } catch (e) {
+                                  // If date parsing fails, just show the raw value
+                                  displayDate = appointment[header.id].toString()
+                                }
+                              }
+                              
+                              return (
+                                <td key={`history-cell-${header.id}-${index}`} className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-indigo-900">{displayDate}</div>
+                                </td>
+                              );
+                            }
+                            
+                            if (header.label.toLowerCase().includes('time')) {
+                              return (
+                                <td key={`history-cell-${header.id}-${index}`} className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-indigo-500">
+                                    {formatTimeFromGoogleSheets(appointment[header.id])}
+                                  </div>
+                                </td>
+                              );
+                            }
+                            
+                            // Default rendering for other columns
+                            return (
+                              <td key={`history-cell-${header.id}-${index}`} className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-indigo-700">
+                                  {appointment[header.id] || '—'}
+                                </div>
+                              </td>
+                            );
+                          })}
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-                
-                <div className="flex justify-end mt-6">
-                  <button
-                    type="button"
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-300"
-                    onClick={() => setShowHistoryModal(false)}
-                  >
-                    Close
-                  </button>
-                </div>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={tableHeaders.length} className="px-6 py-4 text-center text-gray-500">
+                          {historySearchTerm ? "No appointments matching your search" : "No appointments found"}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      
-      {/* Notification popup */}
-      <AnimatePresence>
-        {notification.show && (
-          <motion.div
-            key="notification"
-            initial={{ opacity: 0, y: -50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -50 }}
-            className={`fixed top-4 right-4 px-6 py-4 rounded-lg shadow-lg z-50 flex items-center ${
-              notification.type === "success" ? "bg-green-100" : "bg-red-100"
-            }`}
-          >
-            {notification.type === "success" ? (
-              <CheckCircle2 className="text-green-600 mr-3" size={20} />
-            ) : (
-              <AlertCircle className="text-red-600 mr-3" size={20} />
-            )}
-            <p className={`font-medium ${
-              notification.type === "success" ? "text-green-800" : "text-red-800"
-            }`}>
-              {notification.message}
-            </p>
-            <button 
-              onClick={() => setNotification({ show: false, message: "", type: "" })}
-              className="ml-4 text-gray-500 hover:text-gray-700"
-            >
-              <X size={16} />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  );
-};
               
+              <div className="flex justify-end mt-6">
+                <button
+                  type="button"
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-300"
+                  onClick={() => setShowHistoryModal(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+    
+    {/* Notification popup */}
+    <AnimatePresence>
+      {notification.show && (
+        <motion.div
+          key="notification"
+          initial={{ opacity: 0, y: -50 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -50 }}
+          className={`fixed top-4 right-4 px-6 py-4 rounded-lg shadow-lg z-50 flex items-center ${
+            notification.type === "success" ? "bg-green-100" : "bg-red-100"
+          }`}
+        >
+          {notification.type === "success" ? (
+            <CheckCircle2 className="text-green-600 mr-3" size={20} />
+          ) : (
+            <AlertCircle className="text-red-600 mr-3" size={20} />
+          )}
+          <p className={`font-medium ${
+            notification.type === "success" ? "text-green-800" : "text-red-800"
+          }`}>
+            {notification.message}
+          </p>
+          <button 
+            onClick={() => setNotification({ show: false, message: "", type: "" })}
+            className="ml-4 text-gray-500 hover:text-gray-700"
+          >
+            <X size={16} />
+          </button>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  </motion.div>
+);
+};
+            
 export default Booking;

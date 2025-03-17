@@ -110,39 +110,57 @@ const LoginPage = () => {
   }
 
   // Function to handle proceeding with login after alert
-  const proceedWithLogin = (userMatch) => {
-    setShowPasswordChangeAlert(false)
+  // Inside the proceedWithLogin function in LoginPage.jsx
 
-    // Determine the role - If username is "admin" or has explicit role in spreadsheet
-    let userRole = "staff"; // Default role
-    
-    // Check if user is admin by username
-    if (userMatch?.id.toLowerCase() === "admin") {
-      userRole = "admin";
-    } 
-    // Or check if role is specified in the spreadsheet
-    else if (userMatch?.role) {
-      userRole = userMatch.role.toLowerCase();
-    }
+// In LoginPage.jsx, modify your proceedWithLogin function
 
-    // Create user object with determined role
-    const userData = {
-      email: userMatch?.id || email,
-      name: (userMatch?.id || email).split("@")[0],
-      role: userRole
-    }
+// In LoginPage.jsx, modify your proceedWithLogin function
 
-    // Log the user in
-    login(userData)
-    console.log("User logged in, userData:", userData)
+// In LoginPage.jsx, modify your proceedWithLogin function
 
-    // Navigate to the appropriate dashboard with a small delay
-    setTimeout(() => {
-      navigate("/admin-dashboard", { replace: true })
-    }, 100)
+const proceedWithLogin = (userMatch) => {
+  setShowPasswordChangeAlert(false);
 
-    setIsLoading(false)
+  // Determine the role - If username is "admin" or has explicit role in spreadsheet
+  let userRole = "staff"; // Default role
+  
+  // Check if user is admin by username
+  if (userMatch?.id.toLowerCase() === "admin") {
+    userRole = "admin";
+  } 
+  // Or check if role is specified in the spreadsheet
+  else if (userMatch?.role) {
+    userRole = userMatch.role.toLowerCase();
   }
+  
+  // Get the user ID (email or username)
+  const userId = userMatch?.id || email;
+  
+  // Extract name part if it's an email
+  const userName = userId.split('@')[0];
+  
+  // Create user object with ALL required properties
+  // IMPORTANT: Explicitly set staffName to match what's in the booking sheet
+  const userData = {
+    email: userId,
+    name: userName,
+    role: userRole,
+    staffName: userName  // This is the critical line - setting staffName explicitly
+  };
+  
+  // Add debug output
+  console.log("User data being passed to login:", userData);
+  
+  // Log the user in
+  login(userData);
+  
+  // Navigate to the appropriate dashboard with a small delay
+  setTimeout(() => {
+    navigate("/admin-dashboard", { replace: true });
+  }, 100);
+
+  setIsLoading(false);
+}
 
   // Animation variants
   const fadeIn = {
