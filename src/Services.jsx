@@ -755,7 +755,7 @@ const Services = ({ isAdmin = false }) => {
           <div className="flex space-x-2">
             {isAdmin && (
               <button 
-                className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2"
+                className="flex items-center justify-center px-4 py-2 bg-pink-600 text-white rounded-md hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2"
                 onClick={handleAddServiceClick}
               >
                 <Plus size={18} className="mr-2" />
