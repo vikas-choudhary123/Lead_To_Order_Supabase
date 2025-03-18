@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Calendar, User, Clock, Filter, ChevronDown, Download, Search, CheckCircle, XCircle } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const StaffHistory = () => {
   // State for attendance data and UI
@@ -21,9 +23,16 @@ const StaffHistory = () => {
   // Show filters panel state
   const [showFilters, setShowFilters] = useState(false);
 
+  // Add notification state to your component
+  const [notification, setNotification] = useState({
+    show: false,
+    message: "",
+    type: "" // "success", "error", or "info"
+  });
+
   // Google Sheet Details
   const sheetId = '1Kb-fhC1yiFJCyPO7TJDqnu-lQ1n1H6mLErlkSPc6yHc';
-  const sheetName = 'Copy of Staff Attendance';
+  const sheetName = 'Staff Attendance';
 
   // Fetch attendance data from Google Sheet
   useEffect(() => {
@@ -54,6 +63,7 @@ const StaffHistory = () => {
         let headers = [];
         let allRows = data.table.rows || [];
 
+        // Determine headers
         if (data.table.cols && data.table.cols.some(col => col.label)) {
           headers = data.table.cols.map((col, index) => ({
             id: `col${index}`,
@@ -71,9 +81,7 @@ const StaffHistory = () => {
 
         setTableHeaders(headers);
 
-        // Initialize date filters with the earliest and latest dates from the data
-        initializeDateFilters(headers, allRows);
-
+        // Process rows
         const attendanceData = allRows
           .filter((row) => row.c && row.c.some((cell) => cell && cell.v))
           .map((row, rowIndex) => {
@@ -112,6 +120,12 @@ const StaffHistory = () => {
           });
 
         setAttendanceRecords(attendanceData);
+        
+        // Initialize date filters with min/max dates from data
+        if (attendanceData.length > 0) {
+          initializeDateFilters(attendanceData);
+        }
+        
         setLoading(false);
       } catch (error) {
         console.error("Error fetching Google Sheet data:", error);
@@ -124,42 +138,27 @@ const StaffHistory = () => {
   }, []);
 
   // Initialize date filters with the earliest and latest dates from the data
-  const initializeDateFilters = (headers, rows) => {
+  const initializeDateFilters = (records) => {
     try {
-      // Find the date column index
-      const dateHeaderIndex = headers.findIndex(h => 
-        h.label.toLowerCase().includes('date')
-      );
+      if (!records || records.length === 0) return;
       
-      if (dateHeaderIndex === -1) return;
+      // Find date column id
+      const dateCol = getColumnIndex('date');
+      if (!dateCol) return;
       
-      let dates = [];
-      
-      rows.forEach(row => {
-        if (row.c && row.c[dateHeaderIndex] && row.c[dateHeaderIndex].v) {
-          let dateValue = row.c[dateHeaderIndex].v;
-          
-          if (typeof dateValue === 'string' && dateValue.indexOf('Date') === 0) {
-            const dateParts = dateValue.substring(5, dateValue.length - 1).split(',');
-            if (dateParts.length >= 3) {
-              const year = parseInt(dateParts[0]);
-              const month = parseInt(dateParts[1]) + 1;
-              const day = parseInt(dateParts[2]);
-              dates.push(`${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`);
-            }
-          }
-        }
-      });
+      // Extract all valid dates
+      const dates = records
+        .map(record => record[dateCol])
+        .filter(date => date && !isNaN(new Date(date).getTime()));
       
       if (dates.length > 0) {
-        dates.sort();
-        const firstDate = dates[0];
-        const lastDate = dates[dates.length - 1];
+        // Sort dates to find min and max
+        dates.sort((a, b) => new Date(a) - new Date(b));
         
         setFilters(prev => ({
           ...prev,
-          dateFrom: firstDate,
-          dateTo: lastDate
+          dateFrom: dates[0],
+          dateTo: dates[dates.length - 1]
         }));
       }
     } catch (error) {
@@ -183,15 +182,15 @@ const StaffHistory = () => {
     return index !== -1 ? tableHeaders[index].id : null;
   };
 
-  const nameColumnId = getColumnIndex('name');
+  // For Column A matching, use the first column (index 0)
+  const nameColumnId = 'col0'; // Always use the first column
   const dateColumnId = getColumnIndex('date');
-  // FIXED: Look for 'attendance' column instead of 'status'
   const statusColumnId = getColumnIndex('attendance');
 
   // Apply filters to attendance records
   const filteredRecords = attendanceRecords.filter(record => {
     const matchesName = !filters.staffName || 
-      (nameColumnId && record[nameColumnId] && 
+      (record[nameColumnId] && 
        record[nameColumnId].toString().toLowerCase().includes(filters.staffName.toLowerCase()));
     
     let dateInRange = true;
@@ -199,6 +198,12 @@ const StaffHistory = () => {
       const recordDate = record[dateColumnId] ? new Date(record[dateColumnId]) : null;
       const fromDate = new Date(filters.dateFrom);
       const toDate = new Date(filters.dateTo);
+      
+      // Set hours to 0 for proper date comparison
+      if (recordDate) recordDate.setHours(0, 0, 0, 0);
+      fromDate.setHours(0, 0, 0, 0);
+      toDate.setHours(0, 0, 0, 0);
+      
       dateInRange = recordDate && recordDate >= fromDate && recordDate <= toDate;
     }
     
@@ -237,26 +242,144 @@ const StaffHistory = () => {
 
   const stats = calculateStats();
 
-  // Generate staff attendance report
   const exportAttendanceReport = () => {
-    // In a real application, you would generate a CSV or PDF here
-    alert('Exporting attendance report...');
-  };
-
-  // Group records by date
-  const groupedByDate = filteredRecords.reduce((acc, record) => {
-    if (dateColumnId && record[dateColumnId]) {
-      const date = record[dateColumnId];
-      if (!acc[date]) {
-        acc[date] = [];
+    try {
+      // Show loading notification
+      setNotification({
+        show: true,
+        message: "Generating PDF report...",
+        type: "info"
+      });
+  
+      // Create a new PDF
+      const pdf = new jsPDF('l', 'mm', 'a4'); // 'l' for landscape orientation
+      
+      // Add a title to the PDF
+      pdf.setFontSize(18);
+      pdf.setTextColor(40, 40, 40);
+      pdf.text('Staff Attendance History Report', 14, 20);
+      
+      // Add date range if available
+      if (filters.dateFrom && filters.dateTo) {
+        pdf.setFontSize(12);
+        pdf.text(`Period: ${new Date(filters.dateFrom).toLocaleDateString()} to ${new Date(filters.dateTo).toLocaleDateString()}`, 14, 30);
       }
-      acc[date].push(record);
+      
+      // Add summary statistics
+      pdf.text(`Total Records: ${filteredRecords.length}`, 14, 40);
+      pdf.text(`Present: ${stats.present.count} (${stats.present.percentage}%)`, 14, 48);
+      pdf.text(`Absent: ${stats.absent.count} (${stats.absent.percentage}%)`, 14, 56);
+      
+      // Prepare data for the table
+      const headers = tableHeaders.map(header => header.label);
+      
+      // Format the data rows for PDF
+      const data = filteredRecords.map(record => {
+        return tableHeaders.map(header => {
+          // Handle date columns
+          if (header.label.toLowerCase().includes('date') && record[header.id]) {
+            try {
+              const date = new Date(record[header.id]);
+              if (!isNaN(date.getTime())) {
+                return date.toLocaleDateString();
+              }
+            } catch (error) {}
+          }
+          
+          // Handle other columns
+          return record[header.id] || 'N/A';
+        });
+      });
+      
+      // Define custom styles for different status values
+      const statusIndex = headers.findIndex(h => h.toLowerCase().includes('attendance'));
+      
+      // Use autoTable function with the pdf instance
+      autoTable(pdf, {
+        head: [headers],
+        body: data,
+        startY: 65,
+        styles: {
+          fontSize: 9,
+          cellPadding: 3,
+          lineColor: [100, 100, 100],
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: [220, 220, 220],
+          textColor: [40, 40, 40],
+          fontStyle: 'bold',
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245],
+        },
+        // Style specific cells based on their content
+        didParseCell: function(data) {
+          // Style the status column
+          if (data.section === 'body' && data.column.index === statusIndex) {
+            const value = data.cell.raw ? data.cell.raw.toString().toLowerCase() : '';
+            
+            if (value === 'present') {
+              data.cell.styles.fillColor = [220, 250, 220]; // Light green
+              data.cell.styles.textColor = [0, 100, 0]; // Dark green
+              data.cell.styles.fontStyle = 'bold';
+            } else if (value === 'absent') {
+              data.cell.styles.fillColor = [250, 220, 220]; // Light red
+              data.cell.styles.textColor = [100, 0, 0]; // Dark red
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
+        },
+        // Add page number at the bottom
+        didDrawPage: function(data) {
+          // Footer with page numbers
+          const pageCount = pdf.internal.getNumberOfPages();
+          pdf.setFontSize(8);
+          pdf.setTextColor(100, 100, 100);
+          pdf.text(`Page ${pdf.internal.getCurrentPageInfo().pageNumber} of ${pageCount}`, 
+                   pdf.internal.pageSize.getWidth() - 20, 
+                   pdf.internal.pageSize.getHeight() - 10);
+          
+          // Add generation date in footer
+          const today = new Date();
+          pdf.text(`Generated on: ${today.toLocaleDateString()} ${today.toLocaleTimeString()}`, 
+                   14, 
+                   pdf.internal.pageSize.getHeight() - 10);
+        }
+      });
+      
+      // Generate filename with date
+      const date = new Date();
+      const filename = `staff_attendance_report_${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}.pdf`;
+      
+      // Save the PDF
+      pdf.save(filename);
+      
+      // Show success notification
+      setNotification({
+        show: true,
+        message: "PDF report generated successfully!",
+        type: "success"
+      });
+      
+      // Auto-hide notification after 3 seconds
+      setTimeout(() => {
+        setNotification({ show: false, message: "", type: "" });
+      }, 3000);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      setNotification({
+        show: true,
+        message: `Failed to generate PDF: ${error.message}`,
+        type: "error"
+      });
+      
+      // Auto-hide error notification after 5 seconds
+      setTimeout(() => {
+        setNotification({ show: false, message: "", type: "" });
+      }, 5000);
     }
-    return acc;
-  }, {});
-
-  // Sort dates in descending order (most recent first)
-  const sortedDates = Object.keys(groupedByDate).sort((a, b) => new Date(b) - new Date(a));
+  };
 
   // Helper function to get status color
   const getStatusColor = (status) => {
@@ -287,21 +410,6 @@ const StaffHistory = () => {
     
     return value.toString();
   };
-
-  // Add debug console logs
-  useEffect(() => {
-    if (tableHeaders.length > 0) {
-      console.log("All headers:", tableHeaders);
-      console.log("Status column ID:", statusColumnId);
-      
-      if (statusColumnId && attendanceRecords.length > 0) {
-        // Log a few records to see what the status values actually look like
-        console.log("Sample attendance values:", 
-          attendanceRecords.slice(0, 3).map(r => r[statusColumnId])
-        );
-      }
-    }
-  }, [tableHeaders, attendanceRecords, statusColumnId]);
 
   return (
     <div className="space-y-6">
@@ -431,82 +539,93 @@ const StaffHistory = () => {
         <div className="bg-red-50 p-4 rounded-md text-red-800 text-center">
           {error} <button className="underline ml-2" onClick={() => window.location.reload()}>Try again</button>
         </div>
-      ) : sortedDates.length > 0 ? (
-        /* Attendance History Table */
-        <div className="space-y-6">
-          {sortedDates.map((date) => (
-            <div key={date} className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                <h3 className="text-lg font-medium text-gray-800 flex items-center">
-                  <Calendar size={18} className="mr-2 text-pink-600" />
-                  {new Date(date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                </h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      {tableHeaders.map((header) => (
-                        <th 
-                          key={header.id} 
-                          scope="col" 
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          {header.label}
-                        </th>
-                      ))}
-                      {/* <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th> */}
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {groupedByDate[date].map((record) => (
-                      <tr key={record._id} className="hover:bg-gray-50">
-                        {tableHeaders.map((header) => (
-                          <td key={`${record._id}-${header.id}`} className="px-6 py-4 whitespace-nowrap">
-                            {header.id === nameColumnId ? (
-                              // Special formatting for name column
-                              <div className="flex items-center">
-                                <div className="flex-shrink-0 h-10 w-10 bg-pink-100 rounded-full flex items-center justify-center">
-                                  <User className="text-pink-600" size={20} />
-                                </div>
-                                <div className="ml-4">
-                                  <div className="text-sm font-medium text-gray-900">{record[header.id] || '—'}</div>
-                                </div>
-                              </div>
-                            ) : header.id === statusColumnId ? (
-                              // Special formatting for status column
-                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(record[header.id])}`}>
-                                {record[header.id]?.toString().toLowerCase() === 'present' ? (
-                                  <CheckCircle size={14} className="mr-1" />
-                                ) : record[header.id]?.toString().toLowerCase() === 'absent' ? (
-                                  <XCircle size={14} className="mr-1" />
-                                ) : null}
-                                {record[header.id] || '—'}
-                              </span>
-                            ) : (
-                              // Default formatting for other columns
-                              <div className="text-sm text-gray-900">{formatCellData(header.id, record[header.id])}</div>
-                            )}
-                          </td>
-                        ))}
-                        {/* <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button className="text-pink-600 hover:text-pink-800">
-                            View
-                          </button>
-                        </td> */}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ))}
-        </div>
       ) : (
-        <div className="bg-white rounded-lg shadow p-8 text-center">
-          <div className="text-gray-500">No attendance records found matching your filters</div>
+        /* Attendance History Table */
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  {tableHeaders.map((header) => (
+                    <th 
+                      key={header.id} 
+                      scope="col" 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      {header.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredRecords.map((record) => (
+                  <tr key={record._id} className="hover:bg-gray-50">
+                    {tableHeaders.map((header) => (
+                      <td 
+                        key={`${record._id}-${header.id}`} 
+                        className="px-6 py-4 whitespace-nowrap"
+                      >
+                        {header.id === nameColumnId ? (
+                          // Special formatting for name column
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10 bg-pink-100 rounded-full flex items-center justify-center">
+                              <User className="text-pink-600" size={20} />
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">
+                                {record[header.id] || '—'}
+                              </div>
+                            </div>
+                          </div>
+                        ) : header.id === statusColumnId ? (
+                          // Special formatting for status column
+                          <span 
+                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(record[header.id])}`}
+                          >
+                            {record[header.id]?.toString().toLowerCase() === 'present' ? (
+                              <CheckCircle size={14} className="mr-1" />
+                            ) : record[header.id]?.toString().toLowerCase() === 'absent' ? (
+                              <XCircle size={14} className="mr-1" />
+                            ) : null}
+                            {record[header.id] || '—'}
+                          </span>
+                        ) : (
+                          // Default formatting for other columns
+                          <div className="text-sm text-gray-900">
+                            {formatCellData(header.id, record[header.id])}
+                          </div>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Notification component */}
+      {notification.show && (
+        <div 
+          className={`fixed bottom-4 right-4 px-6 py-4 rounded-lg shadow-lg z-50 flex items-center ${
+            notification.type === "success" ? "bg-green-100" : 
+            notification.type === "info" ? "bg-blue-100" : "bg-red-100"
+          }`}
+        >
+          {notification.type === "success" ? (
+            <CheckCircle className="text-green-600 mr-3" size={20} />
+          ) : notification.type === "info" ? (
+            <Search className="text-blue-600 mr-3" size={20} />
+          ) : (
+            <XCircle className="text-red-600 mr-3" size={20} />
+          )}
+          <p className={`font-medium ${
+            notification.type === "success" ? "text-green-800" : 
+            notification.type === "info" ? "text-blue-800" : "text-red-800"
+          }`}>
+            {notification.message}
+          </p>
         </div>
       )}
     </div>
