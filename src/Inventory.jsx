@@ -1154,20 +1154,24 @@ const handleSaveStockInline = async (product) => {
                   ))}
                   
                   {/* Stock In column */}
+                  {isStaff && (
                   <th
                     scope="col"
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                   >
                     Stock Out
                   </th>
+                  )}
                   
                   {/* Stock Out column */}
+                  {isStaff && (
                   <th
                     scope="col"
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                   >
                     Stock In
                   </th>
+                  )}
                   
                   {/* Actions column */}
                   <th
@@ -1214,8 +1218,8 @@ const handleSaveStockInline = async (product) => {
                           </td>
                         );
                       })}
-                      
                       {/* Stock In cell */}
+                      {isStaff && (
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="relative">
                           <input
@@ -1229,8 +1233,10 @@ const handleSaveStockInline = async (product) => {
                           />
                         </div>
                       </td>
+                      )}
                       
                       {/* Stock Out cell */}
+                      {isStaff && (
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="relative">
                           <input
@@ -1244,7 +1250,7 @@ const handleSaveStockInline = async (product) => {
                           />
                         </div>
                       </td>
-                      
+                      )}
                       {/* Actions cell */}
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex space-x-2 justify-end">
