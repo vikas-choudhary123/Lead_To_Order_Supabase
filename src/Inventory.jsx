@@ -32,6 +32,9 @@ const Inventory = ({ hideHistoryButton = false }) => {
   // Add state for history modal
   const [showHistoryModal, setShowHistoryModal] = useState(false)
   const [historySearchTerm, setHistorySearchTerm] = useState("")
+  const [stockMovementHistory, setStockMovementHistory] = useState([])
+const [stockMovementHeaders, setStockMovementHeaders] = useState([])
+const [loadingHistory, setLoadingHistory] = useState(false)
   // Function to handle search
   const [searchTerm, setSearchTerm] = useState("")
   // Add state for stock in/out values
@@ -321,50 +324,65 @@ const fetchTodayStockMovements = async () => {
         })
         setNewProduct(emptyProduct)
 
-        // Process all rows from the sheet
-        const allProductsData = allRows
-          .filter((row) => row.c && row.c.some((cell) => cell && cell.v))
-          .map((row, rowIndex) => {
-            const productData = {
-              _id: Math.random().toString(36).substring(2, 15),
-              _rowIndex: rowIndex + 2, // +2 for header row and 1-indexing
-            }
+        // Modify the data processing part in the fetchGoogleSheetData function
+// Look for this section in the useEffect hook where you process the data rows
 
-            row.c && row.c.forEach((cell, index) => {
-              // Skip the delete column 
-              if (index === deleteColumnIndex) return;
+// Process all rows from the sheet
+const allProductsData = allRows
+.filter((row) => {
+  // Skip rows with no data
+  if (!row.c || !row.c.some((cell) => cell && cell.v)) return false;
+  
+  // Check if this product is marked as deleted (column H)
+  // Column H is at index 7 (0-indexed)
+  const isDeleted = row.c[deleteColumnIndex] && 
+                   row.c[deleteColumnIndex].v && 
+                   row.c[deleteColumnIndex].v.toString().toLowerCase() === 'yes';
+  
+  // Only include rows that are NOT marked as deleted
+  return !isDeleted;
+})
+.map((row, rowIndex) => {
+  const productData = {
+    _id: Math.random().toString(36).substring(2, 15),
+    _rowIndex: rowIndex + 2, // +2 for header row and 1-indexing
+  }
 
-              const adjustedIndex = index < deleteColumnIndex ? index : index - 1;
-              const header = headers[adjustedIndex]
-              
-              // Handle date values
-              if (cell && cell.v && cell.v.toString().indexOf('Date') === 0) {
-                const dateString = cell.v.toString();
-                const dateParts = dateString.substring(5, dateString.length - 1).split(',');
-                
-                if (dateParts.length >= 3) {
-                  const year = parseInt(dateParts[0]);
-                  // Month is 0-based in JavaScript Date objects, so add 1
-                  const month = parseInt(dateParts[1]) + 1;
-                  const day = parseInt(dateParts[2]);
-                  
-                  // Format as DD/MM/YYYY
-                  productData[header.id] = `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
-                } else {
-                  productData[header.id] = cell.v;
-                }
-              } else {
-                // Handle non-date values
-                productData[header.id] = cell ? cell.v : '';
-                
-                if (header.type === 'number' && !isNaN(productData[header.id])) {
-                  productData[header.id] = Number(productData[header.id]).toLocaleString();
-                }
-              }
-            })
+  row.c && row.c.forEach((cell, index) => {
+    // Skip the delete column 
+    if (index === deleteColumnIndex) return;
 
-            return productData
-          })
+    const adjustedIndex = index < deleteColumnIndex ? index : index - 1;
+    const header = headers[adjustedIndex]
+    
+    // Handle date values
+    if (cell && cell.v && cell.v.toString().indexOf('Date') === 0) {
+      const dateString = cell.v.toString();
+      const dateParts = dateString.substring(5, dateString.length - 1).split(',');
+      
+      if (dateParts.length >= 3) {
+        const year = parseInt(dateParts[0]);
+        // Month is 0-based in JavaScript Date objects, so add 1
+        const month = parseInt(dateParts[1]) + 1;
+        const day = parseInt(dateParts[2]);
+        
+        // Format as DD/MM/YYYY
+        productData[header.id] = `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
+      } else {
+        productData[header.id] = cell.v;
+      }
+    } else {
+      // Handle non-date values
+      productData[header.id] = cell ? cell.v : '';
+      
+      if (header.type === 'number' && !isNaN(productData[header.id])) {
+        productData[header.id] = Number(productData[header.id]).toLocaleString();
+      }
+    }
+  })
+
+  return productData
+})
 
         // Store all products for history
         setAllProducts(allProductsData)
@@ -565,6 +583,80 @@ const fetchTodayStockMovements = async () => {
     })
     setShowEditProductForm(true)
   }
+
+  // Add this function to handle edit form submission
+const handleEditSubmit = async (e) => {
+  e.preventDefault()
+  setSubmitting(true)
+
+  try {
+    const product = editingProduct
+    const rowIndex = product._rowIndex
+    
+    if (!rowIndex) {
+      throw new Error("Could not determine the row index for this product")
+    }
+    
+    // Create row data for all columns
+    const rowData = tableHeaders.map(header => 
+      editingProduct[header.id] || ''
+    )
+    
+    const formData = new FormData()
+    formData.append('sheetName', sheetName)
+    formData.append('action', 'update')
+    formData.append('rowIndex', rowIndex)
+    formData.append('rowData', JSON.stringify(rowData))
+    
+    await fetch(scriptUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: formData
+    })
+    
+    console.log("Edit form submitted successfully")
+    
+    // Update product in products array
+    setProducts(prev => 
+      prev.map(p => 
+        p._id === product._id ? { ...p, ...editingProduct } : p
+      )
+    )
+    
+    // Update product in allProducts array
+    setAllProducts(prev => 
+      prev.map(p => 
+        p._id === product._id ? { ...p, ...editingProduct } : p
+      )
+    )
+    
+    // Close the edit form
+    setShowEditProductForm(false)
+    
+    // Show success notification
+    setNotification({
+      show: true,
+      message: "Product updated successfully!",
+      type: "success"
+    })
+    setTimeout(() => {
+      setNotification({ show: false, message: "", type: "" })
+    }, 3000)
+  } catch (error) {
+    console.error("Error updating product:", error)
+    
+    setNotification({
+      show: true,
+      message: `Failed to update product: ${error.message}`,
+      type: "error"
+    })
+    setTimeout(() => {
+      setNotification({ show: false, message: "", type: "" })
+    }, 5000)
+  } finally {
+    setSubmitting(false)
+  }
+}
 
   // Function to save stock changes inline
 const handleSaveStockInline = async (product) => {
@@ -799,11 +891,143 @@ const handleSaveStockInline = async (product) => {
   }
 
   // Function to open history modal
-  const handleHistoryClick = () => {
+  const handleHistoryClick = async () => {
     setHistorySearchTerm("")
     setShowHistoryModal(true)
+    setLoadingHistory(true)
+    
+    try {
+      console.log("Fetching stock movement history...")
+      
+      // Create URL to fetch the stock in/out sheet
+      const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(stockInOutSheetName)}`
+      
+      const response = await fetch(url)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch stock movement data: ${response.status}`)
+      }
+      
+      // Extract the JSON part from the response
+      const text = await response.text()
+      const jsonStart = text.indexOf('{')
+      const jsonEnd = text.lastIndexOf('}')
+      const jsonString = text.substring(jsonStart, jsonEnd + 1)
+      const data = JSON.parse(jsonString)
+      
+      // Process headers
+      let headers = []
+      
+      if (data.table.cols && data.table.cols.some(col => col.label)) {
+        headers = data.table.cols
+          .filter((_, index) => index < 7) // Only include columns A-G (0-6)
+          .map((col, index) => ({
+            id: `col${index}`,
+            label: col.label || `Column ${index + 1}`,
+            type: col.type || 'string'
+          }))
+      } else if (data.table.rows && data.table.rows.length > 0 && data.table.rows[0].c) {
+        headers = data.table.rows[0].c
+          .filter((_, index) => index < 7) // Only include columns A-G (0-6)
+          .map((cell, index) => ({
+            id: `col${index}`,
+            label: cell && cell.v ? String(cell.v) : `Column ${index + 1}`,
+            type: data.table.cols[index]?.type || 'string'
+          }))
+        data.table.rows = data.table.rows.slice(1) // Remove header row
+      }
+      
+      setStockMovementHeaders(headers)
+      
+      // Process rows
+      const historyData = data.table.rows
+        .filter((row) => row.c && row.c.some((cell) => cell && cell.v))
+        .map((row, rowIndex) => {
+          const movementData = {
+            _id: Math.random().toString(36).substring(2, 15),
+            _rowIndex: rowIndex + 2, // +2 for header row and 1-indexing
+          }
+          
+          row.c && row.c.forEach((cell, index) => {
+            // Only process columns A-G (0-6)
+            if (index < 7) {
+              const header = headers[index]
+              
+              // Handle date values
+              if (cell && cell.v && cell.v.toString().indexOf('Date') === 0) {
+                const dateString = cell.v.toString();
+                const dateParts = dateString.substring(5, dateString.length - 1).split(',');
+                
+                if (dateParts.length >= 3) {
+                  const year = parseInt(dateParts[0]);
+                  // Month is 0-based in JavaScript Date objects, so add 1
+                  const month = parseInt(dateParts[1]) + 1;
+                  const day = parseInt(dateParts[2]);
+                  
+                  // Format as DD/MM/YYYY
+                  movementData[header.id] = `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
+                } else {
+                  movementData[header.id] = cell.v;
+                }
+              } else {
+                // Handle non-date values
+                movementData[header.id] = cell ? cell.v : '';
+                
+                if (header.type === 'number' && !isNaN(movementData[header.id])) {
+                  movementData[header.id] = Number(movementData[header.id]).toLocaleString();
+                }
+              }
+            }
+          })
+          
+          return movementData
+        })
+      
+      // Sort by date (most recent first) if there's a date column
+      const sortedData = historyData.sort((a, b) => {
+        const dateCol = headers.findIndex(h => 
+          h.label.toLowerCase().includes('date') || 
+          h.label.toLowerCase().includes('timestamp')
+        )
+        
+        if (dateCol >= 0) {
+          const colId = `col${dateCol}`
+          // Try to parse dates for comparison
+          try {
+            const dateA = a[colId] ? new Date(a[colId].split('/').reverse().join('-')) : new Date(0)
+            const dateB = b[colId] ? new Date(b[colId].split('/').reverse().join('-')) : new Date(0)
+            return dateB - dateA // Most recent first
+          } catch (e) {
+            return 0
+          }
+        }
+        return 0
+      })
+      
+      setStockMovementHistory(sortedData)
+      
+    } catch (error) {
+      console.error("Error fetching stock movement history:", error)
+      setNotification({
+        show: true,
+        message: `Failed to load history: ${error.message}`,
+        type: "error"
+      })
+      setTimeout(() => {
+        setNotification({ show: false, message: "", type: "" })
+      }, 5000)
+    } finally {
+      setLoadingHistory(false)
+    }
   }
-
+  
+  // Function to filter history products for stock movements
+  const filteredStockMovementHistory = historySearchTerm
+    ? stockMovementHistory.filter(item => 
+        Object.values(item).some(value => 
+          value && value.toString().toLowerCase().includes(historySearchTerm.toLowerCase())
+        )
+      )
+    : stockMovementHistory
   // Function to confirm and "soft delete" a product by marking column H as "Yes"
   const confirmDelete = async () => {
     try {
@@ -1135,13 +1359,15 @@ const handleSaveStockInline = async (product) => {
               <thead className="bg-gray-50">
                 <tr>
                   {/* Checkbox column for row editing */}
+                  {isStaff && (
+
                   <th
                     scope="col"
                     className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10"
                   >
                     Edit
                   </th>
-                  
+                  )}
                   {/* Regular data columns */}
                   {displayHeaders.map((header) => (
                     <th
@@ -1187,6 +1413,7 @@ const handleSaveStockInline = async (product) => {
                   filteredProducts.map((product) => (
                     <tr key={product._id} className={editableRows[product._id] ? 'bg-blue-50' : ''}>
                       {/* Checkbox cell for row editing */}
+                      {isStaff && (
                       <td className="px-2 py-4 whitespace-nowrap text-center">
                         <input
                           type="checkbox"
@@ -1195,6 +1422,7 @@ const handleSaveStockInline = async (product) => {
                           className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                         />
                       </td>
+                      )}
                       
                       {/* Regular data cells */}
                       {displayHeaders.map((header) => {
@@ -1374,76 +1602,76 @@ const handleSaveStockInline = async (product) => {
 
       {/* Edit Product Form Modal */}
       <AnimatePresence>
-        {showEditProductForm && (
-          <motion.div
-            className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
+  {showEditProductForm && (
+    <motion.div
+      className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+      >
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-medium text-gray-900">
+              Edit Product
+            </h3>
+            <button
+              onClick={() => setShowEditProductForm(false)}
+              className="text-gray-400 hover:text-gray-500"
             >
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-medium text-gray-900">
-                    Edit Product
-                  </h3>
-                  <button
-                    onClick={() => setShowEditProductForm(false)}
-                    className="text-gray-400 hover:text-gray-500"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-                <form onSubmit={() => {}} className="space-y-4">
-                  {tableHeaders.map((header) => (
-                    <div key={header.id}>
-                      <label htmlFor={`edit-${header.id}`} className="block text-sm font-medium text-gray-700">
-                        {header.label}
-                      </label>
-                      <input
-                        type={header.type === 'number' ? 'number' : 'text'}
-                        name={header.id}
-                        id={`edit-${header.id}`}
-                        value={editingProduct[header.id] || ''}
-                        onChange={handleEditInputChange}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-                  ))}
-                  <div className="pt-4 flex justify-end space-x-3">
-                    <button
-                      type="button"
-                      onClick={() => setShowEditProductForm(false)}
-                      className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-400 disabled:cursor-not-allowed"
-                    >
-                      {submitting ? (
-                        <>
-                          <span className="inline-block mr-2 h-4 w-4 border-t-2 border-b-2 border-white rounded-full animate-spin"></span>
-                          Saving...
-                        </>
-                      ) : (
-                        'Save Changes'
-                      )}
-                    </button>
-                  </div>
-                </form>
+              <X size={20} />
+            </button>
+          </div>
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            {tableHeaders.map((header) => (
+              <div key={header.id}>
+                <label htmlFor={`edit-${header.id}`} className="block text-sm font-medium text-gray-700">
+                  {header.label}
+                </label>
+                <input
+                  type={header.type === 'number' ? 'number' : 'text'}
+                  name={header.id}
+                  id={`edit-${header.id}`}
+                  value={editingProduct[header.id] || ''}
+                  onChange={handleEditInputChange}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                />
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            ))}
+            <div className="pt-4 flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setShowEditProductForm(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-400 disabled:cursor-not-allowed"
+              >
+                {submitting ? (
+                  <>
+                    <span className="inline-block mr-2 h-4 w-4 border-t-2 border-b-2 border-white rounded-full animate-spin"></span>
+                    Saving...
+                  </>
+                ) : (
+                  'Save Changes'
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      </motion.div>
+    </motion.div>
+  )}
+</AnimatePresence>
 
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
@@ -1500,127 +1728,109 @@ const handleSaveStockInline = async (product) => {
         )}
       </AnimatePresence>
 
-      {/* History Modal */}
-      <AnimatePresence>
-        {showHistoryModal && (
-          <motion.div
-            className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
+     {/* History Modal */}
+<AnimatePresence>
+  {showHistoryModal && (
+    <motion.div
+      className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+      >
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-medium text-gray-900">Inventory IN and OUT History</h3>
+            <button
+              onClick={() => setShowHistoryModal(false)}
+              className="text-gray-400 hover:text-gray-500"
             >
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-medium text-gray-900">Product History</h3>
-                  <button
-                    onClick={() => setShowHistoryModal(false)}
-                    className="text-gray-400 hover:text-gray-500"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-                <div className="mt-4 relative">
-                  <input
-                    type="text"
-                    placeholder="Search all products..."
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    value={historySearchTerm}
-                    onChange={(e) => setHistorySearchTerm(e.target.value)}
-                  />
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                    <Search className="h-5 w-5 text-gray-400" />
-                  </div>
-                  {historySearchTerm && (
-                    <button
-                      onClick={() => setHistorySearchTerm("")}
-                      className="absolute inset-y-0 right-0 flex items-center pr-3"
+              <X size={20} />
+            </button>
+          </div>
+          <div className="mt-4 relative">
+            <input
+              type="text"
+              placeholder="Search stock movements..."
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              value={historySearchTerm}
+              onChange={(e) => setHistorySearchTerm(e.target.value)}
+            />
+            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+              <Search className="h-5 w-5 text-gray-400" />
+            </div>
+            {historySearchTerm && (
+              <button
+                onClick={() => setHistorySearchTerm("")}
+                className="absolute inset-y-0 right-0 flex items-center pr-3"
+              >
+                <X className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="overflow-x-auto flex-1 min-h-0">
+          {loadingHistory ? (
+            <div className="text-center py-10">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500 mb-4"></div>
+              <p className="text-purple-600">Loading inventory history data...</p>
+            </div>
+          ) : (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  {stockMovementHeaders.map((header) => (
+                    <th
+                      key={header.id}
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                     >
-                      <X className="h-5 w-5 text-gray-400 hover:text-gray-600" />
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div className="overflow-x-auto flex-1 min-h-0">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50 sticky top-0">
-                    <tr>
-                      {tableHeaders.map((header) => (
-                        <th
-                          key={header.id}
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          {header.label}
-                        </th>
-                      ))}
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Deleted
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredHistoryProducts.length > 0 ? (
-                      filteredHistoryProducts.map((product) => (
-                        <tr key={product._id} className={product.col7 === 'Yes' ? 'bg-red-50' : ''}>
-                          {tableHeaders.map((header) => {
-                            // Special rendering for stock status column
-                            if (header.label.toLowerCase().includes('status')) {
-                              return (
-                                <td key={header.id} className="px-6 py-4 whitespace-nowrap">
-                                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStockStatusColor(product[header.id])}`}>
-                                    {product[header.id] || 'Unknown'}
-                                  </span>
-                                </td>
-                              );
-                            }
-                            
-                            // Default rendering for other columns
-                            return (
-                              <td key={header.id} className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">
-                                  {product[header.id] || ''}
-                                </div>
-                              </td>
-                            );
-                          })}
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${product.col7 === 'Yes' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-                              {product.col7 === 'Yes' ? 'Yes' : 'No'}
-                            </span>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={tableHeaders.length + 1} className="px-6 py-4 text-center text-gray-500">
-                          No products found
+                      {header.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredStockMovementHistory.length > 0 ? (
+                  filteredStockMovementHistory.map((item) => (
+                    <tr key={item._id}>
+                      {stockMovementHeaders.map((header) => (
+                        <td key={header.id} className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {item[header.id] || ''}
+                          </div>
                         </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              <div className="p-4 border-t border-gray-200 flex justify-end">
-                <button
-                  onClick={() => setShowHistoryModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                >
-                  Close
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                      ))}
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={stockMovementHeaders.length} className="px-6 py-4 text-center text-gray-500">
+                      No stock movements found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div className="p-4 border-t border-gray-200 flex justify-end">
+          <button
+            onClick={() => setShowHistoryModal(false)}
+            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+          >
+            Close
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  )}
+</AnimatePresence>
 
       {/* Notification popup */}
       <AnimatePresence>
