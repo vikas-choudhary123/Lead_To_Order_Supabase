@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calendar, CheckCircle, XCircle, Users, X, Save, Edit, AlertCircle, CheckCircle2, Search, Download, FileText, Filter } from "lucide-react"
+import { Calendar, CheckCircle, Clock, XCircle, Users, X, Save, Edit, AlertCircle, CheckCircle2, Search, Download, FileText, Filter } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
 const StaffAttendance = () => {
@@ -21,7 +21,9 @@ const StaffAttendance = () => {
   const [stats, setStats] = useState({
     total: 0,
     present: 0,
-    absent: 0
+    absent: 0,
+    halfDay: 0,
+    shortShift: 0
   })
   const [todayAttendance, setTodayAttendance] = useState({}) // Store today's attendance data
   const [searchTerm, setSearchTerm] = useState("")
@@ -126,10 +128,20 @@ const StaffAttendance = () => {
       todayAttendance[staff.col_2] === 'Absent'
     ).length;
     
+    const halfDay = filtered.filter(staff => 
+      todayAttendance[staff.col_2] === 'Half Day'
+    ).length;
+    
+    const shortShift = filtered.filter(staff => 
+      todayAttendance[staff.col_2] === 'Short Shift'
+    ).length;
+    
     setStats({
       total: filtered.length,
       present,
-      absent
+      absent,
+      halfDay,
+      shortShift
     });
   }
 
@@ -385,11 +397,15 @@ const StaffAttendance = () => {
   const calculateStats = (attendanceData) => {
     const present = Object.values(attendanceData).filter(value => value === 'Present').length
     const absent = Object.values(attendanceData).filter(value => value === 'Absent').length
+    const halfDay = Object.values(attendanceData).filter(value => value === 'Half Day').length
+    const shortShift = Object.values(attendanceData).filter(value => value === 'Short Shift').length
     
     setStats({
       total: staffData.length,
       present,
-      absent
+      absent,
+      halfDay,
+      shortShift
     })
   }
 
@@ -764,6 +780,24 @@ const StaffAttendance = () => {
             <p className="text-2xl font-bold text-gray-800">{stats.absent}</p>
           </div>
         </div>
+        <div className="bg-white rounded-lg shadow p-4 flex items-center">
+          <div className="rounded-full bg-yellow-100 p-3 mr-4">
+            <Edit size={24} className="text-yellow-600" />
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">Half Day</p>
+            <p className="text-2xl font-bold text-gray-800">{stats.halfDay}</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-4 flex items-center">
+          <div className="rounded-full bg-purple-100 p-3 mr-4">
+            <Clock size={24} className="text-purple-600" />
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">Short Shift</p>
+            <p className="text-2xl font-bold text-gray-800">{stats.shortShift}</p>
+          </div>
+        </div>
       </div>
 
       {/* Search and Filter section */}
@@ -951,20 +985,22 @@ const StaffAttendance = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <select
-                          value={attendanceValues[staff.id] || ''}
-                          onChange={(e) => handleAttendanceChange(staff.id, e.target.value)}
-                          disabled={!selectedRows[staff.id]}
-                          className={`block w-full rounded-md border-gray-300 shadow-sm
-                            focus:border-pink-500 focus:ring focus:ring-pink-500 focus:ring-opacity-50
-                            ${!selectedRows[staff.id] ? 'bg-gray-100' : ''}
-                            ${hasAttendanceToday ? 'border-green-500' : ''}`}
-                        >
-                          <option value="">Select Status</option>
-                          <option value="Present">Present</option>
-                          <option value="Absent">Absent</option>
-                        </select>
-                      </td>
+                    <select
+                      value={attendanceValues[staff.id] || ''}
+                      onChange={(e) => handleAttendanceChange(staff.id, e.target.value)}
+                      disabled={!selectedRows[staff.id]}
+                      className={`block w-full rounded-md border-gray-300 shadow-sm
+                        focus:border-pink-500 focus:ring focus:ring-pink-500 focus:ring-opacity-50
+                        ${!selectedRows[staff.id] ? 'bg-gray-100' : ''}
+                        ${hasAttendanceToday ? 'border-green-500' : ''}`}
+                    >
+                      <option value="">Select Status</option>
+                      <option value="Present">Present</option>
+                      <option value="Absent">Absent</option>
+                      <option value="Half Day">Half Day</option>
+                      <option value="Short Shift">Short Shift</option>
+                    </select>
+                  </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {hasAttendanceToday ? (
                           <div className="flex items-center">
@@ -1039,6 +1075,8 @@ const StaffAttendance = () => {
               // Generate a summary report
               const presentCount = Object.values(todayAttendance).filter(value => value === 'Present').length;
               const absentCount = Object.values(todayAttendance).filter(value => value === 'Absent').length;
+              const halfDayCount = Object.values(todayAttendance).filter(value => value === 'Half Day').length;
+              const shortShiftCount = Object.values(todayAttendance).filter(value => value === 'Short Shift').length;
               const notRecordedCount = staffData.length - presentCount - absentCount;
               const presentPercentage = staffData.length > 0 ? Math.round((presentCount / staffData.length) * 100) : 0;
               
@@ -1049,6 +1087,8 @@ Summary:
 - Total Staff: ${staffData.length}
 - Present: ${presentCount} (${presentPercentage}%)
 - Absent: ${absentCount}
+- Half Day: ${halfDayCount}
+- Short Shift: ${shortShiftCount}
 - Not Recorded: ${notRecordedCount}
 
 Attendance Details:
