@@ -435,7 +435,7 @@ export default function BookingsPage() {
           <div className="p-6 border-b border-gray-800">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h2 className="text-xl font-semibold text-white">Bookings for {format(date, "MMMM d, yyyy")}</h2>
+                <h2 className="text-xl font-semibold text-white">Bookingsssss for {format(date, "MMMM d, yyyy")}</h2>
                 <p className="text-sm text-gray-400">Manage your bookings and appointments</p>
               </div>
               <div className="flex items-center gap-2">
