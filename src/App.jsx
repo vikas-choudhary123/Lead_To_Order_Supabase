@@ -1,53 +1,24 @@
 "use client"
 
 import { useState } from "react"
-import Layout from "./components/layout/Layout"
-import Dashboard from "./components/dashboard/Dashboard"
-import BookingsPage from "./components/bookings/BookingsPage"
-import DailyEntryPage from "./components/dailyEntry/DailyEntryPage"
-import CarServicePage from "./components/services/CarServicePage"
-import BikeServicePage from "./components/services/BikeServicePage"
-import AddServicePage from "./components/services/AddServicePage"
-import ServiceHistoryPage from "./components/services/ServiceHistoryPage"
-import StaffAttendancePage from "./components/staff/StaffAttendancePage"
-import AddStaffPage from "./components/staff/AddStaffPage"
-import StaffHistoryPage from "./components/staff/StaffHistoryPage"
+import LoginForm from "./components/login-form"
+import UserForm from "./components/user-form"
 
 function App() {
-  const [currentRoute, setCurrentRoute] = useState("/")
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
 
-  // Simple routing function
-  const renderContent = () => {
-    switch (currentRoute) {
-      case "/":
-        return <Dashboard />
-      case "/bookings":
-        return <BookingsPage />
-      case "/daily-entry":
-        return <DailyEntryPage />
-      case "/services/car":
-        return <CarServicePage />
-      case "/services/bike":
-        return <BikeServicePage />
-      case "/services/add":
-        return <AddServicePage />
-      case "/services/history":
-        return <ServiceHistoryPage />
-      case "/staff/attendance":
-        return <StaffAttendancePage />
-      case "/staff/add":
-        return <AddStaffPage />
-      case "/staff/history":
-        return <StaffHistoryPage />
-      default:
-        return <Dashboard />
+  const handleLogin = (username, password) => {
+    if (username === "vikas" && password === "vikas@123") {
+      setIsLoggedIn(true)
+    } else {
+      alert("Invalid credentials. Please try again.")
     }
   }
 
   return (
-    <Layout currentRoute={currentRoute} setCurrentRoute={setCurrentRoute}>
-      {renderContent()}
-    </Layout>
+    <main className="flex min-h-screen flex-col items-center justify-center p-4 bg-gray-50">
+      <div className="w-full max-w-md">{!isLoggedIn ? <LoginForm onLogin={handleLogin} /> : <UserForm />}</div>
+    </main>
   )
 }
 
