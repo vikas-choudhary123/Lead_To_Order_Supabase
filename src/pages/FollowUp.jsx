@@ -428,7 +428,7 @@ function FollowUp() {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Action</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Call Date</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Call Time</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th> */}
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -472,11 +472,11 @@ function FollowUp() {
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.nextCallTime}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                               <div className="flex space-x-2">
-                                <Link to={`/follow-up/${followUp.leadNo}`}>
+                                {/* <Link to={`/follow-up/${followUp.leadNo}`}>
                                   <button className="px-3 py-1 text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-md">
                                     View
                                   </button>
-                                </Link>
+                                </Link> */}
                               </div>
                             </td>
                           </tr>

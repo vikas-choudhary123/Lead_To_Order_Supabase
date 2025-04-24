@@ -443,15 +443,39 @@ const handleStateChange = (e) => {
   const handleGeneratePDF = () => {
     setIsGenerating(true)
     
-    // Simulate PDF generation
-    setTimeout(() => {
-      setIsGenerating(false)
-      // In a real app, this would be a URL to the generated PDF
-      setPdfUrl("https://example.com/quotation_" + quotationData.quotationNo + ".pdf")
+    try {
+      // Generate the PDF base64 data
+      const base64Data = generatePDFFromData()
       
-      // Show success message
-      alert("PDF generated successfully!")
-    }, 1500)
+      // Convert base64 to Blob
+      const byteCharacters = atob(base64Data)
+      const byteNumbers = new Array(byteCharacters.length)
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i)
+      }
+      const byteArray = new Uint8Array(byteNumbers)
+      const blob = new Blob([byteArray], { type: 'application/pdf' })
+      
+      // Create a link element to trigger download
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = `Quotation_${quotationData.quotationNo}.pdf`
+      
+      // Append to body, click, and remove
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      // Clean up the URL object
+      URL.revokeObjectURL(link.href)
+      
+      setIsGenerating(false)
+      alert("PDF generated and downloaded successfully!")
+    } catch (error) {
+      console.error("Error generating PDF:", error)
+      alert("Failed to generate PDF")
+      setIsGenerating(false)
+    }
   }
 
   // Generate shareable link
@@ -1621,14 +1645,14 @@ const handleStateChange = (e) => {
                   )}
                 </button>
                 <div className="space-x-2">
-                  <button
+                  {/* <button
                     className="border border-gray-300 hover:bg-gray-50 px-4 py-2 rounded-md flex items-center inline-flex"
                     onClick={handleGenerateLink}
                     disabled={isGenerating || isSubmitting}
                   >
                     <ShareIcon className="h-4 w-4 mr-2" />
                     Generate Link
-                  </button>
+                  </button> */}
                   <button
                     className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md flex items-center inline-flex"
                     onClick={handleGeneratePDF}

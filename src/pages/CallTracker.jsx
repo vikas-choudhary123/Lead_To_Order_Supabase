@@ -162,7 +162,7 @@ function CallTracker() {
           const historyCallTrackerData = []
           
           // Start from index 1 to skip header row
-          historyData.table.rows.slice(1).forEach((row, index) => {
+          historyData.table.rows.slice(0).forEach((row, index) => {
             if (row.c) {
               const callTrackerItem = {
                 id: index + 1,
@@ -467,7 +467,7 @@ function CallTracker() {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer Order Hold Reason Category</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Holding Date</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hold Remark</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th> */}
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -547,11 +547,11 @@ function CallTracker() {
                             <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.holdRemark}>{tracker.holdRemark}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                               <div className="flex space-x-2">
-                                <Link to={`/call-tracker/${tracker.id}`}>
+                                {/* <Link to={`/call-tracker/${tracker.id}`}>
                                   <button className="px-3 py-1 text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-md">
                                     View
                                   </button>
-                                </Link>
+                                </Link> */}
                               </div>
                             </td>
                           </tr>

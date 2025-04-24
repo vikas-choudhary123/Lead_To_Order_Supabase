@@ -206,14 +206,13 @@ function DashboardCharts() {
             quotationData && quotationData.table && quotationData.table.rows) {
             
             // Count total leads from FMS sheet
-            const totalLeads = fmsData.table.rows.filter(row => 
-                row.c && row.c[1] && row.c[1].v
-            ).length
-            
-            // Count total enquiries from Enquiry Tracker sheet
-            const totalEnquiries = enquiryData.table.rows.filter(row => 
-                row.c && row.c[1] && row.c[1].v
-            ).length
+            const totalLeads = fmsData.table.rows.slice(2).filter(row =>
+              row.c && row.c[1] && row.c[1].v
+          ).length
+          
+          // Count total enquiries where column K is not null and column L is null
+          // Count total enquiries where column K is not null and column L is null
+          const totalEnquiries = enquiryData.table.rows.filter(row =>                  row.c && row.c[1] && row.c[1].v             ).length 
             
             // Count total quotations from Make Quotation sheet
             const totalQuotations = quotationData.table.rows.filter(row => 
