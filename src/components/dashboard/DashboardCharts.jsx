@@ -249,12 +249,12 @@ function DashboardCharts() {
                 // Add more colors for other sources if needed
             }
             
-            fmsData.table.rows.forEach(row => {
-                if (row.c && row.c[3] && row.c[3].v) {
-                    const source = row.c[3].v
-                    sourceCounter[source] = (sourceCounter[source] || 0) + 1
-                }
-            })
+            fmsData.table.rows.slice(2).forEach(row => {
+              if (row.c && row.c[3] && row.c[3].v) {
+                  const source = row.c[3].v
+                  sourceCounter[source] = (sourceCounter[source] || 0) + 1
+              }
+          })
             
             // Convert to array format for the chart
             const newSourceData = Object.entries(sourceCounter).map(([name, value]) => ({

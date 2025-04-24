@@ -131,15 +131,18 @@ function CallTracker() {
           const pendingCallTrackerData = []
           
           // Skip the header row (index 0)
-          pendingData.table.rows.slice(0).forEach((row, index) => {
-            if (row.c) {
+          pendingData.table.rows.slice(2).forEach((row, index) => {
+            // MODIFIED: Only show rows where column AJ (index 35) is not null and column AK (index 36) is null
+            if (row.c && 
+                row.c[35] && row.c[35].v && 
+                (!row.c[36] || !row.c[36].v)) {
               const callTrackerItem = {
                 id: index + 1,
                 leadId: row.c[1] ? row.c[1].v : "", // Column B - Lead Number
                 receiverName: row.c[2] ? row.c[2].v : "", // Column C - Lead Receiver Name
-                leadSource: row.c[3] ? row.c[3].v : "", // Column D - Lead Source
-                salespersonName: row.c[4] ? row.c[4].v : "", // Column E - Salesperson Name
-                companyName: row.c[6] ? row.c[6].v : "", // Column G - Company Name
+                leadSource: row.c[38] ? row.c[38].v : "", // Column D - Lead Source
+                salespersonName: row.c[39] ? row.c[39].v : "", // Column E - Salesperson Name
+                companyName: row.c[40] ? row.c[40].v : "", // Column G - Company Name
                 createdAt: row.c[0] ? row.c[0].v : "", // Using date from column A
                 status: "Expected", // Default status for pending
                 priority: determinePriority(row.c[3] ? row.c[3].v : ""), // Determine priority based on source
@@ -159,7 +162,7 @@ function CallTracker() {
           const historyCallTrackerData = []
           
           // Start from index 1 to skip header row
-          historyData.table.rows.slice(0).forEach((row, index) => {
+          historyData.table.rows.slice(1).forEach((row, index) => {
             if (row.c) {
               const callTrackerItem = {
                 id: index + 1,
@@ -342,19 +345,19 @@ function CallTracker() {
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
-                          Lead Source
+                          Enquiry Status
                         </th>
                         <th
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
-                          Sales Person Name
+                          What Did Customer Say
                         </th>
                         <th
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
-                          Company Name
+                          Current Stage
                         </th>
                         <th
                           scope="col"

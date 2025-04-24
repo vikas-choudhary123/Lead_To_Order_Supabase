@@ -55,15 +55,17 @@ function DashboardMetrics() {
         let quotationsSent = 0
         let ordersReceived = 0
         
-        // Count total leads from FMS sheet (assuming header row is excluded)
+        // Count total leads from FMS sheet - MODIFIED to start from row 7
         if (fmsData && fmsData.table && fmsData.table.rows) {
-          // Count all rows with data in column B (index 1)
-          totalLeads = fmsData.table.rows.filter(row => 
-            row.c && row.c[1] && row.c[1].v
+          // Count rows starting from index 6 (row 7 in spreadsheet) with data in column B (index 1)
+          totalLeads = fmsData.table.rows.filter((row, index) => 
+            index >= 2 && row.c && row.c[1] && row.c[1].v
           ).length
           
           // Count pending follow-ups: rows where column K (index 10) is not null and column L (index 11) is null
-          pendingFollowups = fmsData.table.rows.filter(row => 
+          // Also modified to start from row 7
+          pendingFollowups = fmsData.table.rows.filter((row, index) => 
+            index >= 2 && 
             row.c && 
             row.c[10] && row.c[10].v && 
             (!row.c[11] || !row.c[11].v)
