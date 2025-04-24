@@ -20,29 +20,88 @@ export const AuthContext = createContext(null)
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [notification, setNotification] = useState(null)
+  const [currentUser, setCurrentUser] = useState(null)
+  const [userType, setUserType] = useState(null)
 
   // Check if user is already logged in
   useEffect(() => {
     const auth = localStorage.getItem("isAuthenticated")
-    if (auth === "true") {
+    const storedUser = localStorage.getItem("currentUser")
+    const storedUserType = localStorage.getItem("userType")
+    
+    if (auth === "true" && storedUser) {
       setIsAuthenticated(true)
+      setCurrentUser(JSON.parse(storedUser))
+      setUserType(storedUserType)
     }
   }, [])
 
-  const login = (username, password) => {
-    if (username === "admin" && password === "admin123") {
-      setIsAuthenticated(true)
-      localStorage.setItem("isAuthenticated", "true")
-      showNotification("Login successful", "success")
-      return true
+  const login = async (username, password) => {
+    try {
+      // Fetch user credentials from Google Sheet
+      const loginUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=Login"
+      const response = await fetch(loginUrl)
+      const text = await response.text()
+      
+      // Extract JSON from response
+      const jsonStart = text.indexOf('{')
+      const jsonEnd = text.lastIndexOf('}') + 1
+      const jsonData = text.substring(jsonStart, jsonEnd)
+      const data = JSON.parse(jsonData)
+      
+      if (!data || !data.table || !data.table.rows) {
+        showNotification("Failed to fetch user data", "error")
+        return false
+      }
+      
+      // Find matching user
+      let foundUser = null
+      data.table.rows.forEach(row => {
+        if (row.c && 
+            row.c[0] && row.c[0].v === username && 
+            row.c[1] && row.c[1].v === password) {
+          foundUser = {
+            username: row.c[0].v,
+            userType: row.c[2] ? row.c[2].v : "user" // Default to "user" if type is not specified
+          }
+        }
+      })
+      
+      if (foundUser) {
+        // Store user info
+        const userInfo = {
+          username: foundUser.username,
+          loginTime: new Date().toISOString()
+        }
+        
+        setIsAuthenticated(true)
+        setCurrentUser(userInfo)
+        setUserType(foundUser.userType)
+        
+        localStorage.setItem("isAuthenticated", "true")
+        localStorage.setItem("currentUser", JSON.stringify(userInfo))
+        localStorage.setItem("userType", foundUser.userType)
+        
+        showNotification(`Welcome, ${username}! (${foundUser.userType})`, "success")
+        return true
+      } else {
+        showNotification("Invalid credentials", "error")
+        return false
+      }
+    } catch (error) {
+      console.error("Login error:", error)
+      showNotification("An error occurred during login", "error")
+      return false
     }
-    showNotification("Invalid credentials", "error")
-    return false
   }
 
   const logout = () => {
     setIsAuthenticated(false)
+    setCurrentUser(null)
+    setUserType(null)
     localStorage.removeItem("isAuthenticated")
+    localStorage.removeItem("currentUser")
+    localStorage.removeItem("userType")
     showNotification("Logged out successfully", "success")
   }
 
@@ -52,20 +111,40 @@ function App() {
       setNotification(null)
     }, 3000)
   }
+  
+  // Check if user has admin privileges
+  const isAdmin = () => {
+    return userType === "admin"
+  }
 
   // Protected route component
-  const ProtectedRoute = ({ children }) => {
+  const ProtectedRoute = ({ children, adminOnly = false }) => {
     if (!isAuthenticated) {
       return <Navigate to="/login" />
     }
+    
+    // If admin-only route and user is not admin, redirect to dashboard
+    if (adminOnly && !isAdmin()) {
+      showNotification("You don't have permission to access this page", "error")
+      return <Navigate to="/" />
+    }
+    
     return children
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout, showNotification }}>
+    <AuthContext.Provider value={{ 
+      isAuthenticated, 
+      login, 
+      logout, 
+      showNotification, 
+      currentUser, 
+      userType, 
+      isAdmin: isAdmin 
+    }}>
       <Router>
         <div className="min-h-screen flex flex-col bg-white text-gray-900">
-          {isAuthenticated && <MainNav logout={logout} />}
+          {isAuthenticated && <MainNav logout={logout} userType={userType} username={currentUser?.username} />}
           <main className="flex-1">
             <Routes>
               <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/" />} />

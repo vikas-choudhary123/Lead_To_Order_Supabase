@@ -1,7 +1,11 @@
 "use client"
 
-import { useState } from "react"
+// import { useState } from "react"
 import { FileTextIcon, PlusIcon, TrashIcon, DownloadIcon, SaveIcon, ShareIcon, CopyIcon, EyeIcon } from "../components/Icons"
+import { useState, useEffect } from "react"
+
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 function Quotation() {
   const [activeTab, setActiveTab] = useState("edit")
@@ -17,8 +21,7 @@ function Quotation() {
 
   // Initialize quotation data with empty/default values
   const [quotationData, setQuotationData] = useState({
-    // Quotation details
-    quotationNo: "IN-NBD-001",
+    quotationNo: "IN-NBD-...", // Default initial value
     date: new Date().toLocaleDateString("en-GB"),
     
     // Consignor details
@@ -183,6 +186,38 @@ function Quotation() {
     }))
   }
 
+  useEffect(() => {
+    const initializeQuotationNumber = async () => {
+      try {
+        const nextQuotationNumber = await getNextQuotationNumber();
+        setQuotationData(prev => ({
+          ...prev,
+          quotationNo: nextQuotationNumber
+        }));
+      } catch (error) {
+        console.error("Error initializing quotation number:", error);
+      }
+    };
+  
+    initializeQuotationNumber();
+  }, []);
+
+  //   useEffect(() => {
+  //   const initializeQuotationNumber = async () => {
+  //     try {
+  //       const nextQuotationNumber = await getNextQuotationNumber()
+  //       setQuotationData(prev => ({
+  //         ...prev,
+  //         quotationNo: nextQuotationNumber
+  //       }))
+  //     } catch (error) {
+  //       console.error("Error initializing quotation number:", error)
+  //     }
+  //   }
+
+  //   initializeQuotationNumber()
+  // }, [])
+
   // Generate PDF
   const handleGeneratePDF = () => {
     setIsGenerating(true)
@@ -211,8 +246,324 @@ function Quotation() {
       alert("Quotation link has been successfully generated and is ready to share.")
     }, 1000)
   }
+  const generatePDFFromData = () => {
+    // Create a new jsPDF instance 
+    const doc = new jsPDF('p', 'mm', 'a4')
+  
+    // Page dimensions
+    const pageWidth = 210 // A4 width in mm
+    const pageHeight = 297 // A4 height in mm
+    const margin = 10
+    let currentY = 20 // Starting Y position
+  
+    // Set document properties
+    doc.setProperties({
+      title: `Quotation ${quotationData.quotationNo}`,
+      author: quotationData.preparedBy
+    })
+  
+    // Set font
+    doc.setFont('helvetica')
+  
+    // Function to add page header
+    const addPageHeader = () => {
+      // Company Logo (if available)
+      // doc.addImage(logoData, 'PNG', margin, 5, 40, 20)
+      
+      doc.setFillColor(240, 240, 240) // Light gray background
+      doc.rect(margin, 5, pageWidth - 2 * margin, 20, 'F')
+      
+      doc.setTextColor(0, 0, 0) // Black text
+      doc.setFontSize(14)
+      doc.setFont('helvetica', 'bold')
+      doc.text('TAX INVOICE / QUOTATION', pageWidth / 2, 15, { align: 'center' })
+      
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(10)
+      doc.text(`Quotation No: ${quotationData.quotationNo}`, margin, 25)
+      doc.text(`Date: ${quotationData.date}`, pageWidth - margin - 50, 25, { align: 'right' })
+      
+      currentY = 35
+    }
+  
+    // Add initial page header
+    addPageHeader()
+  
+    // Consignor & Consignee Details Section
+    doc.setFillColor(248, 248, 248) // Very light gray background
+    doc.rect(margin, currentY - 5, pageWidth - 2 * margin, 40, 'F')
+    
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(0, 0, 0)
+    doc.text('Consignor Details', margin, currentY)
+    doc.text('Consignee Details', pageWidth / 2 + margin, currentY)
+    doc.setFont('helvetica', 'normal')
+    currentY += 6
+  
+    // Consignor Details
+    const consignorDetails = [
+      `Name: ${quotationData.consignorName}`,
+      `Address: ${quotationData.consignorAddress}`,
+      `GSTIN: ${quotationData.consignorGSTIN}`,
+      `State Code: ${quotationData.consignorStateCode}`
+    ]
+    consignorDetails.forEach((detail) => {
+      doc.text(detail, margin, currentY)
+      currentY += 6
+    })
+  
+    // Consignee Details
+    const consigneeDetails = [
+      `Name: ${quotationData.consigneeName}`,
+      `Address: ${quotationData.consigneeAddress}`,
+      `GSTIN: ${quotationData.consigneeGSTIN}`,
+      `State Code: ${quotationData.consigneeStateCode}`
+    ]
+    consigneeDetails.forEach((detail, index) => {
+      doc.text(detail, pageWidth / 2 + margin, currentY - (consigneeDetails.length * 6) + (index * 6))
+    })
+  
+    currentY += 15
+  
+    // Items Table
+    const itemsData = quotationData.items.map((item, index) => [
+      index + 1,
+      item.code,
+      item.name,
+      `${item.gst}%`,
+      item.qty,
+      item.units,
+      `₹${item.rate.toFixed(2)}`,
+      `₹${item.amount.toFixed(2)}`
+    ])
+  
+    // Calculate the space needed for the table
+    const estimatedTableHeight = 20 + (itemsData.length * 10) // Header + rows + some padding
 
-  // Save quotation - Updated to match lead submission style
+    // Ensure enough space for the table and Financial Summary
+    if (currentY + estimatedTableHeight + 80 > pageHeight) {
+      doc.addPage()
+      addPageHeader()
+      currentY = 40
+    }
+
+    // Use autoTable method with professional styling
+    autoTable(doc, {
+      startY: currentY,
+      head: [['S.No', 'Code', 'Product Name', 'GST %', 'Qty', 'Units', 'Rate', 'Amount']],
+      body: itemsData,
+      theme: 'plain', // Clean, minimal theme
+      styles: { 
+        fontSize: 9,
+        cellPadding: 3,
+        overflow: 'linebreak',
+        lineColor: [200, 200, 200], // Light gray line color
+        lineWidth: 0.5
+      },
+      headStyles: {
+        fillColor: [41, 128, 185], // Blue header background
+        textColor: 255, // White text
+        fontSize: 10,
+        fontStyle: 'bold'
+      },
+      columnStyles: {
+        0: { cellWidth: 15, halign: 'center' }, // Serial Number
+        1: { cellWidth: 25, halign: 'center' }, // Code
+        2: { cellWidth: 50 }, // Product Name
+        3: { cellWidth: 20, halign: 'center' }, // GST %
+        4: { cellWidth: 15, halign: 'center' }, // Quantity
+        5: { cellWidth: 20, halign: 'center' }, // Units
+        6: { cellWidth: 25, halign: 'right' }, // Rate
+        7: { cellWidth: 25, halign: 'right' }  // Amount
+      },
+      columnDefs: [
+        { 
+          targets: '_all',
+          createdCell: function(cell) {
+            cell.styles.cellBorderColor = [200, 200, 200];
+            cell.styles.cellBorderWidth = 0.5;
+          }
+        }
+      ],
+      didParseCell: function(data) {
+        if (data.section === 'head') {
+          data.cell.styles.cellBorderColor = [41, 128, 185];
+          data.cell.styles.cellBorderWidth = 0.5;
+        }
+        
+        // Right-align amount column and ensure full visibility
+        if (data.section === 'body' && data.column.index === 7) {
+          data.cell.styles.halign = 'right';
+        }
+      },
+      margin: { top: 5, bottom: 5, left: margin, right: margin },
+      pageBreak: 'avoid'
+    })
+
+    // Get the final Y position of the table
+    const finalY = doc.previousAutoTable ? doc.previousAutoTable.finalY : currentY + estimatedTableHeight
+
+    // Ensure space for Financial Summary
+    if (finalY + 80 > pageHeight) {
+      doc.addPage()
+      addPageHeader()
+      currentY = 40
+    } else {
+      currentY = finalY + 10
+    }
+
+    // Financial Summary Section with Light Gray Background
+    doc.setFillColor(248, 248, 248) // Very light gray background
+    doc.rect(margin, currentY - 10, pageWidth - 2 * margin, 60, 'F')
+    
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(0, 0, 0)
+    doc.text('Financial Summary', margin, currentY)
+    doc.setFont('helvetica', 'normal')
+    currentY += 10
+    
+    // Align financial summary details to the right
+    const financialDetailsX = pageWidth - margin - 50
+    
+    doc.text('Subtotal:', margin, currentY)
+    doc.text(`₹${quotationData.subtotal.toFixed(2)}`, financialDetailsX, currentY, { align: 'right' })
+    currentY += 7
+    
+    doc.text(`CGST (${quotationData.cgstRate}%):`, margin, currentY)
+    doc.text(`₹${quotationData.cgstAmount.toFixed(2)}`, financialDetailsX, currentY, { align: 'right' })
+    currentY += 7
+    
+    doc.text(`SGST (${quotationData.sgstRate}%):`, margin, currentY)
+    doc.text(`₹${quotationData.sgstAmount.toFixed(2)}`, financialDetailsX, currentY, { align: 'right' })
+    currentY += 7
+    
+    doc.setFont('helvetica', 'bold')
+    doc.text('Total:', margin, currentY)
+    doc.text(`₹${quotationData.total.toFixed(2)}`, financialDetailsX, currentY, { align: 'right' })
+    currentY += 14
+  
+    // Terms & Conditions with Enhanced Styling
+    doc.setFillColor(248, 248, 248) // Very light gray background
+    doc.rect(margin, currentY - 5, pageWidth - 2 * margin, 60, 'F')
+    
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(0, 0, 0)
+    doc.text('Terms & Conditions', margin, currentY)
+    doc.setFont('helvetica', 'normal')
+    currentY += 7
+    
+    const termsLines = [
+      `Validity: ${quotationData.validity}`,
+      `Payment Terms: ${quotationData.paymentTerms}`,
+      `Delivery: ${quotationData.delivery}`,
+      `Freight: ${quotationData.freight}`,
+      `Insurance: ${quotationData.insurance}`,
+      `Taxes: ${quotationData.taxes}`
+    ]
+    termsLines.forEach((line) => {
+      doc.text(line, margin, currentY)
+      currentY += 7
+    })
+  
+    // Notes Section
+    if (quotationData.notes && quotationData.notes.length > 0 && quotationData.notes[0].trim() !== '') {
+      // Check if we need a new page
+      if (currentY > pageHeight - 50) {
+        doc.addPage()
+        addPageHeader()
+        currentY = 40
+      }
+  
+      doc.setFillColor(248, 248, 248) // Very light gray background
+      doc.rect(margin, currentY - 5, pageWidth - 2 * margin, 30, 'F')
+      
+      doc.setFont('helvetica', 'bold')
+      doc.text('Notes', margin, currentY)
+      doc.setFont('helvetica', 'normal')
+      currentY += 7
+      
+      quotationData.notes.forEach((note) => {
+        if (note.trim() !== '') {
+          doc.text(`• ${note}`, margin, currentY)
+          currentY += 7
+        }
+      })
+    }
+  
+    // Bank Details
+    // Check if we need a new page
+    if (currentY > pageHeight - 80) {
+      doc.addPage()
+      addPageHeader()
+      currentY = 40
+    }
+  
+    doc.setFillColor(248, 248, 248) // Very light gray background
+    doc.rect(margin, currentY - 5, pageWidth - 2 * margin, 60, 'F')
+    
+    doc.setFont('helvetica', 'bold')
+    doc.text('Bank Details', margin, currentY)
+    doc.setFont('helvetica', 'normal')
+    currentY += 7
+    
+    const bankDetailLines = [
+      `Account No.: ${quotationData.accountNo}`,
+      `Bank Name: ${quotationData.bankName}`,
+      `Bank Address: ${quotationData.bankAddress}`,
+      `IFSC Code: ${quotationData.ifscCode}`,
+      `Email: ${quotationData.email}`,
+      `Website: ${quotationData.website}`,
+      `Company PAN: ${quotationData.pan}`
+    ]
+    bankDetailLines.forEach((line) => {
+      doc.text(line, margin, currentY)
+      currentY += 7
+    })
+  
+    // Declaration
+    // Check if we need a new page
+    if (currentY > pageHeight - 50) {
+      doc.addPage()
+      addPageHeader()
+      currentY = 40
+    }
+  
+    doc.setFillColor(248, 248, 248) // Very light gray background
+    doc.rect(margin, currentY - 5, pageWidth - 2 * margin, 40, 'F')
+    
+    doc.setFont('helvetica', 'bold')
+    doc.text('Declaration', margin, currentY)
+    doc.setFont('helvetica', 'normal')
+    currentY += 7
+    
+    doc.text('We declare that this Quotation shows the actual price of the goods described', margin, currentY)
+    currentY += 7
+    doc.text('and that all particulars are true and correct.', margin, currentY)
+    currentY += 10
+    
+    doc.setFont('helvetica', 'bold')
+    doc.text(`Prepared By: ${quotationData.preparedBy}`, margin, currentY)
+    
+    // Digital Signature Space (optional)
+    currentY += 20
+    doc.setDrawColor(200, 200, 200)
+    doc.line(margin, currentY, pageWidth - margin, currentY)
+    doc.text('Signature', margin, currentY + 7)
+  
+    // Add page numbers
+    const pageCount = doc.internal.getNumberOfPages()
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i)
+      doc.setFontSize(8)
+      doc.setTextColor(100, 100, 100)
+      doc.text(`Page ${i} of ${pageCount}`, pageWidth - 20, pageHeight - 10, { align: 'right' })
+    }
+  
+    // Generate Base64 PDF
+    const base64Data = doc.output('datauristring').split(',')[1]
+    return base64Data
+  }
+  
   const handleSaveQuotation = async () => {
     // Validate required fields
     if (!quotationData.consigneeName) {
@@ -226,34 +577,195 @@ function Quotation() {
     }
     
     setIsSubmitting(true)
-
+  
     try {
+      // Generate PDF
+      const base64Data = generatePDFFromData()
+      const fileName = `Quotation_${quotationData.quotationNo}.pdf`
+      
       // Script URL
       const scriptUrl = "https://script.google.com/macros/s/AKfycbxeo5tv3kAcSDDAheOCP07HaK76zSfq49jFGtZknseg7kPlj2G1O8U2PuiA2fQSuPvKqA/exec"
       
-      // Data to be submitted (matching the columns in your sheet)
+      // Data to be submitted
       const rowData = [
         new Date().toLocaleString(),
         quotationData.quotationNo,
         quotationData.date,
         quotationData.preparedBy,
-        quotationData.consigneeName
+        quotationData.consigneeName,
+        "" // Empty placeholder for PDF URL
       ]
-
-      // Parameters for Google Apps Script
-      const params = {
+  
+      // Prepare sheet parameters for initial submission
+      const sheetParams = {
         sheetName: "Make Quotation",
         action: "insert",
         rowData: JSON.stringify(rowData)
       }
+  
+      // Create URL-encoded string for the parameters
+      const sheetUrlParams = new URLSearchParams()
+      for (const key in sheetParams) {
+        sheetUrlParams.append(key, sheetParams[key])
+      }
+      
+      // Send the data to sheet
+      const sheetResponse = await fetch(scriptUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: sheetUrlParams
+      })
+  
+      const sheetResult = await sheetResponse.json()
+      
+      if (sheetResult.success) {
+        // Upload PDF to Google Drive
+        const pdfParams = {
+          action: "uploadPDF",
+          pdfData: base64Data,
+          fileName: fileName
+        }
+        
+        const pdfUrlParams = new URLSearchParams()
+        for (const key in pdfParams) {
+          pdfUrlParams.append(key, pdfParams[key])
+        }
+        
+        const pdfResponse = await fetch(scriptUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          body: pdfUrlParams
+        })
+        
+        const pdfResult = await pdfResponse.json()
+        
+        if (pdfResult.success) {
+          // Update the last row with the PDF URL
+          const updateParams = {
+            sheetName: "Make Quotation",
+            action: "update",
+            rowIndex: "0", // This will trigger using the last row in the script
+            rowData: JSON.stringify([
+              "", // Leave timestamp as is
+              "", // Leave quotation number as is
+              "", // Leave date as is
+              "", // Leave prepared by as is
+              "", // Leave company name as is
+              pdfResult.fileUrl // Add PDF URL
+            ])
+          }
+          
+          const updateUrlParams = new URLSearchParams()
+          for (const key in updateParams) {
+            updateUrlParams.append(key, updateParams[key])
+          }
+          
+          const updateResponse = await fetch(scriptUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: updateUrlParams
+          })
+          
+          const updateResult = await updateResponse.json()
+          
+          if (updateResult.success) {
+            alert("Quotation saved, PDF uploaded, and URL added successfully!")
+            
+            // Reset form (same as before)
+            setQuotationData({
+              quotationNo: getNextQuotationNumber(quotationData.quotationNo),
+              date: new Date().toLocaleDateString("en-GB"),
+              consignorState: "",
+              consignorName: "",
+              consignorAddress: "",
+              consignorMobile: "",
+              consignorPhone: "",
+              consignorGSTIN: "",
+              consignorStateCode: "",
+              companyName: "", 
+              consigneeName: "",
+              consigneeAddress: "",
+              consigneeState: "",
+              consigneeContactName: "",
+              consigneeContactNo: "",
+              consigneeGSTIN: "",
+              consigneeStateCode: "",
+              msmeNumber: "",
+              items: [
+                {
+                  id: 1,
+                  code: "",
+                  name: "",
+                  gst: 18,
+                  qty: 1,
+                  units: "Nos",
+                  rate: 0,
+                  amount: 0,
+                },
+              ],
+              subtotal: 0,
+              cgstRate: 9,
+              sgstRate: 9,
+              cgstAmount: 0,
+              sgstAmount: 0,
+              total: 0,
+              validity: "The above quoted prices are valid up to 5 days from date of offer.",
+              paymentTerms: "100% advance payment in the mode of NEFT, RTGS & DD",
+              delivery: "Material is ready in our stock",
+              freight: "Extra as per actual.",
+              insurance: "Transit insurance for all shipment is at Buyer's risk.",
+              taxes: "Extra as per actual.",
+              accountNo: "",
+              bankName: "",
+              bankAddress: "",
+              ifscCode: "",
+              email: "",
+              website: "",
+              pan: "",
+              notes: [""],
+              preparedBy: "",
+            })
+          } else {
+            alert("Error updating PDF URL: " + (updateResult.error || "Unknown error"))
+          }
+        } else {
+          alert("Error uploading PDF: " + (pdfResult.error || "Unknown error"))
+        }
+      } else {
+        alert("Error saving quotation: " + (sheetResult.error || "Unknown error"))
+      }
+    } catch (error) {
+      alert("Error: " + error.message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
+  // Helper function to increment quotation number
+  const getNextQuotationNumber = async () => {
+    // Script URL
+    const scriptUrl = "https://script.google.com/macros/s/AKfycbxeo5tv3kAcSDDAheOCP07HaK76zSfq49jFGtZknseg7kPlj2G1O8U2PuiA2fQSuPvKqA/exec"
+    
+    try {
+      // Prepare parameters to get the last quotation number
+      const params = {
+        sheetName: "Make Quotation",
+        action: "getNextQuotationNumber"
+      }
+      
       // Create URL-encoded string for the parameters
       const urlParams = new URLSearchParams()
       for (const key in params) {
         urlParams.append(key, params[key])
       }
       
-      // Send the data
+      // Send request to get last quotation number
       const response = await fetch(scriptUrl, {
         method: "POST",
         headers: {
@@ -261,85 +773,22 @@ function Quotation() {
         },
         body: urlParams
       })
-
+      
       const result = await response.json()
       
       if (result.success) {
-        alert("Quotation saved successfully!")
-        
-        // Reset form
-        setQuotationData({
-          // Keep quotation number but increment it
-          quotationNo: getNextQuotationNumber(quotationData.quotationNo),
-          date: new Date().toLocaleDateString("en-GB"),
-          
-          // Reset other fields
-          consignorState: "",
-          consignorName: "",
-          consignorAddress: "",
-          consignorMobile: "",
-          consignorPhone: "",
-          consignorGSTIN: "",
-          consignorStateCode: "",
-          companyName: "", 
-          consigneeName: "",
-          consigneeAddress: "",
-          consigneeState: "",
-          consigneeContactName: "",
-          consigneeContactNo: "",
-          consigneeGSTIN: "",
-          consigneeStateCode: "",
-          msmeNumber: "",
-          items: [
-            {
-              id: 1,
-              code: "",
-              name: "",
-              gst: 18,
-              qty: 1,
-              units: "Nos",
-              rate: 0,
-              amount: 0,
-            },
-          ],
-          subtotal: 0,
-          cgstRate: 9,
-          sgstRate: 9,
-          cgstAmount: 0,
-          sgstAmount: 0,
-          total: 0,
-          validity: "The above quoted prices are valid up to 5 days from date of offer.",
-          paymentTerms: "100% advance payment in the mode of NEFT, RTGS & DD",
-          delivery: "Material is ready in our stock",
-          freight: "Extra as per actual.",
-          insurance: "Transit insurance for all shipment is at Buyer's risk.",
-          taxes: "Extra as per actual.",
-          accountNo: "",
-          bankName: "",
-          bankAddress: "",
-          ifscCode: "",
-          email: "",
-          website: "",
-          pan: "",
-          notes: [""],
-          preparedBy: "",
-        })
+        return result.nextQuotationNumber
       } else {
-        alert("Error saving quotation: " + (result.error || "Unknown error"))
+        // Fallback to default if there's an error
+        return "IN-NBD-001"
       }
     } catch (error) {
-      alert("Error submitting form: " + error.message)
-    } finally {
-      setIsSubmitting(false)
+      console.error("Error getting next quotation number:", error)
+      // Fallback to default in case of any error
+      return "IN-NBD-001"
     }
   }
-
-  // Helper function to increment quotation number
-  const getNextQuotationNumber = (currentNo) => {
-    const parts = currentNo.split("-")
-    const num = parseInt(parts[2])
-    return `IN-NBD-${String(num + 1).padStart(3, "0")}`
-  }
+  
 
   return (
     <div className="container mx-auto py-6 px-4">

@@ -1,20 +1,23 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useContext } from "react"
 import { Link, useLocation } from "react-router-dom"
-import { HomeIcon, UsersIcon, PhoneCallIcon, BarChartIcon, MenuIcon, XIcon, MoonIcon, SunIcon, FileTextIcon } from "./Icons"
+import { HomeIcon, UsersIcon, PhoneCallIcon, BarChartIcon, MenuIcon, XIcon, MoonIcon, SunIcon, FileTextIcon, ShieldIcon } from "./Icons"
+import { AuthContext } from "../App"
 
 function MainNav({ logout }) {
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
+  const { currentUser, userType, isAdmin } = useContext(AuthContext)
 
   const toggleDarkMode = () => {
     setDarkMode(!darkMode)
     // In a real app, you would apply dark mode classes to the document here
   }
 
-  const routes = [
+  // Base routes available to all users
+  let routes = [
     {
       href: "/",
       label: "Dashboard",
@@ -46,6 +49,16 @@ function MainNav({ logout }) {
       active: location.pathname.startsWith("/quotation"),
     },
   ]
+  
+  // Add admin-only route if user is admin
+  // if (isAdmin && isAdmin()) {
+  //   routes.push({
+  //     href: "/admin",
+  //     label: "Admin",
+  //     icon: <ShieldIcon className="h-5 w-5 mr-2" />,
+  //     active: location.pathname.startsWith("/admin"),
+  //   });
+  // }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white shadow-sm">
@@ -74,9 +87,27 @@ function MainNav({ logout }) {
         </div>
 
         <div className="ml-auto flex items-center space-x-2">
+          {/* User info display */}
+          <div className="hidden md:flex items-center mr-4">
+            <div className="flex items-center space-x-2">
+              {/* <span className="text-sm font-medium text-slate-700">
+                {currentUser?.username || 'User'}
+              </span> */}
+              {userType && (
+                <span className={`px-2 py-1 text-xs rounded-full ${
+                  userType === 'admin' 
+                    ? 'bg-purple-100 text-purple-800' 
+                    : 'bg-blue-100 text-blue-800'
+                }`}>
+                  {userType}
+                </span>
+              )}
+            </div>
+          </div>
+{/* 
           <button onClick={toggleDarkMode} className="p-2 rounded-full hover:bg-slate-100">
             {darkMode ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
-          </button>
+          </button> */}
 
           <button
             onClick={logout}
@@ -97,6 +128,24 @@ function MainNav({ logout }) {
       {mobileMenuOpen && (
         <div className="md:hidden border-t">
           <div className="container mx-auto py-2 space-y-1 px-4">
+            {/* Mobile user info display */}
+            <div className="flex items-center px-3 py-2 border-b border-slate-100 mb-2">
+              <div className="flex flex-col">
+                <span className="font-medium text-slate-700">
+                  {currentUser?.username || 'User'}
+                </span>
+                {userType && (
+                  <span className={`mt-1 px-2 py-1 text-xs rounded-full w-fit ${
+                    userType === 'admin' 
+                      ? 'bg-purple-100 text-purple-800' 
+                      : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    {userType}
+                  </span>
+                )}
+              </div>
+            </div>
+            
             {routes.map((route) => (
               <Link
                 key={route.href}

@@ -1,28 +1,40 @@
 "use client"
 
 import { useState, useContext } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate } from "react-router-dom" 
 import { AuthContext } from "../App"
 
 function Login() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
   const { login } = useContext(AuthContext)
   const navigate = useNavigate()
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError("")
-
+    
     if (!username || !password) {
       setError("Please enter both username and password")
       return
     }
-
-    const success = login(username, password)
-    if (success) {
-      navigate("/")
+    
+    setIsLoading(true)
+    
+    try {
+      const success = await login(username, password)
+      if (success) {
+        navigate("/")
+      } else {
+        setError("Invalid username or password")
+      }
+    } catch (err) {
+      setError("An error occurred. Please try again.")
+      console.error(err)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -54,6 +66,7 @@ function Login() {
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                   placeholder="Enter your username"
+                  disabled={isLoading}
                 />
               </div>
 
@@ -68,19 +81,21 @@ function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                   placeholder="Enter your password"
+                  disabled={isLoading}
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
+                className={`w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium py-2 px-4 rounded-md transition-colors ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                disabled={isLoading}
               >
-                Sign In
+                {isLoading ? 'Signing In...' : 'Sign In'}
               </button>
             </form>
 
             <div className="mt-4 text-center text-sm text-gray-600">
-              <p>Use admin / admin123 to login</p>
+              <p>Authenticate with your credentials from the Login sheet</p>
             </div>
           </div>
         </div>

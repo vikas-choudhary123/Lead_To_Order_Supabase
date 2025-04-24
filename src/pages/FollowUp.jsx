@@ -41,6 +41,36 @@ function FollowUp() {
     }
   }
 
+  // Helper function to format date to DD/MM/YYYY
+  const formatDateToDDMMYYYY = (dateValue) => {
+    if (!dateValue) return ""
+    
+    try {
+      // Check if it's a Date object-like string (e.g. "Date(2025,3,22)")
+      if (typeof dateValue === 'string' && dateValue.startsWith('Date(')) {
+        // Extract the parts from Date(YYYY,MM,DD) format
+        const dateString = dateValue.substring(5, dateValue.length - 1)
+        const [year, month, day] = dateString.split(',').map(part => parseInt(part.trim()))
+        
+        // JavaScript months are 0-indexed, but we need to display them as 1-indexed
+        // Also ensure day and month are padded with leading zeros if needed
+        return `${day.toString().padStart(2, '0')}/${(month + 1).toString().padStart(2, '0')}/${year}`
+      }
+      
+      // Handle other date formats if needed
+      const date = new Date(dateValue)
+      if (!isNaN(date.getTime())) {
+        return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`
+      }
+      
+      // If it's already in the correct format, return as is
+      return dateValue
+    } catch (error) {
+      console.error("Error formatting date:", error)
+      return dateValue // Return the original value if formatting fails
+    }
+  }
+
   // Function to fetch data from FMS and Leads Tracker sheets
   useEffect(() => {
     const fetchFollowUpData = async () => {
@@ -78,20 +108,27 @@ function FollowUp() {
           // Skip the header row (index 0)
           pendingData.table.rows.slice(0).forEach(row => {
             if (row.c) {
-              const followUpItem = {
-                id: row.c[0] ? row.c[0].v : "",
-                leadId: row.c[1] ? row.c[1].v : "", // Column B - Lead Number
-                receiverName: row.c[2] ? row.c[2].v : "", // Column C - Lead Receiver Name
-                leadSource: row.c[3] ? row.c[3].v : "", // Column D - Lead Source
-                salespersonName: row.c[4] ? row.c[4].v : "", // Column E - Salesperson Name
-                companyName: row.c[6] ? row.c[6].v : "", // Column G - Company Name
-                createdAt: row.c[0] ? row.c[0].v : "", // Using date from column A
-                status: "Expected", // Default status for pending
-                priority: determinePriority(row.c[3] ? row.c[3].v : ""), // Determine priority based on source
-                nextCallDate: calculateNextCallDate(row.c[0] ? row.c[0].v : ""), // Calculate next call date
-              }
+              // Check if column K (index 10) has data and column L (index 11) is null
+              const hasColumnK = row.c[10] && row.c[10].v;
+              const isColumnLEmpty = !row.c[11] || row.c[11].v === null || row.c[11].v === "";
               
-              pendingFollowUpData.push(followUpItem)
+              // Only include rows where column K has data and column L is null/empty
+              if (hasColumnK && isColumnLEmpty) {
+                const followUpItem = {
+                  id: row.c[0] ? row.c[0].v : "",
+                  leadId: row.c[1] ? row.c[1].v : "", // Column B - Lead Number
+                  receiverName: row.c[2] ? row.c[2].v : "", // Column C - Lead Receiver Name
+                  leadSource: row.c[3] ? row.c[3].v : "", // Column D - Lead Source
+                  salespersonName: row.c[4] ? row.c[4].v : "", // Column E - Salesperson Name
+                  companyName: row.c[6] ? row.c[6].v : "", // Column G - Company Name
+                  createdAt: row.c[0] ? row.c[0].v : "", // Using date from column A
+                  status: "Expected", // Default status for pending
+                  priority: determinePriority(row.c[3] ? row.c[3].v : ""), // Determine priority based on source
+                  nextCallDate: calculateNextCallDate(row.c[0] ? row.c[0].v : ""), // Calculate next call date
+                }
+                
+                pendingFollowUpData.push(followUpItem)
+              }
             }
           })
           
@@ -110,11 +147,11 @@ function FollowUp() {
                 customerSay: row.c[2] ? row.c[2].v : "", // Column C - What did the customer say?
                 status: row.c[3] ? row.c[3].v : "", // Column D - Status
                 enquiryReceivedStatus: row.c[4] ? row.c[4].v : "", // Column E - Enquiry Received Status
-                enquiryReceivedDate: row.c[5] ? row.c[5].v : "", // Column F - Enquiry Received Date
+                enquiryReceivedDate: row.c[5] ? formatDateToDDMMYYYY(row.c[5] ? row.c[5].v : "") : "",
                 enquiryState: row.c[6] ? row.c[6].v : "", // Column G - Enquiry for State
                 projectName: row.c[7] ? row.c[7].v : "", // Column H - Project Name
                 salesType: row.c[8] ? row.c[8].v : "", // Column I - Sales Type
-                requiredProductDate: row.c[9] ? row.c[9].v : "", // Column J - Required Product Date
+                requiredProductDate: row.c[9] ? formatDateToDDMMYYYY(row.c[9] ? row.c[9].v : ""): "", // Column J - Required Product Date
                 projectApproxValue: row.c[10] ? row.c[10].v : "", // Column K - Project Approximate Value
                 
                 // Item details
@@ -130,7 +167,7 @@ function FollowUp() {
                 quantity5: row.c[20] ? row.c[20].v : "", // Column U - Quantity5
                 
                 nextAction: row.c[21] ? row.c[21].v : "", // Column V - Next Action
-                nextCallDate: row.c[22] ? row.c[22].v : "", // Column W - Next Call Date
+                nextCallDate: row.c[22] ? formatDateToDDMMYYYY(row.c[22] ? row.c[22].v : ""): "", // Column W - Next Call Date
                 nextCallTime: row.c[23] ? row.c[23].v : "", // Column X - Next Call Time
               }
               
@@ -164,16 +201,16 @@ function FollowUp() {
             customerSay: "Interested in product details",
             status: "Pending",
             enquiryReceivedStatus: "New",
-            enquiryReceivedDate: "2023-05-15",
+            enquiryReceivedDate: "15/05/2023",
             enquiryState: "Maharashtra",
             projectName: "Sample Project",
             salesType: "Direct",
-            requiredProductDate: "2023-06-15",
+            requiredProductDate: "15/06/2023",
             projectApproxValue: "₹500,000",
             itemName1: "Product A",
             quantity1: "10",
             nextAction: "Follow-up call",
-            nextCallDate: "2023-05-20",
+            nextCallDate: "20/05/2023",
             nextCallTime: "10:00 AM"
           }
         ])

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useContext } from "react"
+import { useState, useContext, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { AuthContext } from "../App"
 import MakeQuotationForm from "../components/call-tracker/MakeQuotationFrom"
@@ -11,22 +11,418 @@ import OrderStatusForm from "../components/call-tracker/OrderStatusFrom"
 function NewCallTracker() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const enquiryNo = searchParams.get("enquiryNo")
+  const leadId = searchParams.get("leadId")
   const { showNotification } = useContext(AuthContext)
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [currentStage, setCurrentStage] = useState("")
+  const [formData, setFormData] = useState({
+    enquiryNo: leadId || "",
+    enquiryStatus: "",
+    customerFeedback: "",
+  })
+  const [enquiryStatusOptions, setEnquiryStatusOptions] = useState([])
+  const [isLoadingDropdown, setIsLoadingDropdown] = useState(false)
+  
+  // State for MakeQuotationForm data
+  const [quotationData, setQuotationData] = useState({
+    companyName: "",
+    sendQuotationNo: "",
+    quotationSharedBy: "",
+    quotationNumber: "",
+    valueWithoutTax: "",
+    valueWithTax: "",
+    remarks: "",
+    quotationFile: null,
+    quotationFileUrl: "", // New field to store the uploaded file URL
+  })
 
-  const handleSubmit = (e) => {
+  // State for QuotationValidationForm data
+  const [validationData, setValidationData] = useState({
+    validationQuotationNumber: "",
+    validatorName: "",
+    sendStatus: "",
+    validationRemark: "",
+    faqVideo: "no",
+    productVideo: "no",
+    offerVideo: "no",
+    productCatalog: "no",
+    productImage: "no",
+  })
+
+  // State for OrderExpectedForm data
+  const [orderExpectedData, setOrderExpectedData] = useState({
+    nextCallDate: "",
+    nextCallTime: "",
+  })
+
+  // State for OrderStatusForm data
+  const [orderStatusData, setOrderStatusData] = useState({
+    orderStatusQuotationNumber: "",
+    orderStatus: "",
+    acceptanceVia: "",
+    paymentMode: "",
+    paymentTerms: "",
+    orderVideo: null,
+    acceptanceFile: null,
+    orderRemark: "",
+    apologyVideo: null,
+    reasonStatus: "",
+    reasonRemark: "",
+    holdReason: "",
+    holdingDate: "",
+    holdRemark: "",
+  })
+
+  // Fetch dropdown options from DROPDOWN sheet column G
+  useEffect(() => {
+    const fetchEnquiryStatusOptions = async () => {
+      try {
+        setIsLoadingDropdown(true)
+        
+        // Fetch data from DROPDOWN sheet
+        const dropdownUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=DROPDOWN"
+        const response = await fetch(dropdownUrl)
+        const text = await response.text()
+        
+        // Extract the JSON part from the response
+        const jsonStart = text.indexOf('{')
+        const jsonEnd = text.lastIndexOf('}') + 1
+        const jsonData = text.substring(jsonStart, jsonEnd)
+        
+        const data = JSON.parse(jsonData)
+        
+        // Extract column G values (skip header row)
+        if (data && data.table && data.table.rows) {
+          const options = []
+          
+          // Skip the header row (index 0)
+          data.table.rows.slice(1).forEach(row => {
+            // Column G is index 6
+            if (row.c && row.c[6] && row.c[6].v) {
+              options.push(row.c[6].v)
+            }
+          })
+          
+          setEnquiryStatusOptions(options)
+        }
+      } catch (error) {
+        console.error("Error fetching dropdown options:", error)
+        // Fallback options if fetch fails
+        setEnquiryStatusOptions(["hot", "warm", "cold"])
+      } finally {
+        setIsLoadingDropdown(false)
+      }
+    }
+    
+    fetchEnquiryStatusOptions()
+  }, [])
+
+  // Update form data when leadId changes
+  useEffect(() => {
+    if (leadId) {
+      setFormData(prevData => ({
+        ...prevData,
+        enquiryNo: leadId
+      }))
+    }
+  }, [leadId])
+
+  const handleInputChange = (e) => {
+    const { id, value } = e.target
+    setFormData(prevData => ({
+      ...prevData,
+      [id]: value
+    }))
+  }
+
+  // Handler for quotation form data updates
+  const handleQuotationChange = (field, value) => {
+    setQuotationData(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  // Handler for validation form data updates
+  const handleValidationChange = (field, value) => {
+    setValidationData(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  // Handler for order expected form data updates
+  const handleOrderExpectedChange = (field, value) => {
+    setOrderExpectedData(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  // Handler for order status form data updates
+  const handleOrderStatusChange = (field, value) => {
+    setOrderStatusData(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  // Function to format date as dd/mm/yyyy
+  const formatDate = (date) => {
+    const day = String(date.getDate()).padStart(2, '0')
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const year = date.getFullYear()
+    return `${day}/${month}/${year}`
+  }
+
+  // Function to upload image/video to Google Drive
+  const uploadFileToDrive = async (file, fileType = "image") => {
+    try {
+      // Convert file to base64
+      const reader = new FileReader()
+      
+      return new Promise((resolve, reject) => {
+        reader.onload = async () => {
+          try {
+            const base64Data = reader.result.split(',')[1] // Remove the data:image/...;base64, prefix
+            
+            const scriptUrl = "https://script.google.com/macros/s/AKfycbxeo5tv3kAcSDDAheOCP07HaK76zSfq49jFGtZknseg7kPlj2G1O8U2PuiA2fQSuPvKqA/exec"
+            
+            const params = {
+              action: fileType === "pdf" ? "uploadPDF" : "uploadImage",
+              imageData: base64Data,
+              pdfData: base64Data,
+              fileName: file.name,
+              mimeType: file.type
+            }
+
+            const urlParams = new URLSearchParams()
+            for (const key in params) {
+              urlParams.append(key, params[key])
+            }
+            
+            const response = await fetch(scriptUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded"
+              },
+              body: urlParams
+            })
+
+            const result = await response.json()
+            
+            if (result.success) {
+              resolve(result.fileUrl)
+            } else {
+              reject(new Error(result.error || "Failed to upload file"))
+            }
+          } catch (error) {
+            reject(error)
+          }
+        }
+        
+        reader.onerror = () => {
+          reject(new Error("Failed to read file"))
+        }
+        
+        reader.readAsDataURL(file)
+      })
+    } catch (error) {
+      console.error("Error uploading file:", error)
+      throw error
+    }
+  }
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setIsSubmitting(true)
 
-    // Simulate API call
-    setTimeout(() => {
-      showNotification("Call tracker updated successfully", "success")
-      navigate("/call-tracker")
+    try {
+      const currentDate = new Date()
+      const formattedDate = formatDate(currentDate)
+      
+      // If there's a quotation file and it's an image, upload it first
+      let imageUrl = ""
+      if (currentStage === "make-quotation" && quotationData.quotationFile) {
+        // Check if the file is an image
+        if (quotationData.quotationFile.type.startsWith('image/')) {
+          showNotification("Uploading image...", "info")
+          imageUrl = await uploadFileToDrive(quotationData.quotationFile)
+          showNotification("Image uploaded successfully", "success")
+        }
+      }
+
+      // If there are order status files, upload them
+      let orderVideoUrl = ""
+      let acceptanceFileUrl = ""
+      let apologyVideoUrl = ""
+      
+      if (currentStage === "order-status") {
+        if (orderStatusData.orderVideo) {
+          showNotification("Uploading order video...", "info")
+          orderVideoUrl = await uploadFileToDrive(orderStatusData.orderVideo)
+          showNotification("Order video uploaded successfully", "success")
+        }
+        
+        if (orderStatusData.acceptanceFile) {
+          showNotification("Uploading acceptance file...", "info")
+          acceptanceFileUrl = await uploadFileToDrive(orderStatusData.acceptanceFile)
+          showNotification("Acceptance file uploaded successfully", "success")
+        }
+        
+        if (orderStatusData.apologyVideo) {
+          showNotification("Uploading apology video...", "info")
+          apologyVideoUrl = await uploadFileToDrive(orderStatusData.apologyVideo)
+          showNotification("Apology video uploaded successfully", "success")
+        }
+      }
+      
+      // Prepare row data based on the selected stage
+      let rowData = [
+        formattedDate,                 // Date
+        formData.enquiryNo,            // Enquiry No
+        formData.enquiryStatus,        // Status (hot/warm/cold)
+        formData.customerFeedback,     // Customer feedback
+        currentStage                   // Current Stage
+      ]
+      
+      // Add stage-specific data based on what's selected
+      if (currentStage === "make-quotation") {
+        rowData.push(
+          quotationData.sendQuotationNo,
+          quotationData.quotationSharedBy,
+          quotationData.quotationNumber,    // Column H
+          quotationData.valueWithoutTax,
+          quotationData.valueWithTax,
+          imageUrl || "", // Add the image URL in column K
+          quotationData.remarks // Add the remarks in column L
+        )
+        // Add empty values for columns M-AI (validation, order expected, and order status columns)
+        rowData.push(...new Array(29).fill(""))
+      } else if (currentStage === "quotation-validation") {
+        // Add empty values for columns F-G
+        rowData.push("", "")
+        // Add quotation number in column H
+        rowData.push(validationData.validationQuotationNumber)
+        // Add empty values for columns I-L (remaining quotation data)
+        rowData.push("", "", "", "")
+        // Add validation data for columns M-T
+        rowData.push(
+          validationData.validatorName,            // Column M
+          validationData.sendStatus,               // Column N
+          validationData.validationRemark,         // Column O
+          validationData.faqVideo,                 // Column P
+          validationData.productVideo,             // Column Q
+          validationData.offerVideo,               // Column R
+          validationData.productCatalog,           // Column S
+          validationData.productImage              // Column T
+        )
+        // Add empty values for columns U-AI (order expected and order status columns)
+        rowData.push(...new Array(15).fill(""))
+      } else if (currentStage === "order-expected") {
+        // Add empty values for columns F-T
+        rowData.push(...new Array(15).fill(""))
+        // Add order expected data for columns U-V
+        rowData.push(
+          orderExpectedData.nextCallDate,  // Column U
+          orderExpectedData.nextCallTime   // Column V
+        )
+        // Add empty values for columns W-AI (order status columns)
+        rowData.push(...new Array(13).fill(""))
+      } else if (currentStage === "order-status") {
+        // Add empty values for columns F-G
+        rowData.push("", "")
+        // Add quotation number in column H
+        rowData.push(orderStatusData.orderStatusQuotationNumber)
+        // Add empty values for columns I-V
+        rowData.push(...new Array(14).fill(""))
+        // Add order status in column W
+        rowData.push(orderStatusData.orderStatus)
+        
+        // Based on order status, add data to appropriate columns
+        if (orderStatusData.orderStatus === "yes") {
+          // Add YES data for columns X-AC
+          rowData.push(
+            orderStatusData.acceptanceVia,     // Column X
+            orderStatusData.paymentMode,       // Column Y
+            orderStatusData.paymentTerms,      // Column Z
+            orderVideoUrl || "",               // Column AA
+            acceptanceFileUrl || "",           // Column AB
+            orderStatusData.orderRemark        // Column AC
+          )
+          // Add empty values for NO and HOLD columns (AD-AI)
+          rowData.push(...new Array(6).fill(""))
+        } else if (orderStatusData.orderStatus === "no") {
+          // Add empty values for YES columns (X-AC)
+          rowData.push(...new Array(6).fill(""))
+          // Add NO data for columns AD-AF
+          rowData.push(
+            apologyVideoUrl || "",             // Column AD
+            orderStatusData.reasonStatus,      // Column AE
+            orderStatusData.reasonRemark       // Column AF
+          )
+          // Add empty values for HOLD columns (AG-AI)
+          rowData.push(...new Array(3).fill(""))
+        } else if (orderStatusData.orderStatus === "hold") {
+          // Add empty values for YES and NO columns (X-AF)
+          rowData.push(...new Array(9).fill(""))
+          // Add HOLD data for columns AG-AI
+          rowData.push(
+            orderStatusData.holdReason,        // Column AG
+            orderStatusData.holdingDate,       // Column AH
+            orderStatusData.holdRemark         // Column AI
+          )
+        } else {
+          // If no status selected, fill all columns with empty
+          rowData.push(...new Array(12).fill(""))
+        }
+      } else {
+        // Add empty values for all stage-specific columns (F-AI)
+        rowData.push(...new Array(30).fill(""))
+      }
+      
+      console.log("Row Data to be submitted:", rowData);
+      
+      // Script URL - replace with your Google Apps Script URL
+      const scriptUrl = "https://script.google.com/macros/s/AKfycbxeo5tv3kAcSDDAheOCP07HaK76zSfq49jFGtZknseg7kPlj2G1O8U2PuiA2fQSuPvKqA/exec"
+      
+      // Parameters for Google Apps Script
+      const params = {
+        sheetName: "Enquiry Tracker",
+        action: "insert",
+        rowData: JSON.stringify(rowData)
+      }
+
+      // Create URL-encoded string for the parameters
+      const urlParams = new URLSearchParams()
+      for (const key in params) {
+        urlParams.append(key, params[key])
+      }
+      
+      // Send the data
+      const response = await fetch(scriptUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: urlParams
+      })
+
+      const result = await response.json()
+      
+      if (result.success) {
+        showNotification("Call tracker updated successfully", "success")
+        navigate("/call-tracker")
+      } else {
+        showNotification("Error updating call tracker: " + (result.error || "Unknown error"), "error")
+      }
+    } catch (error) {
+      console.error("Error submitting form:", error)
+      showNotification("Error submitting form: " + error.message, "error")
+    } finally {
       setIsSubmitting(false)
-    }, 1000)
+    }
   }
 
   return (
@@ -36,7 +432,7 @@ function NewCallTracker() {
           <h2 className="text-xl font-bold">Call Tracker</h2>
           <p className="text-sm text-slate-500">
             Track the progress of the enquiry
-            {enquiryNo && <span className="font-medium"> for Enquiry #{enquiryNo}</span>}
+            {formData.enquiryNo && <span className="font-medium"> for Enquiry #{formData.enquiryNo}</span>}
           </p>
         </div>
         <form onSubmit={handleSubmit}>
@@ -49,7 +445,8 @@ function NewCallTracker() {
                 id="enquiryNo"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                 placeholder="En-01"
-                defaultValue={enquiryNo || ""}
+                value={formData.enquiryNo}
+                onChange={handleInputChange}
                 required
               />
             </div>
@@ -61,12 +458,14 @@ function NewCallTracker() {
               <select
                 id="enquiryStatus"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                value={formData.enquiryStatus}
+                onChange={handleInputChange}
                 required
               >
                 <option value="">Select status</option>
-                <option value="hot">Hot</option>
-                <option value="warm">Warm</option>
-                <option value="cold">Cold</option>
+                {enquiryStatusOptions.map((option, index) => (
+                  <option key={index} value={option.toLowerCase()}>{option}</option>
+                ))}
               </select>
             </div>
 
@@ -78,6 +477,8 @@ function NewCallTracker() {
                 id="customerFeedback"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 min-h-[100px]"
                 placeholder="Enter customer feedback"
+                value={formData.customerFeedback}
+                onChange={handleInputChange}
                 required
               />
             </div>
@@ -144,10 +545,34 @@ function NewCallTracker() {
               </div>
             </div>
 
-            {currentStage === "make-quotation" && <MakeQuotationForm />}
-            {currentStage === "order-expected" && <OrderExpectedForm />}
-            {currentStage === "quotation-validation" && <QuotationValidationForm />}
-            {currentStage === "order-status" && <OrderStatusForm />}
+            {currentStage === "make-quotation" && (
+              <MakeQuotationForm 
+                enquiryNo={formData.enquiryNo}
+                formData={quotationData}
+                onFieldChange={handleQuotationChange}
+              />
+            )}
+            {currentStage === "quotation-validation" && (
+              <QuotationValidationForm 
+                enquiryNo={formData.enquiryNo}
+                formData={validationData}
+                onFieldChange={handleValidationChange}
+              />
+            )}
+            {currentStage === "order-expected" && (
+              <OrderExpectedForm 
+                enquiryNo={formData.enquiryNo}
+                formData={orderExpectedData}
+                onFieldChange={handleOrderExpectedChange}
+              />
+            )}
+            {currentStage === "order-status" && (
+              <OrderStatusForm 
+                enquiryNo={formData.enquiryNo}
+                formData={orderStatusData}
+                onFieldChange={handleOrderStatusChange}
+              />
+            )}
           </div>
           <div className="p-6 border-t flex justify-between">
             <button
