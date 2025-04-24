@@ -21,6 +21,49 @@ function FollowUp() {
     return "Low"
   }
 
+  // Helper function to format next call time
+const formatNextCallTime = (timeValue) => {
+  if (!timeValue) return ""
+  
+  try {
+    // Check if it's a Date(YYYY,MM,DD,HH,MM,SS) format
+    if (typeof timeValue === 'string' && timeValue.startsWith('Date(')) {
+      // Extract hours and minutes from the Date string
+      const timeString = timeValue.substring(5, timeValue.length - 1)
+      const [year, month, day, hours, minutes, seconds] = timeString.split(',').map(part => parseInt(part.trim()))
+      
+      // Convert to 12-hour format
+      const formattedHours = hours % 12 || 12 // Convert to 12-hour format
+      const period = hours >= 12 ? 'PM' : 'AM'
+      
+      // Pad minutes with leading zero if needed
+      const formattedMinutes = minutes.toString().padStart(2, '0')
+      
+      return `${formattedHours}:${formattedMinutes} ${period}`
+    }
+    
+    // If it's already in HH:MM:SS format
+    if (typeof timeValue === 'string' && /^\d{2}:\d{2}:\d{2}$/.test(timeValue)) {
+      const [hours, minutes] = timeValue.split(':').map(Number)
+      
+      // Convert to 12-hour format
+      const formattedHours = hours % 12 || 12
+      const period = hours >= 12 ? 'PM' : 'AM'
+      
+      // Pad minutes with leading zero if needed
+      const formattedMinutes = minutes.toString().padStart(2, '0')
+      
+      return `${formattedHours}:${formattedMinutes} ${period}`
+    }
+    
+    // Fallback to original value if parsing fails
+    return timeValue
+  } catch (error) {
+    console.error("Error formatting time:", error)
+    return timeValue
+  }
+}
+
   // Helper function to calculate next call date (3 days after created date)
   const calculateNextCallDate = (createdDate) => {
     if (!createdDate) return ""
@@ -168,7 +211,7 @@ function FollowUp() {
                 
                 nextAction: row.c[21] ? row.c[21].v : "", // Column V - Next Action
                 nextCallDate: row.c[22] ? formatDateToDDMMYYYY(row.c[22] ? row.c[22].v : ""): "", // Column W - Next Call Date
-                nextCallTime: row.c[23] ? row.c[23].v : "", // Column X - Next Call Time
+                nextCallTime: row.c[23] ? formatNextCallTime(row.c[23].v) : "", // Column X - Next Call Time
               }
               
               historyFollowUpData.push(followUpItem)
