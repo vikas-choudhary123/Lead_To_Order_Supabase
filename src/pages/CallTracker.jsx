@@ -140,9 +140,9 @@ function CallTracker() {
                 id: index + 1,
                 leadId: row.c[1] ? row.c[1].v : "", // Column B - Lead Number
                 receiverName: row.c[2] ? row.c[2].v : "", // Column C - Lead Receiver Name
-                leadSource: row.c[38] ? row.c[38].v : "", // Column D - Lead Source
-                salespersonName: row.c[39] ? row.c[39].v : "", // Column E - Salesperson Name
-                companyName: row.c[40] ? row.c[40].v : "", // Column G - Company Name
+                leadSource: row.c[40] ? row.c[40].v : "", // Column D - Lead Source
+                salespersonName: row.c[41] ? row.c[41].v : "", // Column E - Salesperson Name
+                companyName: row.c[42] ? row.c[42].v : "", // Column G - Company Name
                 createdAt: row.c[0] ? row.c[0].v : "", // Using date from column A
                 status: "Expected", // Default status for pending
                 priority: determinePriority(row.c[3] ? row.c[3].v : ""), // Determine priority based on source

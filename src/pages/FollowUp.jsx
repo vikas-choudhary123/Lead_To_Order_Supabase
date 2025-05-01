@@ -161,9 +161,9 @@ const formatNextCallTime = (timeValue) => {
                   id: row.c[0] ? row.c[0].v : "",
                   leadId: row.c[1] ? row.c[1].v : "", // Column B - Lead Number
                   receiverName: row.c[2] ? row.c[2].v : "", // Column C - Lead Receiver Name
-                  leadSource: row.c[13] ? row.c[13].v : "", // Column D - Lead Source
-                  salespersonName: row.c[14] ? row.c[14].v : "", // Column E - Salesperson Name
-                  companyName: row.c[15] ? row.c[15].v : "", // Column G - Company Name
+                  leadSource: row.c[3] ? row.c[3].v : "", // Column D - Lead Source
+                  salespersonName: row.c[4] ? row.c[4].v : "", // Column E - Salesperson Name
+                  companyName: row.c[17] ? row.c[17].v : "", // Column G - Company Name
                   createdAt: row.c[0] ? row.c[0].v : "", // Using date from column A
                   status: "Expected", // Default status for pending
                   priority: determinePriority(row.c[3] ? row.c[3].v : ""), // Determine priority based on source
@@ -367,7 +367,7 @@ const formatNextCallTime = (timeValue) => {
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
-                          What Did Customer Say
+                          Sales Co-Ordinator Name
                         </th>
                         <th
                           scope="col"
