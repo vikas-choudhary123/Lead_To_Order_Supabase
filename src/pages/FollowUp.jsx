@@ -152,8 +152,8 @@ const formatNextCallTime = (timeValue) => {
           pendingData.table.rows.slice(0).forEach(row => {
             if (row.c) {
               // Check if column K (index 10) has data and column L (index 11) is null
-              const hasColumnK = row.c[10] && row.c[10].v;
-              const isColumnLEmpty = !row.c[11] || row.c[11].v === null || row.c[11].v === "";
+              const hasColumnK = row.c[12] && row.c[12].v;
+              const isColumnLEmpty = !row.c[13] || row.c[13].v === null || row.c[13].v === "";
               
               // Only include rows where column K has data and column L is null/empty
               if (hasColumnK && isColumnLEmpty) {

@@ -134,8 +134,8 @@ function CallTracker() {
           pendingData.table.rows.slice(2).forEach((row, index) => {
             // MODIFIED: Only show rows where column AJ (index 35) is not null and column AK (index 36) is null
             if (row.c && 
-                row.c[35] && row.c[35].v && 
-                (!row.c[36] || !row.c[36].v)) {
+                row.c[37] && row.c[37].v && 
+                (!row.c[38] || !row.c[38].v)) {
               const callTrackerItem = {
                 id: index + 1,
                 leadId: row.c[1] ? row.c[1].v : "", // Column B - Lead Number

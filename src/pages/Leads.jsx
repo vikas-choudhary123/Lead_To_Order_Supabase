@@ -8,6 +8,8 @@ function Leads() {
   const [formData, setFormData] = useState({
     receiverName: "",
     source: "",
+    salesCoordinatorName: "", // New field
+    leadAssignTo: "", // New field
     companyName: "",
     phoneNumber: "",
     salespersonName: "",
@@ -17,6 +19,8 @@ function Leads() {
   })
   const [receiverNames, setReceiverNames] = useState([])
   const [leadSources, setLeadSources] = useState([])
+  const [salesCoordinators, setSalesCoordinators] = useState([]) // New state
+  const [leadAssignees, setLeadAssignees] = useState([]) // New state
   const [nextLeadNumber, setNextLeadNumber] = useState("")
   const { showNotification } = useContext(AuthContext)
   
@@ -46,50 +50,67 @@ function Leads() {
   }, [])
 
   // Function to fetch dropdown data from DROPDOWNSHEET
-  // Function to fetch dropdown data from DROPDOWNSHEET
-const fetchDropdownData = async () => {
-  try {
-    // Call the Google Apps Script with query parameters to get public access to the DROPDOWNSHEET
-    const publicUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=DROPDOWN"
-    
-    const response = await fetch(publicUrl)
-    const text = await response.text()
-    
-    // The response is a callback with JSON data - extract just the JSON part
-    const jsonStart = text.indexOf('{')
-    const jsonEnd = text.lastIndexOf('}') + 1
-    const jsonData = text.substring(jsonStart, jsonEnd)
-    
-    const data = JSON.parse(jsonData)
-    
-    // Extract columns A and B (if this structure doesn't match, you may need to adjust)
-    if (data && data.table && data.table.rows) {
-      const receivers = []
-      const sources = []
+  const fetchDropdownData = async () => {
+    try {
+      // Call the Google Apps Script with query parameters to get public access to the DROPDOWNSHEET
+      const publicUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=DROPDOWN"
       
-      // Skip the first row (index 0) which contains headers
-      data.table.rows.slice(1).forEach(row => {
-        // Column A (receivers) - skip empty values
-        if (row.c && row.c[0] && row.c[0].v) {
-          receivers.push(row.c[0].v.toString())
-        }
+      const response = await fetch(publicUrl)
+      const text = await response.text()
+      
+      // The response is a callback with JSON data - extract just the JSON part
+      const jsonStart = text.indexOf('{')
+      const jsonEnd = text.lastIndexOf('}') + 1
+      const jsonData = text.substring(jsonStart, jsonEnd)
+      
+      const data = JSON.parse(jsonData)
+      
+      // Extract columns A, B, AK (column 36), and AI (column 34)
+      if (data && data.table && data.table.rows) {
+        const receivers = []
+        const sources = []
+        const coordinators = []
+        const assignees = []
         
-        // Column B (sources) - skip empty values
-        if (row.c && row.c[1] && row.c[1].v) {
-          sources.push(row.c[1].v.toString())
-        }
-      })
-      
-      setReceiverNames(receivers)
-      setLeadSources(sources)
+        // Skip the first row (index 0) which contains headers
+        data.table.rows.slice(0).forEach(row => {
+          // Column A (receivers) - skip empty values
+          if (row.c && row.c[0] && row.c[0].v) {
+            receivers.push(row.c[0].v.toString())
+          }
+          
+          // Column B (sources) - skip empty values
+          if (row.c && row.c[1] && row.c[1].v) {
+            sources.push(row.c[1].v.toString())
+          }
+          
+          // Column AK (sales coordinators) - skip empty values
+          // Column index 36 (0-based, so AK is 36)
+          if (row.c && row.c[36] && row.c[36].v) {
+            coordinators.push(row.c[36].v.toString())
+          }
+          
+          // Column AI (lead assignees) - skip empty values
+          // Column index 34 (0-based, so AI is 34)
+          if (row.c && row.c[34] && row.c[34].v) {
+            assignees.push(row.c[34].v.toString())
+          }
+        })
+        
+        setReceiverNames(receivers)
+        setLeadSources(sources)
+        setSalesCoordinators(coordinators)
+        setLeadAssignees(assignees)
+      }
+    } catch (error) {
+      console.error("Error fetching dropdown values:", error)
+      // Fallback to default values if needed
+      setReceiverNames(["John Smith", "Sarah Johnson", "Michael Brown"])
+      setLeadSources(["Indiamart", "Justdial", "Social Media", "Website", "Referral", "Other"])
+      setSalesCoordinators(["Coordinator 1", "Coordinator 2", "Coordinator 3"])
+      setLeadAssignees(["Assignee 1", "Assignee 2", "Assignee 3"])
     }
-  } catch (error) {
-    console.error("Error fetching dropdown values:", error)
-    // Fallback to default values if needed
-    setReceiverNames(["John Smith", "Sarah Johnson", "Michael Brown"])
-    setLeadSources(["Indiamart", "Justdial", "Social Media", "Website", "Referral", "Other"])
   }
-}
 
   const handleChange = (e) => {
     const { id, value } = e.target
@@ -169,9 +190,11 @@ const fetchDropdownData = async () => {
         leadNumber, // Generated lead number based on current sheet data
         formData.receiverName,
         formData.source,
-        formData.salespersonName,
-        formData.phoneNumber,
+        formData.salesCoordinatorName, // New field
+        formData.leadAssignTo, // New field
         formData.companyName,
+        formData.phoneNumber,
+        formData.salespersonName,
         formData.location,
         formData.email,
         formData.notes,
@@ -208,6 +231,8 @@ const fetchDropdownData = async () => {
         setFormData({
           receiverName: "",
           source: "",
+          salesCoordinatorName: "",
+          leadAssignTo: "",
           salespersonName: "",
           phoneNumber: "",
           companyName: "",
@@ -286,6 +311,42 @@ const fetchDropdownData = async () => {
               </div>
 
               <div className="space-y-2">
+                <label htmlFor="salesCoordinatorName" className="block text-sm font-medium text-gray-700">
+                  Sales Co-ordinator Name
+                </label>
+                <select
+                  id="salesCoordinatorName"
+                  value={formData.salesCoordinatorName}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="">Select sales coordinator</option>
+                  {salesCoordinators.map((name, index) => (
+                    <option key={index} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="leadAssignTo" className="block text-sm font-medium text-gray-700">
+                  Lead Assign To
+                </label>
+                <select
+                  id="leadAssignTo"
+                  value={formData.leadAssignTo}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="">Select assignee</option>
+                  {leadAssignees.map((name, index) => (
+                    <option key={index} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
                 <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">
                   Company Name
                 </label>
@@ -343,7 +404,7 @@ const fetchDropdownData = async () => {
 
               <div className="space-y-2">
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  Email Address
+                  Email Address <span className="text-xs text-gray-500">(Optional)</span>
                 </label>
                 <input
                   id="email"

@@ -26,52 +26,72 @@ function NewFollowUp() {
   // New state for dropdown options
   const [enquiryStates, setEnquiryStates] = useState([])
   const [salesTypes, setSalesTypes] = useState([])
+  const [productCategories, setProductCategories] = useState([]) // New state for product categories
+  const [nobOptions, setNobOptions] = useState([])
 
   // Function to fetch dropdown data from DROPDOWNSHEET
-  const fetchDropdownData = async () => {
-    try {
-      // Call the Google Apps Script with query parameters to get public access to the DROPDOWNSHEET
-      const publicUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=DROPDOWN"
+// Function to fetch dropdown data from DROPDOWNSHEET
+const fetchDropdownData = async () => {
+  try {
+    // Call the Google Apps Script with query parameters to get public access to the DROPDOWNSHEET
+    const publicUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=DROPDOWN"
+    
+    const response = await fetch(publicUrl)
+    const text = await response.text()
+    
+    // The response is a callback with JSON data - extract just the JSON part
+    const jsonStart = text.indexOf('{')
+    const jsonEnd = text.lastIndexOf('}') + 1
+    const jsonData = text.substring(jsonStart, jsonEnd)
+    
+    const data = JSON.parse(jsonData)
+    
+    // Extract columns C, D, AJ (column index 35), and AL (column index 37)
+    if (data && data.table && data.table.rows) {
+      const states = []
+      const types = []
+      const categories = []
+      const nobs = []
       
-      const response = await fetch(publicUrl)
-      const text = await response.text()
-      
-      // The response is a callback with JSON data - extract just the JSON part
-      const jsonStart = text.indexOf('{')
-      const jsonEnd = text.lastIndexOf('}') + 1
-      const jsonData = text.substring(jsonStart, jsonEnd)
-      
-      const data = JSON.parse(jsonData)
-      
-      // Extract columns C and D (if this structure doesn't match, you may need to adjust)
-      if (data && data.table && data.table.rows) {
-        const states = []
-        const types = []
+      // Skip the first row (index 0) which contains headers
+      data.table.rows.slice(0).forEach(row => {
+        // Column C (enquiry states) - skip empty values
+        if (row.c && row.c[2] && row.c[2].v) {
+          states.push(row.c[2].v.toString())
+        }
         
-        // Skip the first row (index 0) which contains headers
-        data.table.rows.slice(1).forEach(row => {
-          // Column C (enquiry states) - skip empty values
-          if (row.c && row.c[2] && row.c[2].v) {
-            states.push(row.c[2].v.toString())
-          }
-          
-          // Column D (sales types) - skip empty values
-          if (row.c && row.c[3] && row.c[3].v) {
-            types.push(row.c[3].v.toString())
-          }
-        })
+        // Column D (sales types) - skip empty values
+        if (row.c && row.c[3] && row.c[3].v) {
+          types.push(row.c[3].v.toString())
+        }
         
-        setEnquiryStates(states)
-        setSalesTypes(types)
-      }
-    } catch (error) {
-      console.error("Error fetching dropdown values:", error)
-      // Fallback to default values if needed
-      setEnquiryStates(["Maharashtra", "Gujarat", "Karnataka", "Tamil Nadu", "Delhi"])
-      setSalesTypes(["NBD", "CRR", "NBD_CRR"])
-    }
-  }
+        // Column AJ (product categories) - skip empty values
+        // Column index 35 (0-based, so AJ is 35)
+        if (row.c && row.c[35] && row.c[35].v) {
+          categories.push(row.c[35].v.toString())
+        }
 
+        // Column AL (NOB options) - skip empty values
+        // Column index 37 (0-based, so AL is 37)
+        if (row.c && row.c[37] && row.c[37].v) {
+          nobs.push(row.c[37].v.toString())
+        }
+      })
+      
+      setEnquiryStates(states)
+      setSalesTypes(types)
+      setProductCategories(categories)
+      setNobOptions(nobs)
+    }
+  } catch (error) {
+    console.error("Error fetching dropdown values:", error)
+    // Fallback to default values if needed
+    setEnquiryStates(["Maharashtra", "Gujarat", "Karnataka", "Tamil Nadu", "Delhi"])
+    setSalesTypes(["NBD", "CRR", "NBD_CRR"])
+    setProductCategories(["Product 1", "Product 2", "Product 3"])
+    setNobOptions(["NOB 1", "NOB 2", "NOB 3"])
+  }
+}
   useEffect(() => {
     // Fetch dropdown data when component mounts
     fetchDropdownData()
@@ -121,15 +141,16 @@ function NewFollowUp() {
           document.getElementById("nextCallDate").value,    // W: Next call date
           document.getElementById("nextCallTime").value     // X: Next call time
         )
-      } else if (enquiryStatus === "yes") {
+      } else // Change this part in your handleSubmit function
+      if (enquiryStatus === "yes") {
         // Add columns F-K
         rowData.push(
           document.getElementById("enquiryDate").value,     // F: Enquiry Received Date
           document.getElementById("enquiryState").value,    // G: Enquiry for State
           document.getElementById("projectName").value,     // H: Project Name
           document.getElementById("salesType").value,       // I: Sales Type
-          document.getElementById("requiredDate").value,    // J: Required Product Date
-          document.getElementById("projectValue").value     // K: Project Approximate Value
+          "",                                              // J: Required Product Date (empty string since input is commented out)
+          ""                                               // K: Project Value (empty string since input is commented out)
         )
         
         // Add item details
@@ -417,21 +438,25 @@ function NewFollowUp() {
                   </select>
                 </div>
 
-                  <div className="space-y-2">
-                    <label htmlFor="projectName" className="block text-sm font-medium text-gray-700">
-                      Project Name
-                    </label>
-                    <input
-                      id="projectName"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
-                      placeholder="Enter project name"
-                      required
-                    />
-                  </div>
+                <div className="space-y-2">
+  <label htmlFor="projectName" className="block text-sm font-medium text-gray-700">
+    NOB
+  </label>
+  <select
+    id="projectName"
+    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+    required
+  >
+    <option value="">Select NOB</option>
+    {nobOptions.map((nob, index) => (
+      <option key={index} value={nob}>{nob}</option>
+    ))}
+  </select>
+</div>
 
                   <div className="space-y-2">
                   <label htmlFor="salesType" className="block text-sm font-medium text-gray-700">
-                    Sales Type
+                    Enquiry Type
                   </label>
                   <select
                     id="salesType"
@@ -445,7 +470,7 @@ function NewFollowUp() {
                   </select>
                 </div>
 
-                  <div className="space-y-2">
+                  {/* <div className="space-y-2">
                     <label htmlFor="requiredDate" className="block text-sm font-medium text-gray-700">
                       Required Product Date
                     </label>
@@ -468,7 +493,7 @@ function NewFollowUp() {
                       placeholder="Enter value"
                       required
                     />
-                  </div>
+                  </div> */}
                 </div>
 
                 <div className="space-y-4">
@@ -487,19 +512,23 @@ function NewFollowUp() {
                     <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                       <div className="md:col-span-5 space-y-2">
                         <label htmlFor={`itemName-${item.id}`} className="block text-sm font-medium text-gray-700">
-                          Item Name
+                          Requirement Product category
                         </label>
-                        <input
+                        <select
                           id={`itemName-${item.id}`}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
-                          placeholder="Enter item name"
                           value={item.name}
                           onChange={(e) => updateItem(item.id, "name", e.target.value)}
                           required
-                        />
+                        >
+                          <option value="">Select product category</option>
+                          {productCategories.map((category, index) => (
+                            <option key={index} value={category}>{category}</option>
+                          ))}
+                        </select>
                       </div>
 
-                      <div className="md:col-span-5 space-y-2">
+                      {/* <div className="md:col-span-5 space-y-2">
                         <label htmlFor={`quantity-${item.id}`} className="block text-sm font-medium text-gray-700">
                           Quantity
                         </label>
@@ -511,7 +540,7 @@ function NewFollowUp() {
                           onChange={(e) => updateItem(item.id, "quantity", e.target.value)}
                           required
                         />
-                      </div>
+                      </div> */}
 
                       <div className="md:col-span-2">
                         <button

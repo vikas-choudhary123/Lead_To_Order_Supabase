@@ -67,8 +67,8 @@ function DashboardMetrics() {
           pendingFollowups = fmsData.table.rows.filter((row, index) => 
             index >= 2 && 
             row.c && 
-            row.c[10] && row.c[10].v && 
-            (!row.c[11] || !row.c[11].v)
+            row.c[12] && row.c[12].v && 
+            (!row.c[13] || !row.c[13].v)
           ).length
         }
         

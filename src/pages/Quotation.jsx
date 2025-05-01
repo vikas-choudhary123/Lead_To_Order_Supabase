@@ -191,6 +191,7 @@ function Quotation() {
 
   // Fetch dropdown data for states and corresponding details
 // Enhanced fetchDropdownData function that includes company details mapping
+// Enhanced fetchDropdownData function that includes reference details with mobile numbers
 useEffect(() => {
   const fetchDropdownData = async () => {
     try {
@@ -218,6 +219,7 @@ useEffect(() => {
         
         // For reference options (Column V - index 21)
         const referenceOptionsData = ["Select Reference"]
+        const referenceDetailsMap = {} // Add this to store reference details including mobile number
         
         dropdownData.table.rows.slice(0).forEach((row) => {
           if (row.c) {
@@ -261,6 +263,11 @@ useEffect(() => {
             const referenceName = row.c[21] ? row.c[21].v : ""
             if (referenceName && !referenceOptionsData.includes(referenceName)) {
               referenceOptionsData.push(referenceName)
+              
+              // Store reference details including mobile number (Column W - index 22)
+              referenceDetailsMap[referenceName] = {
+                mobile: row.c[22] ? row.c[22].v : ""  // Mobile number from Column W
+              }
             }
           }
         })
@@ -273,7 +280,8 @@ useEffect(() => {
         // Update dropdown data
         setDropdownData({
           states: stateDetailsMap,
-          companies: companyDetailsMap
+          companies: companyDetailsMap,
+          references: referenceDetailsMap  // Add reference details to dropdown data
         })
       }
     } catch (error) {
@@ -284,7 +292,7 @@ useEffect(() => {
       setCompanyOptions(["Select Company", "ABC Corp", "XYZ Industries", "PQR Ltd"])
       setReferenceOptions(["Select Reference", "John Doe", "Jane Smith", "Mike Johnson"])
       
-      // Fallback mock data for state details and company details
+      // Fallback mock data for state details, company details, and reference details
       setDropdownData({
         states: {
           "Chhattisgarh": {
@@ -331,6 +339,17 @@ useEffect(() => {
             gstin: "22KLMNO9101P1Z5",
             stateCode: "22"
           }
+        },
+        references: {
+          "John Doe": {
+            mobile: "9898989898"
+          },
+          "Jane Smith": {
+            mobile: "8787878787"
+          },
+          "Mike Johnson": {
+            mobile: "7676767676"
+          }
         }
       })
     }
@@ -338,6 +357,24 @@ useEffect(() => {
   
   fetchDropdownData()
 }, [])
+
+// Handle reference name change and auto-fill mobile number
+const handleReferenceChange = (e) => {
+  const selectedReference = e.target.value
+  handleInputChange("consignorName", selectedReference)
+  
+  if (selectedReference && dropdownData.references && dropdownData.references[selectedReference]) {
+    const referenceDetails = dropdownData.references[selectedReference]
+    
+    // Auto-fill mobile number from reference details
+    if (referenceDetails.mobile) {
+      handleInputChange("consignorMobile", referenceDetails.mobile)
+    }
+  } else {
+    // Clear mobile field when no reference is selected or data is not available
+    handleInputChange("consignorMobile", "")
+  }
+}
 
 // Handle company change and auto-fill consignee details
 const handleCompanyChange = (e) => {
@@ -1137,20 +1174,20 @@ const handleStateChange = (e) => {
 
                   <h3 className="text-lg font-medium mt-6 mb-4">Consignor Details</h3>
                   <div className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium">Reference Name</label>
-                      <select
-                        value={quotationData.consignorName}
-                        onChange={(e) => handleInputChange("consignorName", e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded-md"
-                      >
-                        {referenceOptions.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  <div className="space-y-2">
+  <label className="block text-sm font-medium">Reference Name</label>
+  <select
+    value={quotationData.consignorName}
+    onChange={handleReferenceChange}  // Use the new handler here
+    className="w-full p-2 border border-gray-300 rounded-md"
+  >
+    {referenceOptions.map((option) => (
+      <option key={option} value={option}>
+        {option}
+      </option>
+    ))}
+  </select>
+</div>
 
                     <div className="space-y-2">
                       <label className="block text-sm font-medium">Address</label>
@@ -1645,14 +1682,14 @@ const handleStateChange = (e) => {
                   )}
                 </button>
                 <div className="space-x-2">
-                  {/* <button
+                  <button
                     className="border border-gray-300 hover:bg-gray-50 px-4 py-2 rounded-md flex items-center inline-flex"
                     onClick={handleGenerateLink}
                     disabled={isGenerating || isSubmitting}
                   >
                     <ShareIcon className="h-4 w-4 mr-2" />
                     Generate Link
-                  </button> */}
+                  </button>
                   <button
                     className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md flex items-center inline-flex"
                     onClick={handleGeneratePDF}
