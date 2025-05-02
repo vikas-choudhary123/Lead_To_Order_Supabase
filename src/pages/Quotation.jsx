@@ -18,6 +18,9 @@ function Quotation() {
   const [stateOptions, setStateOptions] = useState(["Select State"])
   const [companyOptions, setCompanyOptions] = useState(["Select Company"])
   const [referenceOptions, setReferenceOptions] = useState(["Select Reference"])
+  const [isRevising, setIsRevising] = useState(false);
+const [existingQuotations, setExistingQuotations] = useState([]);
+const [selectedQuotation, setSelectedQuotation] = useState("");
   
   // State for dropdown data
   const [dropdownData, setDropdownData] = useState({})
@@ -59,17 +62,21 @@ function Quotation() {
         qty: 1,
         units: "Nos",
         rate: 0,
+        discount: 0, // Percentage discount
+        flatDiscount: 0, // Flat discount amount
         amount: 0,
       },
     ],
     
     // Totals
     subtotal: 0,
+    totalFlatDiscount: 0,
     cgstRate: 9,
     sgstRate: 9,
     cgstAmount: 0,
     sgstAmount: 0,
     total: 0,
+  
     
     // Terms
     validity: "The above quoted prices are valid up to 5 days from date of offer.",
@@ -102,40 +109,63 @@ function Quotation() {
     }));
   };
 
-  // Handle item changes
+  // Handle item changes with discount calculation
   const handleItemChange = (id, field, value) => {
-    setQuotationData((prev) => {
-      const newItems = prev.items.map((item) => {
-        if (item.id === id) {
-          const updatedItem = { ...item, [field]: value }
-
-          // Recalculate amount if quantity or rate changes
-          if (field === "qty" || field === "rate") {
-            updatedItem.amount = Number(updatedItem.qty) * Number(updatedItem.rate)
-          }
-
-          return updatedItem
+  setQuotationData((prev) => {
+    const newItems = prev.items.map((item) => {
+      if (item.id === id) {
+        const updatedItem = { ...item, [field]: value }
+  
+        // Ensure numeric calculations
+        if (field === "qty" || field === "rate" || field === "discount" || field === "flatDiscount") {
+          const baseAmount = Number(updatedItem.qty) * Number(updatedItem.rate)
+          const discountedAmount = baseAmount * (1 - (Number(updatedItem.discount) / 100))  // Added missing closing parenthesis
+          updatedItem.amount = Math.max(0, discountedAmount - Number(updatedItem.flatDiscount))
         }
-        return item
-      })
+  
+        return updatedItem
+      }
+      return item
+    })
+  
+    // Ensure all calculations result in numbers
+    const subtotal = Number(newItems.reduce((sum, item) => sum + item.amount, 0))
+    const subtotalAfterDiscount = Math.max(0, subtotal - Number(prev.totalFlatDiscount))
+    const cgstAmount = Number((subtotalAfterDiscount * (prev.cgstRate / 100)).toFixed(2))  // Added missing closing parenthesis
+    const sgstAmount = Number((subtotalAfterDiscount * (prev.sgstRate / 100)).toFixed(2))  // Added missing closing parenthesis
+    const total = Number((subtotalAfterDiscount + cgstAmount + sgstAmount).toFixed(2))  // Added missing closing parenthesis
+  
+    return {
+      ...prev,
+      items: newItems,
+      subtotal,
+      cgstAmount,
+      sgstAmount,
+      total,
+    }
+  })
+}
 
-      // Recalculate totals
-      const subtotal = newItems.reduce((sum, item) => sum + item.amount, 0)
-      const cgstAmount = subtotal * (prev.cgstRate / 100)
-      const sgstAmount = subtotal * (prev.sgstRate / 100)
-      const total = subtotal + cgstAmount + sgstAmount
-
+  // Handle total flat discount change
+  const handleFlatDiscountChange = (value) => {
+    setQuotationData((prev) => {
+      const numValue = Number(value)
+      const subtotal = prev.items.reduce((sum, item) => sum + item.amount, 0)
+      const subtotalAfterDiscount = Math.max(0, subtotal - numValue)
+      const cgstAmount = Number((subtotalAfterDiscount * (prev.cgstRate / 100)).toFixed(2))
+      const sgstAmount = Number((subtotalAfterDiscount * (prev.sgstRate / 100)).toFixed(2))
+      const total = Number((subtotalAfterDiscount + cgstAmount + sgstAmount).toFixed(2))
+    
       return {
         ...prev,
-        items: newItems,
-        subtotal,
+        totalFlatDiscount: numValue,
+        subtotal: subtotal, // Use the calculated subtotal from prev.items
         cgstAmount,
         sgstAmount,
         total,
       }
     })
   }
-
   // Handle note changes
   const handleNoteChange = (index, value) => {
     setQuotationData((prev) => {
@@ -147,6 +177,60 @@ function Quotation() {
       }
     })
   }
+
+  useEffect(() => {
+    const fetchExistingQuotations = async () => {
+      try {
+        const scriptUrl = "https://script.google.com/macros/s/AKfycbxeo5tv3kAcSDDAheOCP07HaK76zSfq49jFGtZknseg7kPlj2G1O8U2PuiA2fQSuPvKqA/exec";
+        const response = await fetch(scriptUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({
+            sheetName: "Make Quotation",
+            action: "getQuotationNumbers"
+          })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+          setExistingQuotations(result.quotationNumbers);
+        }
+      } catch (error) {
+        console.error("Error fetching quotation numbers:", error);
+      }
+    };
+    
+    fetchExistingQuotations();
+  }, []);
+
+  const handleQuotationSelect = async (quotationNo) => {
+    setSelectedQuotation(quotationNo);
+    
+    try {
+      const scriptUrl = "https://script.google.com/macros/s/AKfycbxeo5tv3kAcSDDAheOCP07HaK76zSfq49jFGtZknseg7kPlj2G1O8U2PuiA2fQSuPvKqA/exec";
+      const response = await fetch(scriptUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          sheetName: "Make Quotation",
+          action: "getQuotationData",
+          quotationNo: quotationNo
+        })
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        // Update the form with the fetched data
+        setQuotationData(result.quotationData);
+      }
+    } catch (error) {
+      console.error("Error fetching quotation data:", error);
+    }
+  };
 
   // Add a new note
   const addNote = () => {
@@ -168,7 +252,7 @@ function Quotation() {
     })
   }
 
-  // Add a new item
+  // Add a new item with discount fields
   const handleAddItem = () => {
     const newId = Math.max(0, ...quotationData.items.map((item) => item.id)) + 1
     setQuotationData((prev) => ({
@@ -183,6 +267,8 @@ function Quotation() {
           qty: 1,
           units: "Nos",
           rate: 0,
+          discount: 0, // Percentage discount
+          flatDiscount: 0, // Flat discount
           amount: 0,
         },
       ],
@@ -190,275 +276,272 @@ function Quotation() {
   }
 
   // Fetch dropdown data for states and corresponding details
-// Enhanced fetchDropdownData function that includes company details mapping
-// Enhanced fetchDropdownData function that includes reference details with mobile numbers
-useEffect(() => {
-  const fetchDropdownData = async () => {
-    try {
-      // Fetch data from Dropdown sheet
-      const dropdownUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=DROPDOWN"
-      const dropdownResponse = await fetch(dropdownUrl)
-      const dropdownText = await dropdownResponse.text()
-      
-      // Extract the JSON part from the Dropdown sheet response
-      const dropdownJsonStart = dropdownText.indexOf('{')
-      const dropdownJsonEnd = dropdownText.lastIndexOf('}') + 1
-      const dropdownJsonData = dropdownText.substring(dropdownJsonStart, dropdownJsonEnd)
-      
-      const dropdownData = JSON.parse(dropdownJsonData)
-      
-      // Process Dropdown sheet data
-      if (dropdownData && dropdownData.table && dropdownData.table.rows) {
-        // For state options (Column AA - index 26)
-        const stateOptionsData = ["Select State"]
-        const stateDetailsMap = {}
+  useEffect(() => {
+    const fetchDropdownData = async () => {
+      try {
+        // Fetch data from Dropdown sheet
+        const dropdownUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=DROPDOWN"
+        const dropdownResponse = await fetch(dropdownUrl)
+        const dropdownText = await dropdownResponse.text()
         
-        // For company options (Column M - index 12)
-        const companyOptionsData = ["Select Company"]
-        const companyDetailsMap = {}
+        // Extract the JSON part from the Dropdown sheet response
+        const dropdownJsonStart = dropdownText.indexOf('{')
+        const dropdownJsonEnd = dropdownText.lastIndexOf('}') + 1
+        const dropdownJsonData = dropdownText.substring(dropdownJsonStart, dropdownJsonEnd)
         
-        // For reference options (Column V - index 21)
-        const referenceOptionsData = ["Select Reference"]
-        const referenceDetailsMap = {} // Add this to store reference details including mobile number
+        const dropdownData = JSON.parse(dropdownJsonData)
         
-        dropdownData.table.rows.slice(0).forEach((row) => {
-          if (row.c) {
-            // Extract state name and details (Column AA - index 26)
-            const stateName = row.c[26] ? row.c[26].v : ""
-            if (stateName && !stateOptionsData.includes(stateName)) {
-              stateOptionsData.push(stateName)
-              
-              // Parse bank details from column AB (index 27)
-              let bankDetails = ""
-              if (row.c[27] && row.c[27].v) {
-                bankDetails = row.c[27].v
+        // Process Dropdown sheet data
+        if (dropdownData && dropdownData.table && dropdownData.table.rows) {
+          // For state options (Column AA - index 26)
+          const stateOptionsData = ["Select State"]
+          const stateDetailsMap = {}
+          
+          // For company options (Column M - index 12)
+          const companyOptionsData = ["Select Company"]
+          const companyDetailsMap = {}
+          
+          // For reference options (Column V - index 21)
+          const referenceOptionsData = ["Select Reference"]
+          const referenceDetailsMap = {} // Add this to store reference details including mobile number
+          
+          dropdownData.table.rows.slice(0).forEach((row) => {
+            if (row.c) {
+              // Extract state name and details (Column AA - index 26)
+              const stateName = row.c[26] ? row.c[26].v : ""
+              if (stateName && !stateOptionsData.includes(stateName)) {
+                stateOptionsData.push(stateName)
+                
+                // Parse bank details from column AB (index 27)
+                let bankDetails = ""
+                if (row.c[27] && row.c[27].v) {
+                  bankDetails = row.c[27].v
+                }
+                
+                // Store associated data
+                stateDetailsMap[stateName] = {
+                  bankDetails: bankDetails, // Column AB - Bank Details
+                  consignerAddress: row.c[28] ? row.c[28].v : "", // Column AC - Consigner Address
+                  stateCode: row.c[30] ? row.c[30].v : "", // Column AE - State Code
+                  gstin: row.c[31] ? row.c[31].v : "" // Column AF - GSTIN
+                }
               }
               
-              // Store associated data
-              stateDetailsMap[stateName] = {
-                bankDetails: bankDetails, // Column AB - Bank Details
-                consignerAddress: row.c[28] ? row.c[28].v : "", // Column AC - Consigner Address
-                stateCode: row.c[30] ? row.c[30].v : "", // Column AE - State Code
-                gstin: row.c[31] ? row.c[31].v : "" // Column AF - GSTIN
+              // Extract company name (Column M - index 12)
+              const companyName = row.c[12] ? row.c[12].v : ""
+              if (companyName && !companyOptionsData.includes(companyName)) {
+                companyOptionsData.push(companyName)
+                
+                // Store company details
+                companyDetailsMap[companyName] = {
+                  address: row.c[15] ? row.c[15].v : "",     // Column P - Address
+                  state: row.c[16] ? row.c[16].v : "",       // Column Q - State
+                  contactName: row.c[13] ? row.c[13].v : "", // Column N - Contact Name
+                  contactNo: row.c[14] ? row.c[14].v : "",   // Column O - Contact No
+                  gstin: row.c[17] ? row.c[17].v : "",       // Column R - GSTIN
+                  stateCode: row.c[18] ? row.c[18].v : ""    // Column S - State Code
+                }
+              }
+              
+              // Extract reference name (Column V - index 21)
+              const referenceName = row.c[21] ? row.c[21].v : ""
+              if (referenceName && !referenceOptionsData.includes(referenceName)) {
+                referenceOptionsData.push(referenceName)
+                
+                // Store reference details including mobile number (Column W - index 22)
+                referenceDetailsMap[referenceName] = {
+                  mobile: row.c[22] ? row.c[22].v : ""  // Mobile number from Column W
+                }
               }
             }
-            
-            // Extract company name (Column M - index 12)
-            const companyName = row.c[12] ? row.c[12].v : ""
-            if (companyName && !companyOptionsData.includes(companyName)) {
-              companyOptionsData.push(companyName)
-              
-              // Store company details
-              companyDetailsMap[companyName] = {
-                address: row.c[15] ? row.c[15].v : "",     // Column P - Address
-                state: row.c[16] ? row.c[16].v : "",       // Column Q - State
-                contactName: row.c[13] ? row.c[13].v : "", // Column N - Contact Name
-                contactNo: row.c[14] ? row.c[14].v : "",   // Column O - Contact No
-                gstin: row.c[17] ? row.c[17].v : "",       // Column R - GSTIN
-                stateCode: row.c[18] ? row.c[18].v : ""    // Column S - State Code
-              }
+          })
+          
+          // Update all dropdown options and data
+          setStateOptions(stateOptionsData)
+          setCompanyOptions(companyOptionsData)
+          setReferenceOptions(referenceOptionsData)
+          
+          // Update dropdown data
+          setDropdownData({
+            states: stateDetailsMap,
+            companies: companyDetailsMap,
+            references: referenceDetailsMap  // Add reference details to dropdown data
+          })
+        }
+      } catch (error) {
+        console.error("Error fetching dropdown data:", error)
+        
+        // Fallback mock data for dropdowns
+        setStateOptions(["Select State", "Chhattisgarh", "Maharashtra", "Delhi"])
+        setCompanyOptions(["Select Company", "ABC Corp", "XYZ Industries", "PQR Ltd"])
+        setReferenceOptions(["Select Reference", "John Doe", "Jane Smith", "Mike Johnson"])
+        
+        // Fallback mock data for state details, company details, and reference details
+        setDropdownData({
+          states: {
+            "Chhattisgarh": {
+              bankDetails: "Account No.: 438605000447\nBank Name: ICICI BANK\nBank Address: FAFADIH, RAIPUR\nIFSC CODE: ICIC0004386\nEmail: Support@thedivineempire.com\nWebsite: www.thedivineempire.com",
+              consignerAddress: "Divine Empire Private Limited, Raipur, Chhattisgarh",
+              stateCode: "22",
+              gstin: "22AAKCD1234M1Z5"
+            },
+            "Maharashtra": {
+              bankDetails: "Account No.: 878705000123\nBank Name: HDFC BANK\nBank Address: ANDHERI, MUMBAI\nIFSC CODE: HDFC0001234\nEmail: Support@thedivineempire.com\nWebsite: www.thedivineempire.com",
+              consignerAddress: "Divine Empire Private Limited, Mumbai, Maharashtra",
+              stateCode: "27",
+              gstin: "27AAKCD1234M1Z5"
+            },
+            "Delhi": {
+              bankDetails: "Account No.: 912305000789\nBank Name: SBI BANK\nBank Address: CONNAUGHT PLACE, DELHI\nIFSC CODE: SBIN0005678\nEmail: Support@thedivineempire.com\nWebsite: www.thedivineempire.com",
+              consignerAddress: "Divine Empire Private Limited, New Delhi, Delhi",
+              stateCode: "07",
+              gstin: "07AAKCD1234M1Z5"
             }
-            
-            // Extract reference name (Column V - index 21)
-            const referenceName = row.c[21] ? row.c[21].v : ""
-            if (referenceName && !referenceOptionsData.includes(referenceName)) {
-              referenceOptionsData.push(referenceName)
-              
-              // Store reference details including mobile number (Column W - index 22)
-              referenceDetailsMap[referenceName] = {
-                mobile: row.c[22] ? row.c[22].v : ""  // Mobile number from Column W
-              }
+          },
+          companies: {
+            "ABC Corp": {
+              address: "123 Main Street, Mumbai, Maharashtra",
+              state: "Maharashtra",
+              contactName: "Rajesh Kumar",
+              contactNo: "9876543210",
+              gstin: "27ABCDE1234F1Z5",
+              stateCode: "27"
+            },
+            "XYZ Industries": {
+              address: "456 Industrial Area, Delhi",
+              state: "Delhi",
+              contactName: "Amit Singh",
+              contactNo: "8765432109",
+              gstin: "07FGHIJ5678K1Z5",
+              stateCode: "07"
+            },
+            "PQR Ltd": {
+              address: "789 Business Park, Raipur, Chhattisgarh",
+              state: "Chhattisgarh",
+              contactName: "Priya Sharma",
+              contactNo: "7654321098",
+              gstin: "22KLMNO9101P1Z5",
+              stateCode: "22"
+            }
+          },
+          references: {
+            "John Doe": {
+              mobile: "9898989898"
+            },
+            "Jane Smith": {
+              mobile: "8787878787"
+            },
+            "Mike Johnson": {
+              mobile: "7676767676"
             }
           }
-        })
-        
-        // Update all dropdown options and data
-        setStateOptions(stateOptionsData)
-        setCompanyOptions(companyOptionsData)
-        setReferenceOptions(referenceOptionsData)
-        
-        // Update dropdown data
-        setDropdownData({
-          states: stateDetailsMap,
-          companies: companyDetailsMap,
-          references: referenceDetailsMap  // Add reference details to dropdown data
         })
       }
-    } catch (error) {
-      console.error("Error fetching dropdown data:", error)
+    }
+    
+    fetchDropdownData()
+  }, [])
+
+  // Handle reference name change and auto-fill mobile number
+  const handleReferenceChange = (e) => {
+    const selectedReference = e.target.value
+    handleInputChange("consignorName", selectedReference)
+    
+    if (selectedReference && dropdownData.references && dropdownData.references[selectedReference]) {
+      const referenceDetails = dropdownData.references[selectedReference]
       
-      // Fallback mock data for dropdowns
-      setStateOptions(["Select State", "Chhattisgarh", "Maharashtra", "Delhi"])
-      setCompanyOptions(["Select Company", "ABC Corp", "XYZ Industries", "PQR Ltd"])
-      setReferenceOptions(["Select Reference", "John Doe", "Jane Smith", "Mike Johnson"])
-      
-      // Fallback mock data for state details, company details, and reference details
-      setDropdownData({
-        states: {
-          "Chhattisgarh": {
-            bankDetails: "Account No.: 438605000447\nBank Name: ICICI BANK\nBank Address: FAFADIH, RAIPUR\nIFSC CODE: ICIC0004386\nEmail: Support@thedivineempire.com\nWebsite: www.thedivineempire.com",
-            consignerAddress: "Divine Empire Private Limited, Raipur, Chhattisgarh",
-            stateCode: "22",
-            gstin: "22AAKCD1234M1Z5"
-          },
-          "Maharashtra": {
-            bankDetails: "Account No.: 878705000123\nBank Name: HDFC BANK\nBank Address: ANDHERI, MUMBAI\nIFSC CODE: HDFC0001234\nEmail: Support@thedivineempire.com\nWebsite: www.thedivineempire.com",
-            consignerAddress: "Divine Empire Private Limited, Mumbai, Maharashtra",
-            stateCode: "27",
-            gstin: "27AAKCD1234M1Z5"
-          },
-          "Delhi": {
-            bankDetails: "Account No.: 912305000789\nBank Name: SBI BANK\nBank Address: CONNAUGHT PLACE, DELHI\nIFSC CODE: SBIN0005678\nEmail: Support@thedivineempire.com\nWebsite: www.thedivineempire.com",
-            consignerAddress: "Divine Empire Private Limited, New Delhi, Delhi",
-            stateCode: "07",
-            gstin: "07AAKCD1234M1Z5"
-          }
-        },
-        companies: {
-          "ABC Corp": {
-            address: "123 Main Street, Mumbai, Maharashtra",
-            state: "Maharashtra",
-            contactName: "Rajesh Kumar",
-            contactNo: "9876543210",
-            gstin: "27ABCDE1234F1Z5",
-            stateCode: "27"
-          },
-          "XYZ Industries": {
-            address: "456 Industrial Area, Delhi",
-            state: "Delhi",
-            contactName: "Amit Singh",
-            contactNo: "8765432109",
-            gstin: "07FGHIJ5678K1Z5",
-            stateCode: "07"
-          },
-          "PQR Ltd": {
-            address: "789 Business Park, Raipur, Chhattisgarh",
-            state: "Chhattisgarh",
-            contactName: "Priya Sharma",
-            contactNo: "7654321098",
-            gstin: "22KLMNO9101P1Z5",
-            stateCode: "22"
-          }
-        },
-        references: {
-          "John Doe": {
-            mobile: "9898989898"
-          },
-          "Jane Smith": {
-            mobile: "8787878787"
-          },
-          "Mike Johnson": {
-            mobile: "7676767676"
-          }
-        }
-      })
+      // Auto-fill mobile number from reference details
+      if (referenceDetails.mobile) {
+        handleInputChange("consignorMobile", referenceDetails.mobile)
+      }
+    } else {
+      // Clear mobile field when no reference is selected or data is not available
+      handleInputChange("consignorMobile", "")
     }
   }
-  
-  fetchDropdownData()
-}, [])
 
-// Handle reference name change and auto-fill mobile number
-const handleReferenceChange = (e) => {
-  const selectedReference = e.target.value
-  handleInputChange("consignorName", selectedReference)
-  
-  if (selectedReference && dropdownData.references && dropdownData.references[selectedReference]) {
-    const referenceDetails = dropdownData.references[selectedReference]
+  // Handle company change and auto-fill consignee details
+  const handleCompanyChange = (e) => {
+    const selectedCompany = e.target.value
+    handleInputChange("consigneeName", selectedCompany)
     
-    // Auto-fill mobile number from reference details
-    if (referenceDetails.mobile) {
-      handleInputChange("consignorMobile", referenceDetails.mobile)
+    if (selectedCompany && dropdownData.companies && dropdownData.companies[selectedCompany]) {
+      const companyDetails = dropdownData.companies[selectedCompany]
+      
+      // Auto-fill company details
+      handleInputChange("consigneeAddress", companyDetails.address)      // Column P - Address
+      handleInputChange("consigneeState", companyDetails.state)          // Column Q - State
+      handleInputChange("consigneeContactName", companyDetails.contactName) // Column N - Contact Name
+      handleInputChange("consigneeContactNo", companyDetails.contactNo)  // Column O - Contact No
+      handleInputChange("consigneeGSTIN", companyDetails.gstin)          // Column R - GSTIN
+      handleInputChange("consigneeStateCode", companyDetails.stateCode)  // Column S - State Code
+    } else {
+      // Clear fields when no company is selected or data is not available
+      handleInputChange("consigneeAddress", "")
+      handleInputChange("consigneeState", "")
+      handleInputChange("consigneeContactName", "")
+      handleInputChange("consigneeContactNo", "")
+      handleInputChange("consigneeGSTIN", "")
+      handleInputChange("consigneeStateCode", "")
     }
-  } else {
-    // Clear mobile field when no reference is selected or data is not available
-    handleInputChange("consignorMobile", "")
   }
-}
-
-// Handle company change and auto-fill consignee details
-const handleCompanyChange = (e) => {
-  const selectedCompany = e.target.value
-  handleInputChange("consigneeName", selectedCompany)
-  
-  if (selectedCompany && dropdownData.companies && dropdownData.companies[selectedCompany]) {
-    const companyDetails = dropdownData.companies[selectedCompany]
-    
-    // Auto-fill company details
-    handleInputChange("consigneeAddress", companyDetails.address)      // Column P - Address
-    handleInputChange("consigneeState", companyDetails.state)          // Column Q - State
-    handleInputChange("consigneeContactName", companyDetails.contactName) // Column N - Contact Name
-    handleInputChange("consigneeContactNo", companyDetails.contactNo)  // Column O - Contact No
-    handleInputChange("consigneeGSTIN", companyDetails.gstin)          // Column R - GSTIN
-    handleInputChange("consigneeStateCode", companyDetails.stateCode)  // Column S - State Code
-  } else {
-    // Clear fields when no company is selected or data is not available
-    handleInputChange("consigneeAddress", "")
-    handleInputChange("consigneeState", "")
-    handleInputChange("consigneeContactName", "")
-    handleInputChange("consigneeContactNo", "")
-    handleInputChange("consigneeGSTIN", "")
-    handleInputChange("consigneeStateCode", "")
-  }
-}
 
   // Handle state change and auto-fill related fields
- // Handle state change and auto-fill related fields
-const handleStateChange = (e) => {
-  const selectedState = e.target.value
-  handleInputChange("consignorState", selectedState)
-  
-  if (selectedState && dropdownData.states && dropdownData.states[selectedState]) {
-    const stateDetails = dropdownData.states[selectedState]
+  const handleStateChange = (e) => {
+    const selectedState = e.target.value
+    handleInputChange("consignorState", selectedState)
     
-    // Parse bank details (from column AB)
-    if (stateDetails.bankDetails) {
-      const bankDetailsText = stateDetails.bankDetails
+    if (selectedState && dropdownData.states && dropdownData.states[selectedState]) {
+      const stateDetails = dropdownData.states[selectedState]
       
-      // Extract bank details using regex patterns
-      const accountNoMatch = bankDetailsText.match(/Account No\.: ([^\n]+)/)
-      const bankNameMatch = bankDetailsText.match(/Bank Name: ([^\n]+)/)
-      const bankAddressMatch = bankDetailsText.match(/Bank Address: ([^\n]+)/)
-      const ifscMatch = bankDetailsText.match(/IFSC CODE: ([^\n]+)/)
-      const emailMatch = bankDetailsText.match(/Email: ([^\n]+)/)
-      const websiteMatch = bankDetailsText.match(/Website: ([^\n]+)/)
+      // Parse bank details (from column AB)
+      if (stateDetails.bankDetails) {
+        const bankDetailsText = stateDetails.bankDetails
+        
+        // Extract bank details using regex patterns
+        const accountNoMatch = bankDetailsText.match(/Account No\.: ([^\n]+)/)
+        const bankNameMatch = bankDetailsText.match(/Bank Name: ([^\n]+)/)
+        const bankAddressMatch = bankDetailsText.match(/Bank Address: ([^\n]+)/)
+        const ifscMatch = bankDetailsText.match(/IFSC CODE: ([^\n]+)/)
+        const emailMatch = bankDetailsText.match(/Email: ([^\n]+)/)
+        const websiteMatch = bankDetailsText.match(/Website: ([^\n]+)/)
+        
+        // Update bank details fields
+        if (accountNoMatch) handleInputChange("accountNo", accountNoMatch[1])
+        if (bankNameMatch) handleInputChange("bankName", bankNameMatch[1])
+        if (bankAddressMatch) handleInputChange("bankAddress", bankAddressMatch[1])
+        if (ifscMatch) handleInputChange("ifscCode", ifscMatch[1])
+        if (emailMatch) handleInputChange("email", emailMatch[1])
+        if (websiteMatch) handleInputChange("website", websiteMatch[1])
+      }
       
-      // Update bank details fields
-      if (accountNoMatch) handleInputChange("accountNo", accountNoMatch[1])
-      if (bankNameMatch) handleInputChange("bankName", bankNameMatch[1])
-      if (bankAddressMatch) handleInputChange("bankAddress", bankAddressMatch[1])
-      if (ifscMatch) handleInputChange("ifscCode", ifscMatch[1])
-      if (emailMatch) handleInputChange("email", emailMatch[1])
-      if (websiteMatch) handleInputChange("website", websiteMatch[1])
+      // Update consigner address from column AC
+      if (stateDetails.consignerAddress) {
+        handleInputChange("consignorAddress", stateDetails.consignerAddress)
+      }
+      
+      // Update state code from column AE
+      if (stateDetails.stateCode) {
+        handleInputChange("consignorStateCode", stateDetails.stateCode)
+      }
+      
+      // Update GSTIN from column AF
+      if (stateDetails.gstin) {
+        handleInputChange("consignorGSTIN", stateDetails.gstin)
+      }
+    } else {
+      // Clear fields when no state is selected or data is not available
+      handleInputChange("accountNo", "")
+      handleInputChange("bankName", "")
+      handleInputChange("bankAddress", "")
+      handleInputChange("ifscCode", "")
+      handleInputChange("email", "")
+      handleInputChange("website", "")
+      handleInputChange("consignorAddress", "")
+      handleInputChange("consignorStateCode", "")
+      handleInputChange("consignorGSTIN", "")
     }
-    
-    // Update consigner address from column AC
-    if (stateDetails.consignerAddress) {
-      handleInputChange("consignorAddress", stateDetails.consignerAddress)
-    }
-    
-    // Update state code from column AE
-    if (stateDetails.stateCode) {
-      handleInputChange("consignorStateCode", stateDetails.stateCode)
-    }
-    
-    // Update GSTIN from column AF
-    if (stateDetails.gstin) {
-      handleInputChange("consignorGSTIN", stateDetails.gstin)
-    }
-  } else {
-    // Clear fields when no state is selected or data is not available
-    handleInputChange("accountNo", "")
-    handleInputChange("bankName", "")
-    handleInputChange("bankAddress", "")
-    handleInputChange("ifscCode", "")
-    handleInputChange("email", "")
-    handleInputChange("website", "")
-    handleInputChange("consignorAddress", "")
-    handleInputChange("consignorStateCode", "")
-    handleInputChange("consignorGSTIN", "")
   }
-}
 
   useEffect(() => {
     const initializeQuotationNumber = async () => {
@@ -528,6 +611,8 @@ const handleStateChange = (e) => {
       alert("Quotation link has been successfully generated and is ready to share.")
     }, 1000)
   }
+  
+  // Generate PDF
   const generatePDFFromData = () => {
     // Create a new jsPDF instance 
     const doc = new jsPDF('p', 'mm', 'a4')
@@ -681,7 +766,7 @@ const handleStateChange = (e) => {
     // Update current Y to the max of both sections
     currentY = Math.max(consignorSectionY, consigneeSectionY) + 5
   
-    // Prepare items data
+    // Prepare items data with discount columns
     const itemsData = quotationData.items.map((item, index) => [
       index + 1,
       item.code,
@@ -690,6 +775,8 @@ const handleStateChange = (e) => {
       item.qty,
       item.units,
       formatCurrency(item.rate),
+      `${item.discount}%`,  // Discount percentage
+      formatCurrency(item.flatDiscount), // Flat discount amount
       formatCurrency(item.amount)
     ])
   
@@ -698,42 +785,37 @@ const handleStateChange = (e) => {
   
     // Use autoTable method with professional styling
     autoTable(doc, {
-      startY: currentY,
-      head: [['S.No', 'Code', 'Product Name', 'GST %', 'Qty', 'Units', 'Rate', 'Amount']],
-      body: itemsData,
-      theme: 'plain',
-      styles: { 
+    startY: currentY,
+    head: [['S.No', 'Code', 'Product Name', 'GST %', 'Qty', 'Units', 'Rate', 'Disc %', 'Flat Disc', 'Amount']],
+    body: itemsData,
+    theme: 'plain',
+    styles: { 
         fontSize: 9,
         cellPadding: 3,
         overflow: 'linebreak',
         lineColor: [200, 200, 200],
         lineWidth: 0.5
-      },
-      headStyles: {
+    },
+    headStyles: {
         fillColor: [41, 128, 185],
         textColor: 255,
         fontSize: 10,
         fontStyle: 'bold'
-      },
-      columnStyles: {
-        0: { cellWidth: 15, halign: 'center' },
-        1: { cellWidth: 25, halign: 'center' },
-        2: { cellWidth: 50, cellOverflow: 'linebreak' },
-        3: { cellWidth: 20, halign: 'center' },
-        4: { cellWidth: 15, halign: 'center' },
-        5: { cellWidth: 20, halign: 'center' },
-        6: { cellWidth: 25, halign: 'right' },
-        7: { cellWidth: 25, halign: 'right' }
-      },
-      didParseCell: function(data) {
-        // Ensure consistent styling
-        if (data.section === 'body') {
-          data.cell.styles.halign = data.column.index >= 6 ? 'right' : 
-                                     data.column.index <= 1 ? 'center' : 
-                                     data.column.index === 2 ? 'left' : 'center'
-        }
-      }
-    })
+    },
+    // Add this property to auto-calculate column widths
+    columnStyles: {
+        0: { halign: 'center' },
+        1: { halign: 'center' },
+        2: { cellOverflow: 'linebreak' },
+        3: { halign: 'center' },
+        4: { halign: 'center' },
+        5: { halign: 'center' },
+        6: { halign: 'right' },
+        7: { halign: 'center' },
+        8: { halign: 'right' },
+        9: { halign: 'right' }
+    }
+})
   
     // Get the final Y position of the table
     const finalY = doc.previousAutoTable ? doc.previousAutoTable.finalY : currentY + 30
@@ -741,10 +823,12 @@ const handleStateChange = (e) => {
     // Ensure space for Financial Summary
     ensureSpaceOrNewPage(60)
   
-    // Financial Summary Section
+    // Financial Summary Section including total flat discount
     let summaryY = finalY + 20
     const financialSummaryItems = [
       { label: 'Subtotal:', value: formatCurrency(quotationData.subtotal) },
+      { label: 'Total Flat Discount:', value: `-${formatCurrency(quotationData.totalFlatDiscount)}` },
+      { label: 'Taxable Amount:', value: formatCurrency(quotationData.subtotal - quotationData.totalFlatDiscount) },
       { label: `CGST (${quotationData.cgstRate}%):`, value: formatCurrency(quotationData.cgstAmount) },
       { label: `SGST (${quotationData.sgstRate}%):`, value: formatCurrency(quotationData.sgstAmount) },
       { label: 'Total:', value: formatCurrency(quotationData.total) }
@@ -855,188 +939,265 @@ const handleStateChange = (e) => {
     const base64Data = doc.output('datauristring').split(',')[1]
     return base64Data
   }
-  const handleSaveQuotation = async () => {
-    // Validate required fields
-    if (!quotationData.consigneeName) {
-      alert("Please select a company name")
-      return
-    }
-    
-    if (!quotationData.preparedBy) {
-      alert("Please enter prepared by name")
-      return
-    }
-    
-    setIsSubmitting(true)
+
+  // Modified handleSaveQuotation function to submit data in specified order
+// Modified handleSaveQuotation function to include item data after bank details
+const handleSaveQuotation = async () => {
+  // Validate required fields
+  if (!quotationData.consigneeName) {
+    alert("Please select a company name")
+    return
+  }
   
-    try {
-      // Generate PDF
-      const base64Data = generatePDFFromData()
-      const fileName = `Quotation_${quotationData.quotationNo}.pdf`
-      
-      // Script URL
-      const scriptUrl = "https://script.google.com/macros/s/AKfycbxeo5tv3kAcSDDAheOCP07HaK76zSfq49jFGtZknseg7kPlj2G1O8U2PuiA2fQSuPvKqA/exec"
-      
-      // Data to be submitted
-      const rowData = [
-        new Date().toLocaleString(),
-        quotationData.quotationNo,
-        quotationData.date,
-        quotationData.preparedBy,
-        quotationData.consigneeName,
-        "" // Empty placeholder for PDF URL
+  if (!quotationData.preparedBy) {
+    alert("Please enter prepared by name")
+    return
+  }
+  
+  setIsSubmitting(true)
+
+  try {
+    // Generate PDF
+    const base64Data = generatePDFFromData()
+    const fileName = `Quotation_${quotationData.quotationNo}.pdf`
+    
+    // Script URL
+    const scriptUrl = "https://script.google.com/macros/s/AKfycbxeo5tv3kAcSDDAheOCP07HaK76zSfq49jFGtZknseg7kPlj2G1O8U2PuiA2fQSuPvKqA/exec"
+    
+    // 1. Upload PDF to Google Drive and get URL
+    const pdfParams = {
+      action: "uploadPDF",
+      pdfData: base64Data,
+      fileName: fileName
+    }
+    
+    const pdfUrlParams = new URLSearchParams()
+    for (const key in pdfParams) {
+      pdfUrlParams.append(key, pdfParams[key])
+    }
+    
+    const pdfResponse = await fetch(scriptUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: pdfUrlParams
+    })
+    
+    const pdfResult = await pdfResponse.json()
+    
+    if (!pdfResult.success) {
+      throw new Error("Failed to upload PDF: " + (pdfResult.error || "Unknown error"))
+    }
+    
+    // Get the PDF URL to include in the main data submission
+    const pdfUrl = pdfResult.fileUrl
+    
+    // 2. Prepare the main quotation data in the specified order
+    // Quotation Details
+    const quotationDetails = [
+      new Date().toLocaleString(), // timestamp
+      quotationData.quotationNo,
+      quotationData.date,
+      quotationData.preparedBy
+    ]
+    
+    // Consignor Details
+    const consignorDetails = [
+      quotationData.consignorState,
+      quotationData.consignorName,
+      quotationData.consignorAddress,
+      quotationData.consignorMobile,
+      quotationData.consignorPhone,
+      quotationData.consignorGSTIN,
+      quotationData.consignorStateCode
+    ]
+    
+    // Consignee Details
+    const consigneeDetails = [
+      quotationData.consigneeName,
+      quotationData.consigneeAddress,
+      quotationData.consigneeState,
+      quotationData.consigneeContactName,
+      quotationData.consigneeContactNo,
+      quotationData.consigneeGSTIN,
+      quotationData.consigneeStateCode,
+      quotationData.msmeNumber
+    ]
+    
+    // Terms and Conditions
+    const termsDetails = [
+      quotationData.validity,
+      quotationData.paymentTerms,
+      quotationData.delivery,
+      quotationData.freight,
+      quotationData.insurance,
+      quotationData.taxes,
+      quotationData.notes.join("|") // Join notes with a separator
+    ]
+    
+    // Bank Details
+    const bankDetails = [
+      quotationData.accountNo,
+      quotationData.bankName,
+      quotationData.bankAddress,
+      quotationData.ifscCode,
+      quotationData.email,
+      quotationData.website,
+      quotationData.pan
+    ]
+    
+    // Format item data as a single string to include in the main row data
+    // Join all items into a string representation
+    // Format: "Code1|Name1|GST1|Qty1|Units1|Rate1|Disc1|FlatDisc1|Amount1;Code2|Name2|GST2|..."
+    const itemsString = quotationData.items.map(item => {
+      return `${item.code}|${item.name}|${item.gst}|${item.qty}|${item.units}|${item.rate}|${item.discount}|${item.flatDiscount}|${item.amount}`;
+    }).join(";");
+    
+    // Combine all data in one array with PDF URL as the last element
+    const mainRowData = [
+      ...quotationDetails,
+      ...consignorDetails,
+      ...consigneeDetails,
+      ...termsDetails,
+      ...bankDetails,
+      itemsString, // Include items as a string right after bank details
+      pdfUrl // PDF URL as the last column
+    ]
+    
+    // 3. Submit main quotation data with items and PDF URL
+    const sheetParams = {
+      sheetName: "Make Quotation",
+      action: "insert",
+      rowData: JSON.stringify(mainRowData)
+    }
+    
+    const sheetUrlParams = new URLSearchParams()
+    for (const key in sheetParams) {
+      sheetUrlParams.append(key, sheetParams[key])
+    }
+    
+    const sheetResponse = await fetch(scriptUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: sheetUrlParams
+    })
+
+    const sheetResult = await sheetResponse.json()
+    
+    if (!sheetResult.success) {
+      throw new Error("Error saving quotation: " + (sheetResult.error || "Unknown error"))
+    }
+    
+    // 4. Also submit each item to the Items sheet separately if needed
+    const itemPromises = quotationData.items.map(async (item) => {
+      const itemData = [
+        quotationData.quotationNo,   // Quotation Number as reference
+        item.code,                   // Code
+        item.name,                   // Product Name
+        item.gst,                    // GST %
+        item.qty,                    // Qty
+        item.units,                  // Units
+        item.rate,                   // Rate
+        item.discount,               // Disc %
+        item.flatDiscount,           // Flat Disc
+        item.amount                  // Amount
       ]
-  
-      // Prepare sheet parameters for initial submission
-      const sheetParams = {
-        sheetName: "Make Quotation",
+      
+      const itemParams = {
+        sheetName: "Quotation Items", // Separate sheet for items
         action: "insert",
-        rowData: JSON.stringify(rowData)
-      }
-  
-      // Create URL-encoded string for the parameters
-      const sheetUrlParams = new URLSearchParams()
-      for (const key in sheetParams) {
-        sheetUrlParams.append(key, sheetParams[key])
+        rowData: JSON.stringify(itemData)
       }
       
-      // Send the data to sheet
-      const sheetResponse = await fetch(scriptUrl, {
+      const itemUrlParams = new URLSearchParams()
+      for (const key in itemParams) {
+        itemUrlParams.append(key, itemParams[key])
+      }
+      
+      return fetch(scriptUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded"
         },
-        body: sheetUrlParams
+        body: itemUrlParams
       })
-  
-      const sheetResult = await sheetResponse.json()
-      
-      if (sheetResult.success) {
-        // Upload PDF to Google Drive
-        const pdfParams = {
-          action: "uploadPDF",
-          pdfData: base64Data,
-          fileName: fileName
-        }
-        
-        const pdfUrlParams = new URLSearchParams()
-        for (const key in pdfParams) {
-          pdfUrlParams.append(key, pdfParams[key])
-        }
-        
-        const pdfResponse = await fetch(scriptUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded"
-          },
-          body: pdfUrlParams
-        })
-        
-        const pdfResult = await pdfResponse.json()
-        
-        if (pdfResult.success) {
-          // Update the last row with the PDF URL
-          const updateParams = {
-            sheetName: "Make Quotation",
-            action: "update",
-            rowIndex: "0", // This will trigger using the last row in the script
-            rowData: JSON.stringify([
-              "", // Leave timestamp as is
-              "", // Leave quotation number as is
-              "", // Leave date as is
-              "", // Leave prepared by as is
-              "", // Leave company name as is
-              pdfResult.fileUrl // Add PDF URL
-            ])
-          }
-          
-          const updateUrlParams = new URLSearchParams()
-          for (const key in updateParams) {
-            updateUrlParams.append(key, updateParams[key])
-          }
-          
-          const updateResponse = await fetch(scriptUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded"
-            },
-            body: updateUrlParams
-          })
-          
-          const updateResult = await updateResponse.json()
-          
-          if (updateResult.success) {
-            alert("Quotation saved, PDF uploaded, and URL added successfully!")
-            
-            // Reset form (same as before)
-            setQuotationData({
-              quotationNo: getNextQuotationNumber(quotationData.quotationNo),
-              date: new Date().toLocaleDateString("en-GB"),
-              consignorState: "",
-              consignorName: "",
-              consignorAddress: "",
-              consignorMobile: "",
-              consignorPhone: "",
-              consignorGSTIN: "",
-              consignorStateCode: "",
-              companyName: "", 
-              consigneeName: "",
-              consigneeAddress: "",
-              consigneeState: "",
-              consigneeContactName: "",
-              consigneeContactNo: "",
-              consigneeGSTIN: "",
-              consigneeStateCode: "",
-              msmeNumber: "",
-              items: [
-                {
-                  id: 1,
-                  code: "",
-                  name: "",
-                  gst: 18,
-                  qty: 1,
-                  units: "Nos",
-                  rate: 0,
-                  amount: 0,
-                },
-              ],
-              subtotal: 0,
-              cgstRate: 9,
-              sgstRate: 9,
-              cgstAmount: 0,
-              sgstAmount: 0,
-              total: 0,
-              validity: "The above quoted prices are valid up to 5 days from date of offer.",
-              paymentTerms: "100% advance payment in the mode of NEFT, RTGS & DD",
-              delivery: "Material is ready in our stock",
-              freight: "Extra as per actual.",
-              insurance: "Transit insurance for all shipment is at Buyer's risk.",
-              taxes: "Extra as per actual.",
-              accountNo: "",
-              bankName: "",
-              bankAddress: "",
-              ifscCode: "",
-              email: "",
-              website: "",
-              pan: "",
-              notes: [""],
-              preparedBy: "",
-            })
-          } else {
-            alert("Error updating PDF URL: " + (updateResult.error || "Unknown error"))
-          }
-        } else {
-          alert("Error uploading PDF: " + (pdfResult.error || "Unknown error"))
-        }
-      } else {
-        alert("Error saving quotation: " + (sheetResult.error || "Unknown error"))
-      }
-    } catch (error) {
-      alert("Error: " + error.message)
-    } finally {
-      setIsSubmitting(false)
-    }
+    })
+    
+    // Wait for all item submissions to complete
+    await Promise.all(itemPromises)
+    
+    // Set the PDF URL for preview
+    setPdfUrl(pdfUrl)
+    
+    alert("Quotation saved successfully with all items!")
+    
+    // Reset form to prepare for new quotation
+    const nextQuotationNumber = await getNextQuotationNumber()
+    setQuotationData({
+      quotationNo: nextQuotationNumber,
+      date: new Date().toLocaleDateString("en-GB"),
+      consignorState: "",
+      consignorName: "",
+      consignorAddress: "",
+      consignorMobile: "",
+      consignorPhone: "",
+      consignorGSTIN: "",
+      consignorStateCode: "",
+      companyName: "", 
+      consigneeName: "",
+      consigneeAddress: "",
+      consigneeState: "",
+      consigneeContactName: "",
+      consigneeContactNo: "",
+      consigneeGSTIN: "",
+      consigneeStateCode: "",
+      msmeNumber: "",
+      items: [
+        {
+          id: 1,
+          code: "",
+          name: "",
+          gst: 18,
+          qty: 1,
+          units: "Nos",
+          rate: 0,
+          discount: 0,
+          flatDiscount: 0,
+          amount: 0,
+        },
+      ],
+      totalFlatDiscount: 0,
+      subtotal: 0,
+      cgstRate: 9,
+      sgstRate: 9,
+      cgstAmount: 0,
+      sgstAmount: 0,
+      total: 0,
+      validity: "The above quoted prices are valid up to 5 days from date of offer.",
+      paymentTerms: "100% advance payment in the mode of NEFT, RTGS & DD",
+      delivery: "Material is ready in our stock",
+      freight: "Extra as per actual.",
+      insurance: "Transit insurance for all shipment is at Buyer's risk.",
+      taxes: "Extra as per actual.",
+      accountNo: "",
+      bankName: "",
+      bankAddress: "",
+      ifscCode: "",
+      email: "",
+      website: "",
+      pan: "",
+      notes: [""],
+      preparedBy: "",
+    })
+  } catch (error) {
+    alert("Error: " + error.message)
+  } finally {
+    setIsSubmitting(false)
   }
+}
 
   // Helper function to increment quotation number
   const getNextQuotationNumber = async () => {
@@ -1086,6 +1247,13 @@ const handleStateChange = (e) => {
       <h1 className="text-3xl font-bold mb-6 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
         Make Quotation
       </h1>
+      {/* <button
+    className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md absolute top-20 right-30"
+    onClick={() => setIsRevising(!isRevising)}
+  >
+    {isRevising ? 'Cancel Revise' : 'Revise'}
+  </button> */}
+
 
       <div className="bg-white rounded-lg shadow border">
         <div className="border-b">
@@ -1119,15 +1287,30 @@ const handleStateChange = (e) => {
                   <h3 className="text-lg font-medium mb-4">Quotation Details</h3>
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium">Quotation No.</label>
-                        <input
-                          type="text"
-                          value={quotationData.quotationNo}
-                          readOnly
-                          className="w-full p-2 border border-gray-300 rounded-md bg-gray-50"
-                        />
-                      </div>
+                    <div className="space-y-2">
+  <label className="block text-sm font-medium">Quotation No.</label>
+  {isRevising ? (
+    <select
+      value={selectedQuotation}
+      onChange={(e) => handleQuotationSelect(e.target.value)}
+      className="w-full p-2 border border-gray-300 rounded-md"
+    >
+      <option value="">Select Quotation</option>
+      {existingQuotations.map((quotation) => (
+        <option key={quotation} value={quotation}>
+          {quotation}
+        </option>
+      ))}
+    </select>
+  ) : (
+    <input
+      type="text"
+      value={quotationData.quotationNo}
+      readOnly
+      className="w-full p-2 border border-gray-300 rounded-md bg-gray-50"
+    />
+  )}
+</div>
                       <div className="space-y-2">
                         <label className="block text-sm font-medium">Date</label>
                         <input
@@ -1239,6 +1422,15 @@ const handleStateChange = (e) => {
                           className="w-full p-2 border border-gray-300 rounded-md"
                         />
                       </div>
+                      <div className="space-y-2">
+  <label className="block text-sm font-medium">MSME No.</label>
+  <input
+    type="text"
+    value={quotationData.msmeNumber || ""}
+    onChange={(e) => handleInputChange("msmeNumber", e.target.value)}
+    className="w-full p-2 border border-gray-300 rounded-md"
+  />
+</div>
                     </div>
                   </div>
                 </div>
@@ -1272,6 +1464,16 @@ const handleStateChange = (e) => {
                         placeholder="Enter address"
                       />
                     </div>
+                    <div className="space-y-2">
+  <label className="block text-sm font-medium">Ship To</label>
+  <textarea
+    value={quotationData.shipTo || ""}
+    onChange={(e) => handleInputChange("shipTo", e.target.value)}
+    className="w-full p-2 border border-gray-300 rounded-md"
+    rows={3}
+    placeholder="Enter shipping address if different from billing address"
+  />
+</div>
 
                     <div className="space-y-2">
                       <label className="block text-sm font-medium">State</label>
@@ -1325,16 +1527,6 @@ const handleStateChange = (e) => {
                         />
                       </div>
                     </div>
-
-                    {/* <div className="space-y-2">
-                      <label className="block text-sm font-medium">MSME Number</label>
-                      <input
-                        type="text"
-                        value={quotationData.msmeNumber}
-                        onChange={(e) => handleInputChange("msmeNumber", e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded-md"
-                      />
-                    </div> */}
                   </div>
                 </div>
               </div>
@@ -1362,6 +1554,8 @@ const handleStateChange = (e) => {
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty.</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Units</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rate</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Disc %</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Flat Disc</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
                         </tr>
@@ -1436,6 +1630,27 @@ const handleStateChange = (e) => {
                             <td className="px-4 py-2">
                               <input
                                 type="number"
+                                value={item.discount}
+                                onChange={(e) => handleItemChange(item.id, "discount", Number.parseFloat(e.target.value) || 0)}
+                                className="w-20 p-1 border border-gray-300 rounded-md"
+                                placeholder="0%"
+                                min="0"
+                                max="100"
+                              />
+                            </td>
+                            <td className="px-4 py-2">
+                              <input
+                                type="number"
+                                value={item.flatDiscount}
+                                onChange={(e) => handleItemChange(item.id, "flatDiscount", Number.parseFloat(e.target.value) || 0)}
+                                className="w-24 p-1 border border-gray-300 rounded-md"
+                                placeholder="0.00"
+                                min="0"
+                              />
+                            </td>
+                            <td className="px-4 py-2">
+                              <input
+                                type="number"
                                 value={item.amount}
                                 className="w-24 p-1 border border-gray-300 rounded-md bg-gray-50"
                                 readOnly
@@ -1451,9 +1666,10 @@ const handleStateChange = (e) => {
 
                                   // Recalculate totals
                                   const subtotal = newItems.reduce((sum, i) => sum + i.amount, 0)
-                                  const cgstAmount = subtotal * (quotationData.cgstRate / 100)
-                                  const sgstAmount = subtotal * (quotationData.sgstRate / 100)
-                                  const total = subtotal + cgstAmount + sgstAmount
+                                  const subtotalAfterDiscount = Math.max(0, subtotal - quotationData.totalFlatDiscount)
+                                  const cgstAmount = subtotalAfterDiscount * (quotationData.cgstRate / 100)
+                                  const sgstAmount = subtotalAfterDiscount * (quotationData.sgstRate / 100)
+                                  const total = subtotalAfterDiscount + cgstAmount + sgstAmount
 
                                   setQuotationData({
                                     ...quotationData,
@@ -1474,28 +1690,50 @@ const handleStateChange = (e) => {
                       </tbody>
                       <tfoot>
                         <tr>
-                          <td colSpan="7" className="px-4 py-2 text-right font-medium">
+                          <td colSpan="9" className="px-4 py-2 text-right font-medium">
                             Subtotal:
                           </td>
-                          <td className="px-4 py-2">₹{quotationData.subtotal.toFixed(2)}</td>
+                          <td className="border p-2">₹{typeof quotationData.subtotal === 'number' ? quotationData.subtotal.toFixed(2) : '0.00'}</td>
                           <td></td>
                         </tr>
                         <tr>
-                          <td colSpan="7" className="px-4 py-2 text-right font-medium">
+                          <td colSpan="9" className="px-4 py-2 text-right font-medium">
+                            Total Flat Discount:
+                          </td>
+                          <td className="px-4 py-2">
+                            <input
+                              type="number"
+                              value={quotationData.totalFlatDiscount}
+                              onChange={(e) => handleFlatDiscountChange(e.target.value)}
+                              className="w-24 p-1 border border-gray-300 rounded-md"
+                              min="0"
+                            />
+                          </td>
+                          <td></td>
+                        </tr>
+                        <tr>
+                          <td colSpan="9" className="px-4 py-2 text-right font-medium">
+                            Taxable Amount:
+                          </td>
+                          <td className="px-4 py-2">₹{(quotationData.subtotal - quotationData.totalFlatDiscount).toFixed(2)}</td>
+                          <td></td>
+                        </tr>
+                        <tr>
+                          <td colSpan="9" className="px-4 py-2 text-right font-medium">
                             CGST ({quotationData.cgstRate}%):
                           </td>
                           <td className="px-4 py-2">₹{quotationData.cgstAmount.toFixed(2)}</td>
                           <td></td>
                         </tr>
                         <tr>
-                          <td colSpan="7" className="px-4 py-2 text-right font-medium">
+                          <td colSpan="9" className="px-4 py-2 text-right font-medium">
                             SGST ({quotationData.sgstRate}%):
                           </td>
                           <td className="px-4 py-2">₹{quotationData.sgstAmount.toFixed(2)}</td>
                           <td></td>
                         </tr>
                         <tr className="font-bold">
-                          <td colSpan="7" className="px-4 py-2 text-right">
+                          <td colSpan="9" className="px-4 py-2 text-right">
                             Total:
                           </td>
                           <td className="px-4 py-2">₹{quotationData.total.toFixed(2)}</td>
@@ -1751,11 +1989,11 @@ const handleStateChange = (e) => {
                   </div>
                   <div>
                     <h3 className="font-bold mb-2">Ship To</h3>
-                    <p>{quotationData.consigneeAddress || "Please enter address"}</p>
+                    <p>{quotationData.shipTo || quotationData.consigneeAddress || "Please enter address"}</p>
                   </div>
                 </div>
 
-                {/* Items Table */}
+                {/* Items Table with Discount Columns */}
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
@@ -1767,6 +2005,8 @@ const handleStateChange = (e) => {
                         <th className="border p-2 text-left">Qty.</th>
                         <th className="border p-2 text-left">Units</th>
                         <th className="border p-2 text-left">Rate</th>
+                        <th className="border p-2 text-left">Disc %</th>
+                        <th className="border p-2 text-left">Flat Disc</th>
                         <th className="border p-2 text-left">Amount</th>
                       </tr>
                     </thead>
@@ -1780,23 +2020,37 @@ const handleStateChange = (e) => {
                           <td className="border p-2">{item.qty}</td>
                           <td className="border p-2">{item.units}</td>
                           <td className="border p-2">₹{item.rate.toFixed(2)}</td>
+                          <td className="border p-2">{item.discount}%</td>
+                          <td className="border p-2">₹{item.flatDiscount.toFixed(2)}</td>
                           <td className="border p-2">₹{item.amount.toFixed(2)}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
                       <tr className="border">
-                        <td colSpan="7" className="border p-2 text-right font-bold">
-                          TOTAL
+                        <td colSpan="9" className="border p-2 text-right font-bold">
+                          SUBTOTAL
                         </td>
                         <td className="border p-2 font-bold">₹{quotationData.subtotal.toFixed(2)}</td>
+                      </tr>
+                      <tr className="border">
+                        <td colSpan="9" className="border p-2 text-right">
+                          Total Flat Discount
+                        </td>
+                        <td className="border p-2">-₹{quotationData.totalFlatDiscount.toFixed(2)}</td>
+                      </tr>
+                      <tr className="border">
+                        <td colSpan="9" className="border p-2 text-right">
+                          Taxable Amount
+                        </td>
+                        <td className="border p-2">₹{(quotationData.subtotal - quotationData.totalFlatDiscount).toFixed(2)}</td>
                       </tr>
                     </tfoot>
                   </table>
                 </div>
 
                 {/* Tax Details */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4 mt-4">
                   <div>
                     <h3 className="font-bold mb-2">Total Taxes</h3>
                     <table className="w-full border-collapse">
@@ -1824,7 +2078,7 @@ const handleStateChange = (e) => {
                     <div>
                       <p className="font-bold">Amount Chargeable (in words)</p>
                       <p className="capitalize">
-                        Rupees only
+                        Rupees {quotationData.total > 0 ? 'only' : 'zero only'}
                       </p>
                     </div>
                     <div className="text-right">
@@ -1835,7 +2089,7 @@ const handleStateChange = (e) => {
                 </div>
 
                 {/* Terms and Conditions */}
-                <div>
+                <div className="mt-4">
                   <h3 className="font-bold mb-2">Terms & Conditions</h3>
                   <table className="w-full">
                     <tbody>
@@ -1877,9 +2131,9 @@ const handleStateChange = (e) => {
                 </div>
 
                 {/* Bank Details and Footer */}
-                <div className="grid grid-cols-2 gap-4 border-t pt-4">
+                <div className="grid grid-cols-2 gap-4 border-t pt-4 mt-4">
                   <div>
-                    <h3 className="font-bold mb-2">For Physical assistance</h3>
+                    <h3 className="font-bold mb-2">Bank Details</h3>
                     <p>Account No.: {quotationData.accountNo}</p>
                     <p>Bank Name: {quotationData.bankName}</p>
                     <p>Bank Address: {quotationData.bankAddress}</p>
@@ -1896,7 +2150,7 @@ const handleStateChange = (e) => {
                     </p>
                     <p className="mt-4">Prepared By- {quotationData.preparedBy}</p>
                     <p className="mt-4 text-sm italic">
-                      This Quotation Is computerized generated, hence doesn't required any seal & signature.
+                      This Quotation is computerized generated, hence doesn't require any seal & signature.
                     </p>
                   </div>
                 </div>
@@ -1979,7 +2233,7 @@ const handleStateChange = (e) => {
                   <button
                     className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md flex items-center inline-flex"
                     onClick={handleGeneratePDF}
-                    disabled={isGenerating || isSubmitting}
+                    disabled={isGenerating || isSubmitting} 
                   >
                     <DownloadIcon className="h-4 w-4 mr-2" />
                     {isGenerating ? "Generating..." : "Download PDF"}

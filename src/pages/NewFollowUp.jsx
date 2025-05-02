@@ -19,8 +19,10 @@ function NewFollowUp() {
     nextAction: "",
     nextCallDate: "",
     nextCallTime: "",
-    customerFeedback: ""
+    customerFeedback: "",
+    enquiryApproach: "" // Add this new field
   })
+  
   const [leadStatus, setLeadStatus] = useState("")
 
   // New state for dropdown options
@@ -28,53 +30,41 @@ function NewFollowUp() {
   const [salesTypes, setSalesTypes] = useState([])
   const [productCategories, setProductCategories] = useState([]) // New state for product categories
   const [nobOptions, setNobOptions] = useState([])
+  const [enquiryApproachOptions, setEnquiryApproachOptions] = useState([])
+
 
   // Function to fetch dropdown data from DROPDOWNSHEET
 // Function to fetch dropdown data from DROPDOWNSHEET
 const fetchDropdownData = async () => {
   try {
-    // Call the Google Apps Script with query parameters to get public access to the DROPDOWNSHEET
     const publicUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=DROPDOWN"
     
     const response = await fetch(publicUrl)
     const text = await response.text()
     
-    // The response is a callback with JSON data - extract just the JSON part
     const jsonStart = text.indexOf('{')
     const jsonEnd = text.lastIndexOf('}') + 1
     const jsonData = text.substring(jsonStart, jsonEnd)
     
     const data = JSON.parse(jsonData)
     
-    // Extract columns C, D, AJ (column index 35), and AL (column index 37)
     if (data && data.table && data.table.rows) {
       const states = []
       const types = []
       const categories = []
       const nobs = []
+      const approaches = [] // New array for enquiry approaches
       
-      // Skip the first row (index 0) which contains headers
       data.table.rows.slice(0).forEach(row => {
-        // Column C (enquiry states) - skip empty values
-        if (row.c && row.c[2] && row.c[2].v) {
-          states.push(row.c[2].v.toString())
-        }
+        // Existing column processing...
+        if (row.c && row.c[2] && row.c[2].v) states.push(row.c[2].v.toString())
+        if (row.c && row.c[3] && row.c[3].v) types.push(row.c[3].v.toString())
+        if (row.c && row.c[35] && row.c[35].v) categories.push(row.c[35].v.toString())
+        if (row.c && row.c[37] && row.c[37].v) nobs.push(row.c[37].v.toString())
         
-        // Column D (sales types) - skip empty values
-        if (row.c && row.c[3] && row.c[3].v) {
-          types.push(row.c[3].v.toString())
-        }
-        
-        // Column AJ (product categories) - skip empty values
-        // Column index 35 (0-based, so AJ is 35)
-        if (row.c && row.c[35] && row.c[35].v) {
-          categories.push(row.c[35].v.toString())
-        }
-
-        // Column AL (NOB options) - skip empty values
-        // Column index 37 (0-based, so AL is 37)
-        if (row.c && row.c[37] && row.c[37].v) {
-          nobs.push(row.c[37].v.toString())
+        // Add column AM (index 38) processing
+        if (row.c && row.c[38] && row.c[38].v) {
+          approaches.push(row.c[38].v.toString())
         }
       })
       
@@ -82,16 +72,19 @@ const fetchDropdownData = async () => {
       setSalesTypes(types)
       setProductCategories(categories)
       setNobOptions(nobs)
+      setEnquiryApproachOptions(approaches) // Set the new state
     }
   } catch (error) {
     console.error("Error fetching dropdown values:", error)
-    // Fallback to default values if needed
+    // Fallback values
     setEnquiryStates(["Maharashtra", "Gujarat", "Karnataka", "Tamil Nadu", "Delhi"])
     setSalesTypes(["NBD", "CRR", "NBD_CRR"])
     setProductCategories(["Product 1", "Product 2", "Product 3"])
     setNobOptions(["NOB 1", "NOB 2", "NOB 3"])
+    setEnquiryApproachOptions(["Approach 1", "Approach 2", "Approach 3"]) // Fallback for enquiry approach
   }
 }
+
   useEffect(() => {
     // Fetch dropdown data when component mounts
     fetchDropdownData()
@@ -142,21 +135,31 @@ const fetchDropdownData = async () => {
           document.getElementById("nextCallTime").value     // X: Next call time
         )
       } else // Change this part in your handleSubmit function
+
       if (enquiryStatus === "yes") {
         // Add columns F-K
         rowData.push(
           document.getElementById("enquiryDate").value,     // F: Enquiry Received Date
           document.getElementById("enquiryState").value,    // G: Enquiry for State
-          document.getElementById("projectName").value,     // H: Project Name
+          document.getElementById("projectName").value,     // H: Project Name (NOB)
           document.getElementById("salesType").value,       // I: Sales Type
-          "",                                              // J: Required Product Date (empty string since input is commented out)
-          ""                                               // K: Project Value (empty string since input is commented out)
+          formData.enquiryApproach,                        // J: Enquiry Approach
+          ""                                               // K: Project Value (empty)
         )
         
-        // Add item details
-        items.forEach(item => {
-          rowData.push(item.name, item.quantity)
-        })
+        // Add item details (columns L-O)
+        // First, ensure we have at least 4 columns for items (name and quantity pairs)
+        // If no items, add empty values
+        if (items.length > 0) {
+          items.forEach(item => {
+            rowData.push(item.name);    // Product category (column L, N, etc.)
+            rowData.push(item.quantity); // Quantity (column M, O, etc.)
+          });
+        } else {
+          // Add empty values if no items
+          rowData.push("", "");
+        }
+        
       } else if (enquiryStatus === "not-interested") {
         // Pad columns F-K and then V-X with empty values
         rowData.push("", "", "", "", "", "", "", "", "")
@@ -469,6 +472,25 @@ const fetchDropdownData = async () => {
                     ))}
                   </select>
                 </div>
+
+                <div className="space-y-2">
+  <label htmlFor="enquiryApproach" className="block text-sm font-medium text-gray-700">
+    Enquiry Approach
+  </label>
+  <select
+    id="enquiryApproach"
+    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+    value={formData.enquiryApproach}
+    onChange={handleChange}
+    required
+  >
+    <option value="">Select approach</option>
+    {enquiryApproachOptions.map((approach, index) => (
+      <option key={index} value={approach}>{approach}</option>
+    ))}
+  </select>
+</div>
+
 
                   {/* <div className="space-y-2">
                     <label htmlFor="requiredDate" className="block text-sm font-medium text-gray-700">

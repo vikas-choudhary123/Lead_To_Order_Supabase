@@ -26,6 +26,7 @@
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.477.0",
     "path-browserify": "^1.0.1",
+    "pdfjs-dist": "^5.2.133",
     "react": "^19.0.0",
     "react-datepicker": "^8.2.1",
     "react-dom": "^19.0.0",
