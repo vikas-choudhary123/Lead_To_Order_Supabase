@@ -20,9 +20,9 @@ function NewFollowUp() {
     nextCallDate: "",
     nextCallTime: "",
     customerFeedback: "",
-    enquiryApproach: "" // Add this new field
+    enquiryApproach: "", // Add this new field
   })
-  
+
   const [leadStatus, setLeadStatus] = useState("")
 
   // New state for dropdown options
@@ -32,58 +32,58 @@ function NewFollowUp() {
   const [nobOptions, setNobOptions] = useState([])
   const [enquiryApproachOptions, setEnquiryApproachOptions] = useState([])
 
-
   // Function to fetch dropdown data from DROPDOWNSHEET
-// Function to fetch dropdown data from DROPDOWNSHEET
-const fetchDropdownData = async () => {
-  try {
-    const publicUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=DROPDOWN"
-    
-    const response = await fetch(publicUrl)
-    const text = await response.text()
-    
-    const jsonStart = text.indexOf('{')
-    const jsonEnd = text.lastIndexOf('}') + 1
-    const jsonData = text.substring(jsonStart, jsonEnd)
-    
-    const data = JSON.parse(jsonData)
-    
-    if (data && data.table && data.table.rows) {
-      const states = []
-      const types = []
-      const categories = []
-      const nobs = []
-      const approaches = [] // New array for enquiry approaches
-      
-      data.table.rows.slice(0).forEach(row => {
-        // Existing column processing...
-        if (row.c && row.c[2] && row.c[2].v) states.push(row.c[2].v.toString())
-        if (row.c && row.c[3] && row.c[3].v) types.push(row.c[3].v.toString())
-        if (row.c && row.c[35] && row.c[35].v) categories.push(row.c[35].v.toString())
-        if (row.c && row.c[37] && row.c[37].v) nobs.push(row.c[37].v.toString())
-        
-        // Add column AM (index 38) processing
-        if (row.c && row.c[38] && row.c[38].v) {
-          approaches.push(row.c[38].v.toString())
-        }
-      })
-      
-      setEnquiryStates(states)
-      setSalesTypes(types)
-      setProductCategories(categories)
-      setNobOptions(nobs)
-      setEnquiryApproachOptions(approaches) // Set the new state
+  // Function to fetch dropdown data from DROPDOWNSHEET
+  const fetchDropdownData = async () => {
+    try {
+      const publicUrl =
+        "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=DROPDOWN"
+
+      const response = await fetch(publicUrl)
+      const text = await response.text()
+
+      const jsonStart = text.indexOf("{")
+      const jsonEnd = text.lastIndexOf("}") + 1
+      const jsonData = text.substring(jsonStart, jsonEnd)
+
+      const data = JSON.parse(jsonData)
+
+      if (data && data.table && data.table.rows) {
+        const states = []
+        const types = []
+        const categories = []
+        const nobs = []
+        const approaches = [] // New array for enquiry approaches
+
+        data.table.rows.slice(0).forEach((row) => {
+          // Existing column processing...
+          if (row.c && row.c[2] && row.c[2].v) states.push(row.c[2].v.toString())
+          if (row.c && row.c[3] && row.c[3].v) types.push(row.c[3].v.toString())
+          if (row.c && row.c[35] && row.c[35].v) categories.push(row.c[35].v.toString())
+          if (row.c && row.c[37] && row.c[37].v) nobs.push(row.c[37].v.toString())
+
+          // Add column AM (index 38) processing
+          if (row.c && row.c[38] && row.c[38].v) {
+            approaches.push(row.c[38].v.toString())
+          }
+        })
+
+        setEnquiryStates(states)
+        setSalesTypes(types)
+        setProductCategories(categories)
+        setNobOptions(nobs)
+        setEnquiryApproachOptions(approaches) // Set the new state
+      }
+    } catch (error) {
+      console.error("Error fetching dropdown values:", error)
+      // Fallback values
+      setEnquiryStates(["Maharashtra", "Gujarat", "Karnataka", "Tamil Nadu", "Delhi"])
+      setSalesTypes(["NBD", "CRR", "NBD_CRR"])
+      setProductCategories(["Product 1", "Product 2", "Product 3"])
+      setNobOptions(["NOB 1", "NOB 2", "NOB 3"])
+      setEnquiryApproachOptions(["Approach 1", "Approach 2", "Approach 3"]) // Fallback for enquiry approach
     }
-  } catch (error) {
-    console.error("Error fetching dropdown values:", error)
-    // Fallback values
-    setEnquiryStates(["Maharashtra", "Gujarat", "Karnataka", "Tamil Nadu", "Delhi"])
-    setSalesTypes(["NBD", "CRR", "NBD_CRR"])
-    setProductCategories(["Product 1", "Product 2", "Product 3"])
-    setNobOptions(["NOB 1", "NOB 2", "NOB 3"])
-    setEnquiryApproachOptions(["Approach 1", "Approach 2", "Approach 3"]) // Fallback for enquiry approach
   }
-}
 
   useEffect(() => {
     // Fetch dropdown data when component mounts
@@ -91,18 +91,18 @@ const fetchDropdownData = async () => {
 
     // Prepopulate lead number if available
     if (leadNo) {
-      setFormData(prevData => ({
+      setFormData((prevData) => ({
         ...prevData,
-        leadNo: leadNo
+        leadNo: leadNo,
       }))
     }
   }, [leadNo])
 
   const handleChange = (e) => {
     const { id, value } = e.target
-    setFormData(prevData => ({
+    setFormData((prevData) => ({
       ...prevData,
-      [id]: value
+      [id]: value,
     }))
   }
 
@@ -113,68 +113,67 @@ const fetchDropdownData = async () => {
     try {
       const currentDate = new Date()
       const formattedDate = formatDate(currentDate)
-      
+
       // Prepare base row data (columns A-E)
-      let rowData = [
-        formattedDate,               // A: Current date
-        formData.leadNo,              // B: Lead Number
-        document.getElementById("customerFeedback").value,  // C: Customer feedback
-        leadStatus,                   // D: Hot/Cold/Warm status
-        enquiryStatus                 // E: Enquiry Status
+      const rowData = [
+        formattedDate, // A: Current date
+        formData.leadNo, // B: Lead Number
+        document.getElementById("customerFeedback").value, // C: Customer feedback
+        leadStatus, // D: Hot/Cold/Warm status
+        enquiryStatus, // E: Enquiry Status
       ]
-      
+
       // Handle different scenarios
       if (enquiryStatus === "expected") {
         // Explicitly add columns F-K as empty (6 empty columns)
-        rowData.push("", "", "", "", "", "","", "", "", "", "", "","","","","")
-        
+        rowData.push("", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "","","","","")
+
         // Then add columns V, W, X
         rowData.push(
-          document.getElementById("nextAction").value,      // V: Next action
-          document.getElementById("nextCallDate").value,    // W: Next call date
-          document.getElementById("nextCallTime").value     // X: Next call time
+          document.getElementById("nextAction").value, // V: Next action
+          document.getElementById("nextCallDate").value, // W: Next call date
+          document.getElementById("nextCallTime").value, // X: Next call time
         )
-      } else // Change this part in your handleSubmit function
-
-      if (enquiryStatus === "yes") {
+      } // Change this part in your handleSubmit function
+      else if (enquiryStatus === "yes") {
         // Add columns F-K
         rowData.push(
-          document.getElementById("enquiryDate").value,     // F: Enquiry Received Date
-          document.getElementById("enquiryState").value,    // G: Enquiry for State
-          document.getElementById("projectName").value,     // H: Project Name (NOB)
-          document.getElementById("salesType").value,       // I: Sales Type
-          formData.enquiryApproach,                        // J: Enquiry Approach
-          ""                                               // K: Project Value (empty)
+          document.getElementById("enquiryDate").value, // F: Enquiry Received Date
+          document.getElementById("enquiryState").value, // G: Enquiry for State
+          document.getElementById("projectName").value, // H: Project Name (NOB)
+          document.getElementById("salesType").value, // I: Sales Type
+          formData.enquiryApproach, // J: Enquiry Approach
+          "", // K: Project Value (empty)
         )
-        
+
         // Add item details (columns L-O)
         // First, ensure we have at least 4 columns for items (name and quantity pairs)
         // If no items, add empty values
         if (items.length > 0) {
-          items.forEach(item => {
-            rowData.push(item.name);    // Product category (column L, N, etc.)
-            rowData.push(item.quantity); // Quantity (column M, O, etc.)
-          });
+          items.forEach((item) => {
+            rowData.push(item.name) // Product category (column L, N, etc.)
+            rowData.push(item.quantity) // Quantity (column M, O, etc.)
+          })
         } else {
           // Add empty values if no items
-          rowData.push("", "");
+          rowData.push("", "")
         }
-        
       } else if (enquiryStatus === "not-interested") {
         // Pad columns F-K and then V-X with empty values
         rowData.push("", "", "", "", "", "", "", "", "")
       }
-      
-      console.log("Row Data to be submitted:", rowData);
-      
+
+      console.log("Row Data to be submitted:", rowData)
+
       // Script URL - replace with your Google Apps Script URL
-      const scriptUrl = "https://script.google.com/macros/s/AKfycbxeo5tv3kAcSDDAheOCP07HaK76zSfq49jFGtZknseg7kPlj2G1O8U2PuiA2fQSuPvKqA/exec"
-      
+      const scriptUrl =
+        "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
+
       // Parameters for Google Apps Script
       const params = {
         sheetName: "Leads Tracker",
         action: "insert",
-        rowData: JSON.stringify(rowData)
+        rowData: JSON.stringify(rowData),
       }
 
       // Create URL-encoded string for the parameters
@@ -182,18 +181,18 @@ const fetchDropdownData = async () => {
       for (const key in params) {
         urlParams.append(key, params[key])
       }
-      
+
       // Send the data
       const response = await fetch(scriptUrl, {
         method: "POST",
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
+          "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: urlParams
+        body: urlParams,
       })
 
       const result = await response.json()
-      
+
       if (result.success) {
         showNotification("Follow-up recorded successfully", "success")
         navigate("/follow-up")
@@ -207,18 +206,24 @@ const fetchDropdownData = async () => {
       setIsSubmitting(false)
     }
   }
-  
+
   // Function to format date as dd/mm/yyyy
   const formatDate = (date) => {
-    const day = String(date.getDate()).padStart(2, '0')
-    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, "0")
+    const month = String(date.getMonth() + 1).padStart(2, "0")
     const year = date.getFullYear()
     return `${day}/${month}/${year}`
   }
 
   const addItem = () => {
-    const newId = (items.length + 1).toString()
-    setItems([...items, { id: newId, name: "", quantity: "" }])
+    // Define maximum number of items allowed
+    const MAX_ITEMS = 10
+
+    // Only add a new item if we haven't reached the maximum
+    if (items.length < MAX_ITEMS) {
+      const newId = (items.length + 1).toString()
+      setItems([...items, { id: newId, name: "", quantity: "" }])
+    }
   }
 
   const removeItem = (id) => {
@@ -235,7 +240,7 @@ const fetchDropdownData = async () => {
     <div className="container mx-auto py-10 px-4">
       <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-md">
         <div className="p-6 border-b">
-          <h2 className="text-xl font-bold">New Follow-Up</h2>
+          <h2 className="text-xl font-bold">Lead Follow-Up</h2>
           <p className="text-sm text-slate-500">
             Record details of the follow-up call
             {leadId && <span className="font-medium"> for Lead #{leadId}</span>}
@@ -268,7 +273,7 @@ const fetchDropdownData = async () => {
                 required
               />
             </div>
-            
+
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">Lead Status</label>
               <div className="space-y-1">
@@ -283,7 +288,7 @@ const fetchDropdownData = async () => {
                     className="h-4 w-4 text-red-600 focus:ring-red-500"
                   />
                   <label htmlFor="hot" className="text-sm text-gray-700">
-                    Hot
+                    Relevant
                   </label>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -297,10 +302,10 @@ const fetchDropdownData = async () => {
                     className="h-4 w-4 text-amber-600 focus:ring-amber-500"
                   />
                   <label htmlFor="warm" className="text-sm text-gray-700">
-                    Warm
+                    Not Relevant
                   </label>
                 </div>
-                <div className="flex items-center space-x-2">
+                {/* <div className="flex items-center space-x-2">
                   <input
                     type="radio"
                     id="cold"
@@ -313,7 +318,7 @@ const fetchDropdownData = async () => {
                   <label htmlFor="cold" className="text-sm text-gray-700">
                     Cold
                   </label>
-                </div>
+                </div> */}
               </div>
             </div>
 
@@ -426,71 +431,78 @@ const fetchDropdownData = async () => {
                   </div>
 
                   <div className="space-y-2">
-                  <label htmlFor="enquiryState" className="block text-sm font-medium text-gray-700">
-                    Enquiry for State
-                  </label>
-                  <select
-                    id="enquiryState"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    required
-                  >
-                    <option value="">Select state</option>
-                    {enquiryStates.map((state, index) => (
-                      <option key={index} value={state}>{state}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-  <label htmlFor="projectName" className="block text-sm font-medium text-gray-700">
-    NOB
-  </label>
-  <select
-    id="projectName"
-    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
-    required
-  >
-    <option value="">Select NOB</option>
-    {nobOptions.map((nob, index) => (
-      <option key={index} value={nob}>{nob}</option>
-    ))}
-  </select>
-</div>
+                    <label htmlFor="enquiryState" className="block text-sm font-medium text-gray-700">
+                      Enquiry for State
+                    </label>
+                    <select
+                      id="enquiryState"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      required
+                    >
+                      <option value="">Select state</option>
+                      {enquiryStates.map((state, index) => (
+                        <option key={index} value={state}>
+                          {state}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
                   <div className="space-y-2">
-                  <label htmlFor="salesType" className="block text-sm font-medium text-gray-700">
-                    Enquiry Type
-                  </label>
-                  <select
-                    id="salesType"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    required
-                  >
-                    <option value="">Select type</option>
-                    {salesTypes.map((type, index) => (
-                      <option key={index} value={type}>{type}</option>
-                    ))}
-                  </select>
-                </div>
+                    <label htmlFor="projectName" className="block text-sm font-medium text-gray-700">
+                      NOB
+                    </label>
+                    <select
+                      id="projectName"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      required
+                    >
+                      <option value="">Select NOB</option>
+                      {nobOptions.map((nob, index) => (
+                        <option key={index} value={nob}>
+                          {nob}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                <div className="space-y-2">
-  <label htmlFor="enquiryApproach" className="block text-sm font-medium text-gray-700">
-    Enquiry Approach
-  </label>
-  <select
-    id="enquiryApproach"
-    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
-    value={formData.enquiryApproach}
-    onChange={handleChange}
-    required
-  >
-    <option value="">Select approach</option>
-    {enquiryApproachOptions.map((approach, index) => (
-      <option key={index} value={approach}>{approach}</option>
-    ))}
-  </select>
-</div>
+                  <div className="space-y-2">
+                    <label htmlFor="salesType" className="block text-sm font-medium text-gray-700">
+                      Enquiry Type
+                    </label>
+                    <select
+                      id="salesType"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      required
+                    >
+                      <option value="">Select type</option>
+                      {salesTypes.map((type, index) => (
+                        <option key={index} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
+                  <div className="space-y-2">
+                    <label htmlFor="enquiryApproach" className="block text-sm font-medium text-gray-700">
+                      Enquiry Approach
+                    </label>
+                    <select
+                      id="enquiryApproach"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      value={formData.enquiryApproach}
+                      onChange={handleChange}
+                      required
+                    >
+                      <option value="">Select approach</option>
+                      {enquiryApproachOptions.map((approach, index) => (
+                        <option key={index} value={approach}>
+                          {approach}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
                   {/* <div className="space-y-2">
                     <label htmlFor="requiredDate" className="block text-sm font-medium text-gray-700">
@@ -525,8 +537,9 @@ const fetchDropdownData = async () => {
                       type="button"
                       onClick={addItem}
                       className="px-3 py-1 text-xs border border-amber-200 text-amber-600 hover:bg-amber-50 rounded-md"
+                      disabled={items.length >= 10}
                     >
-                      + Add Item
+                      + Add Item ({items.length}/10)
                     </button>
                   </div>
 
@@ -534,7 +547,7 @@ const fetchDropdownData = async () => {
                     <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                       <div className="md:col-span-5 space-y-2">
                         <label htmlFor={`itemName-${item.id}`} className="block text-sm font-medium text-gray-700">
-                          Requirement Product category
+                          Item Name 1
                         </label>
                         <select
                           id={`itemName-${item.id}`}
@@ -543,14 +556,16 @@ const fetchDropdownData = async () => {
                           onChange={(e) => updateItem(item.id, "name", e.target.value)}
                           required
                         >
-                          <option value="">Select product category</option>
+                          <option value="">Select item name</option>
                           {productCategories.map((category, index) => (
-                            <option key={index} value={category}>{category}</option>
+                            <option key={index} value={category}>
+                              {category}
+                            </option>
                           ))}
                         </select>
                       </div>
 
-                      {/* <div className="md:col-span-5 space-y-2">
+                      <div className="md:col-span-5 space-y-2">
                         <label htmlFor={`quantity-${item.id}`} className="block text-sm font-medium text-gray-700">
                           Quantity
                         </label>
@@ -562,7 +577,7 @@ const fetchDropdownData = async () => {
                           onChange={(e) => updateItem(item.id, "quantity", e.target.value)}
                           required
                         />
-                      </div> */}
+                      </div>
 
                       <div className="md:col-span-2">
                         <button

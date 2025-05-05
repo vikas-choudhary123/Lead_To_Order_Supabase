@@ -6,7 +6,9 @@ function DashboardMetrics() {
     totalLeads: "0",
     pendingFollowups: "0",
     quotationsSent: "0",
-    ordersReceived: "0"
+    ordersReceived: "0",
+    totalEnquiry: "0",
+    pendingEnquiry: "0"
   })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -17,7 +19,7 @@ function DashboardMetrics() {
         setIsLoading(true)
         
         // FMS sheet - For total leads (column B) and pending follow-ups (column K not null and column L null)
-        const fmsUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=FMS"
+        const fmsUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=FMS"
         const fmsResponse = await fetch(fmsUrl)
         const fmsText = await fmsResponse.text()
         
@@ -28,7 +30,7 @@ function DashboardMetrics() {
         const fmsData = JSON.parse(fmsJsonData)
         
         // Make Quotation sheet - For quotations sent (count of rows in column B)
-        const quotationUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=Make Quotation"
+        const quotationUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=Make Quotation"
         const quotationResponse = await fetch(quotationUrl)
         const quotationText = await quotationResponse.text()
         
@@ -37,13 +39,24 @@ function DashboardMetrics() {
         const quotationJsonEnd = quotationText.lastIndexOf('}') + 1
         const quotationJsonData = quotationText.substring(quotationJsonStart, quotationJsonEnd)
         const quotationData = JSON.parse(quotationJsonData)
+
+        const enquiryUrl1 = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=Enquiry Tracker"
+    const enquiryResponse1 = await fetch(enquiryUrl1)
+    const enquiryText1 = await enquiryResponse1.text()
+    
+    // Extract JSON from Enquiry Tracker sheet response
+    const enquiryJsonStart1 = enquiryText1.indexOf('{')
+    const enquiryJsonEnd1 = enquiryText1.lastIndexOf('}') + 1
+    const enquiryJsonData1 = enquiryText1.substring(enquiryJsonStart1, enquiryJsonEnd1)
+    const enquiryData1 = JSON.parse(enquiryJsonData1)
+    
         
-        // Enquiry Tracker sheet - For orders received (column W = "yes")
-        const enquiryUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=Enquiry Tracker"
+        // Enquiry to Order sheet - For total enquiry and pending enquiry
+        const enquiryUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=ENQUIRY TO ORDER"
         const enquiryResponse = await fetch(enquiryUrl)
         const enquiryText = await enquiryResponse.text()
         
-        // Extract JSON from Enquiry Tracker sheet response
+        // Extract JSON from Enquiry to Order sheet response
         const enquiryJsonStart = enquiryText.indexOf('{')
         const enquiryJsonEnd = enquiryText.lastIndexOf('}') + 1
         const enquiryJsonData = enquiryText.substring(enquiryJsonStart, enquiryJsonEnd)
@@ -54,6 +67,8 @@ function DashboardMetrics() {
         let pendingFollowups = 0
         let quotationsSent = 0
         let ordersReceived = 0
+        let totalEnquiry = 0
+        let pendingEnquiry = 0
         
         // Count total leads from FMS sheet - MODIFIED to start from row 7
         if (fmsData && fmsData.table && fmsData.table.rows) {
@@ -72,23 +87,40 @@ function DashboardMetrics() {
           ).length
         }
         
-        // Count quotations sent from Make Quotation sheet
-        if (quotationData && quotationData.table && quotationData.table.rows) {
-          // Count all rows with data in column B (index 1), excluding header
-          quotationsSent = quotationData.table.rows.filter(row => 
-            row.c && row.c[1] && row.c[1].v
-          ).length
-        }
+       // Count quotations sent from Make Quotation sheet
+    if (quotationData && quotationData.table && quotationData.table.rows) {
+      // Count all rows with data in column B (index 1), excluding header
+      quotationsSent = quotationData.table.rows.filter(row => 
+        row.c && row.c[1] && row.c[1].v
+      ).length
+    }
+    
+    // Count orders received from Enquiry Tracker sheet
+    if (enquiryData1 && enquiryData1.table && enquiryData1.table.rows) {
+      // Count rows where column W (index 22) = "yes"
+      ordersReceived = enquiryData1.table.rows.filter(row => 
+        row.c && 
+        row.c[22] && 
+        row.c[22].v && 
+        row.c[22].v.toLowerCase() === "yes"
+      ).length
+    }
+
         
-        // Count orders received from Enquiry Tracker sheet
+        // Count from Enquiry to Order sheet
         if (enquiryData && enquiryData.table && enquiryData.table.rows) {
-          // Count rows where column W (index 22) = "yes"
-          ordersReceived = enquiryData.table.rows.filter(row => 
-            row.c && 
-            row.c[22] && 
-            row.c[22].v && 
-            row.c[22].v.toLowerCase() === "yes"
+          // Count total enquiries (all rows with data in column A)
+          totalEnquiry = enquiryData.table.rows.filter(row => 
+            row.c && row.c[0] && row.c[0].v
           ).length
+          
+          // Count pending enquiries where column AH (index 33) is not null and column AI (index 34) is null
+          pendingEnquiry = enquiryData.table.rows.filter(row => 
+            row.c && 
+            row.c[33] && row.c[33].v && 
+            (!row.c[34] || !row.c[34].v)
+          ).length
+          
         }
         
         // Update metrics state
@@ -96,7 +128,9 @@ function DashboardMetrics() {
           totalLeads: totalLeads.toString(),
           pendingFollowups: pendingFollowups.toString(),
           quotationsSent: quotationsSent.toString(),
-          ordersReceived: ordersReceived.toString()
+          ordersReceived: ordersReceived.toString(),
+          totalEnquiry: totalEnquiry.toString(),
+          pendingEnquiry: pendingEnquiry.toString()
         })
         
       } catch (error) {
@@ -107,7 +141,9 @@ function DashboardMetrics() {
           totalLeads: "124",
           pendingFollowups: "38",
           quotationsSent: "56",
-          ordersReceived: "27"
+          ordersReceived: "27",
+          totalEnquiry: "145",
+          pendingEnquiry: "42"
         })
       } finally {
         setIsLoading(false)
@@ -118,42 +154,72 @@ function DashboardMetrics() {
   }, [])
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
-      <MetricCard
-        title="Total Leads"
-        value={isLoading ? "Loading..." : metrics.totalLeads}
-        change="+12%"
-        trend="up"
-        icon={<UsersIcon className="h-5 w-5" />}
-        color="from-blue-500 to-indigo-600"
-      />
+    <div className="space-y-8">
+      {/* Lead to Order Section */}
+      <div>
+        {/* <h2 className="text-xl font-bold mb-4 text-slate-800 border-b pb-2">Lead to Order</h2> */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
+          <MetricCard
+            title="Total Leads"
+            value={isLoading ? "Loading..." : metrics.totalLeads}
+            change="+12%"
+            trend="up"
+            icon={<UsersIcon className="h-5 w-5" />}
+            color="from-blue-500 to-indigo-600"
+          />
+          
+          <MetricCard
+            title="Pending Follow-ups"
+            value={isLoading ? "Loading..." : metrics.pendingFollowups}
+            change="+5%"
+            trend="up"
+            icon={<PhoneCallIcon className="h-5 w-5" />}
+            color="from-amber-500 to-orange-600"
+          />
+          
+          <MetricCard
+            title="Quotations Sent"
+            value={isLoading ? "Loading..." : metrics.quotationsSent}
+            change="+8%"
+            trend="up"
+            icon={<FileTextIcon className="h-5 w-5" />}
+            color="from-emerald-500 to-green-600"
+          />
+          
+          <MetricCard
+            title="Orders Received"
+            value={isLoading ? "Loading..." : metrics.ordersReceived}
+            change="-3%"
+            trend="down"
+            icon={<ShoppingCartIcon className="h-5 w-5" />}
+            color="from-purple-500 to-pink-600"
+          />
+        </div>
+      </div>
       
-      <MetricCard
-        title="Pending Follow-ups"
-        value={isLoading ? "Loading..." : metrics.pendingFollowups}
-        change="+5%"
-        trend="up"
-        icon={<PhoneCallIcon className="h-5 w-5" />}
-        color="from-amber-500 to-orange-600"
-      />
-      
-      <MetricCard
-        title="Quotations Sent"
-        value={isLoading ? "Loading..." : metrics.quotationsSent}
-        change="+8%"
-        trend="up"
-        icon={<FileTextIcon className="h-5 w-5" />}
-        color="from-emerald-500 to-green-600"
-      />
-      
-      <MetricCard
-        title="Orders Received"
-        value={isLoading ? "Loading..." : metrics.ordersReceived}
-        change="-3%"
-        trend="down"
-        icon={<ShoppingCartIcon className="h-5 w-5" />}
-        color="from-purple-500 to-pink-600"
-      />
+      {/* Enquiry to Order Section */}
+      <div>
+        {/* <h2 className="text-xl font-bold mb-4 text-slate-800 border-b pb-2">Enquiry to Order</h2> */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <MetricCard
+            title="Total Enquiry"
+            value={isLoading ? "Loading..." : metrics.totalEnquiry}
+            change="+15%"
+            trend="up"
+            icon={<UsersIcon className="h-5 w-5" />}
+            color="from-cyan-500 to-blue-600"
+          />
+          
+          <MetricCard
+            title="Pending Enquiry"
+            value={isLoading ? "Loading..." : metrics.pendingEnquiry}
+            change="+7%"
+            trend="up"
+            icon={<AlertCircleIcon className="h-5 w-5" />}
+            color="from-rose-500 to-red-600"
+          />
+        </div>
+      </div>
     </div>
   )
 }

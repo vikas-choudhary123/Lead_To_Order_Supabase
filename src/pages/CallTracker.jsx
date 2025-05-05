@@ -2,7 +2,14 @@
 
 import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
-import { PlusIcon, SearchIcon, ArrowRightIcon, CalendarIcon, ClockIcon, FileTextIcon, BuildingIcon } from "../components/Icons"
+import { PlusIcon, SearchIcon, ArrowRightIcon, BuildingIcon } from "../components/Icons"
+import CallTrackerForm from "./Call-Tracker-Form"
+
+// Animation classes
+const slideIn = "animate-in slide-in-from-right duration-300"
+const slideOut = "animate-out slide-out-to-right duration-300"
+const fadeIn = "animate-in fade-in duration-300"
+const fadeOut = "animate-out fade-out duration-300"
 
 function CallTracker() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -10,11 +17,15 @@ function CallTracker() {
   const [pendingCallTrackers, setPendingCallTrackers] = useState([])
   const [historyCallTrackers, setHistoryCallTrackers] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [showNewCallTrackerForm, setShowNewCallTrackerForm] = useState(false)
+  const [showPopup, setShowPopup] = useState(false)
+  const [selectedTracker, setSelectedTracker] = useState(null)
+  const [directEnquiryPendingTrackers, setDirectEnquiryPendingTrackers] = useState([])
 
   // Helper function to determine priority based on status
   const determinePriority = (status) => {
     if (!status) return "Low"
-    
+
     const statusLower = status.toLowerCase()
     if (statusLower === "hot") return "High"
     if (statusLower === "warm") return "Medium"
@@ -24,25 +35,25 @@ function CallTracker() {
   // Helper function to format date to DD/MM/YYYY
   const formatDateToDDMMYYYY = (dateValue) => {
     if (!dateValue) return ""
-    
+
     try {
       // Check if it's a Date object-like string (e.g. "Date(2025,3,22)")
-      if (typeof dateValue === 'string' && dateValue.startsWith('Date(')) {
+      if (typeof dateValue === "string" && dateValue.startsWith("Date(")) {
         // Extract the parts from Date(YYYY,MM,DD) format
         const dateString = dateValue.substring(5, dateValue.length - 1)
-        const [year, month, day] = dateString.split(',').map(part => parseInt(part.trim()))
-        
+        const [year, month, day] = dateString.split(",").map((part) => Number.parseInt(part.trim()))
+
         // JavaScript months are 0-indexed, but we need to display them as 1-indexed
         // Also ensure day and month are padded with leading zeros if needed
-        return `${day.toString().padStart(2, '0')}/${(month + 1).toString().padStart(2, '0')}/${year}`
+        return `${day.toString().padStart(2, "0")}/${month.toString().padStart(2, "0")}/${year}`
       }
-      
+
       // Handle other date formats if needed
       const date = new Date(dateValue)
       if (!isNaN(date.getTime())) {
-        return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`
+        return `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1).toString().padStart(2, "0")}/${date.getFullYear()}`
       }
-      
+
       // If it's already in the correct format, return as is
       return dateValue
     } catch (error) {
@@ -54,40 +65,40 @@ function CallTracker() {
   // Helper function to format time to 12-hour format with AM/PM
   const formatTimeTo12Hour = (timeValue) => {
     if (!timeValue) return ""
-    
+
     try {
       // Check if it's a Date object-like string (e.g. "Date(1899,11,30,17,9,0)")
-      if (typeof timeValue === 'string' && timeValue.startsWith('Date(')) {
+      if (typeof timeValue === "string" && timeValue.startsWith("Date(")) {
         // Extract the parts from Date(YYYY,MM,DD,HH,MM,SS) format
         const dateString = timeValue.substring(5, timeValue.length - 1)
-        const parts = dateString.split(',')
-        
+        const parts = dateString.split(",")
+
         // If we have at least 5 parts (year, month, day, hour, minute)
         if (parts.length >= 5) {
-          const hour = parseInt(parts[3].trim())
-          const minute = parseInt(parts[4].trim())
-          
+          const hour = Number.parseInt(parts[3].trim())
+          const minute = Number.parseInt(parts[4].trim())
+
           // Convert to 12-hour format
-          const period = hour >= 12 ? 'PM' : 'AM'
+          const period = hour >= 12 ? "PM" : "AM"
           const displayHour = hour % 12 || 12 // Convert 0 to 12 for 12 AM
-          
+
           // Format as h:mm AM/PM with leading zero for minutes when needed
-          return `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`
+          return `${displayHour}:${minute.toString().padStart(2, "0")} ${period}`
         }
       }
-      
+
       // Handle HH:MM:SS format
-      if (typeof timeValue === 'string' && timeValue.includes(':')) {
-        const [hour, minute] = timeValue.split(':').map(part => parseInt(part))
-        
+      if (typeof timeValue === "string" && timeValue.includes(":")) {
+        const [hour, minute] = timeValue.split(":").map((part) => Number.parseInt(part))
+
         // Convert to 12-hour format
-        const period = hour >= 12 ? 'PM' : 'AM'
+        const period = hour >= 12 ? "PM" : "AM"
         const displayHour = hour % 12 || 12 // Convert 0 to 12 for 12 AM
-        
+
         // Format as h:mm AM/PM
-        return `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`
+        return `${displayHour}:${minute.toString().padStart(2, "0")} ${period}`
       }
-      
+
       // If it's already in the correct format or we can't parse it, return as is
       return timeValue
     } catch (error) {
@@ -101,66 +112,79 @@ function CallTracker() {
     const fetchCallTrackerData = async () => {
       try {
         setIsLoading(true)
-        
+
         // Fetch data from FMS sheet for Pending Call Trackers
-        const pendingUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=FMS"
+        const pendingUrl =
+          "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=FMS"
         const pendingResponse = await fetch(pendingUrl)
         const pendingText = await pendingResponse.text()
-        
+
         // Extract the JSON part from the FMS sheet response
-        const pendingJsonStart = pendingText.indexOf('{')
-        const pendingJsonEnd = pendingText.lastIndexOf('}') + 1
+        const pendingJsonStart = pendingText.indexOf("{")
+        const pendingJsonEnd = pendingText.lastIndexOf("}") + 1
         const pendingJsonData = pendingText.substring(pendingJsonStart, pendingJsonEnd)
-        
+
         const pendingData = JSON.parse(pendingJsonData)
-        
+
         // Fetch data from Enquiry Tracker sheet for History
-        const historyUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=Enquiry Tracker"
+        const historyUrl =
+          "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=Enquiry Tracker"
         const historyResponse = await fetch(historyUrl)
         const historyText = await historyResponse.text()
-        
+
         // Extract the JSON part from the Enquiry Tracker sheet response
-        const historyJsonStart = historyText.indexOf('{')
-        const historyJsonEnd = historyText.lastIndexOf('}') + 1
+        const historyJsonStart = historyText.indexOf("{")
+        const historyJsonEnd = historyText.lastIndexOf("}") + 1
         const historyJsonData = historyText.substring(historyJsonStart, historyJsonEnd)
-        
+
         const historyData = JSON.parse(historyJsonData)
-        
+
+        // Fetch data from ENQUIRY TO ORDER sheet for Direct Enquiry Pending
+        const directEnquiryUrl =
+          "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=ENQUIRY TO ORDER"
+        const directEnquiryResponse = await fetch(directEnquiryUrl)
+        const directEnquiryText = await directEnquiryResponse.text()
+
+        // Extract the JSON part from the ENQUIRY TO ORDER sheet response
+        const directEnquiryJsonStart = directEnquiryText.indexOf("{")
+        const directEnquiryJsonEnd = directEnquiryText.lastIndexOf("}") + 1
+        const directEnquiryJsonData = directEnquiryText.substring(directEnquiryJsonStart, directEnquiryJsonEnd)
+
+        const directEnquiryData = JSON.parse(directEnquiryJsonData)
+
         // Process Pending Call Trackers from FMS sheet
         if (pendingData && pendingData.table && pendingData.table.rows) {
           const pendingCallTrackerData = []
-          
+
           // Skip the header row (index 0)
           pendingData.table.rows.slice(2).forEach((row, index) => {
             // MODIFIED: Only show rows where column AJ (index 35) is not null and column AK (index 36) is null
-            if (row.c && 
-                row.c[37] && row.c[37].v && 
-                (!row.c[38] || !row.c[38].v)) {
+            if (row.c && row.c[37] && row.c[37].v && (!row.c[38] || !row.c[38].v)) {
               const callTrackerItem = {
                 id: index + 1,
                 leadId: row.c[1] ? row.c[1].v : "", // Column B - Lead Number
                 receiverName: row.c[2] ? row.c[2].v : "", // Column C - Lead Receiver Name
-                leadSource: row.c[40] ? row.c[40].v : "", // Column D - Lead Source
+                leadSource: row.c[6] ? row.c[6].v : "", // Column D - Lead Source
                 salespersonName: row.c[41] ? row.c[41].v : "", // Column E - Salesperson Name
                 companyName: row.c[42] ? row.c[42].v : "", // Column G - Company Name
-                createdAt: row.c[0] ? row.c[0].v : "", // Using date from column A
+                createdAt: row.c[0] ? formatDateToDDMMYYYY(row.c[0].v) : "", // Using date from column A
                 status: "Expected", // Default status for pending
                 priority: determinePriority(row.c[3] ? row.c[3].v : ""), // Determine priority based on source
                 stage: "Pending", // Default stage
                 dueDate: "", // You might want to add logic to calculate due date
               }
-              
+
               pendingCallTrackerData.push(callTrackerItem)
             }
           })
-          
+
           setPendingCallTrackers(pendingCallTrackerData)
         }
-        
+
         // Process History Call Trackers from Enquiry Tracker sheet
         if (historyData && historyData.table && historyData.table.rows) {
           const historyCallTrackerData = []
-          
+
           // Start from index 1 to skip header row
           historyData.table.rows.slice(0).forEach((row, index) => {
             if (row.c) {
@@ -203,12 +227,41 @@ function CallTracker() {
                 holdRemark: row.c[34] ? row.c[34].v : "", // Column AI - Hold Remark
                 priority: determinePriority(row.c[2] ? row.c[2].v : ""), // Determine priority based on status
               }
-              
+
               historyCallTrackerData.push(callTrackerItem)
             }
           })
-          
+
           setHistoryCallTrackers(historyCallTrackerData)
+        }
+
+        // Process Direct Enquiry Pending from ENQUIRY TO ORDER sheet
+        if (directEnquiryData && directEnquiryData.table && directEnquiryData.table.rows) {
+          const directEnquiryPendingData = []
+
+          // Skip the header row (index 0)
+          directEnquiryData.table.rows.slice(1).forEach((row, index) => {
+            // Only show rows where column AH (index 33) is not null and column AI (index 34) is null
+            if (row.c && row.c[33] && row.c[33].v && (!row.c[34] || !row.c[34].v)) {
+              const directEnquiryItem = {
+                id: index + 1,
+                leadId: row.c[1] ? row.c[1].v : "", // Column B - Lead Number
+                receiverName: row.c[2] ? row.c[2].v : "", // Column C - Lead Receiver Name
+                leadSource: row.c[3] ? row.c[3].v : "", // Column D - Lead Source
+                salespersonName: row.c[37] ? row.c[37].v : "", // Column E - Salesperson Name
+                companyName: row.c[38] ? row.c[38].v : "", // Column G - Company Name
+                createdAt: row.c[0] ? formatDateToDDMMYYYY(row.c[0].v) : "", // Using date from column A
+                status: "Expected", // Default status for pending
+                priority: determinePriority(row.c[3] ? row.c[3].v : ""), // Determine priority based on source
+                stage: "Pending", // Default stage
+                dueDate: "", // You might want to add logic to calculate due date
+              }
+
+              directEnquiryPendingData.push(directEnquiryItem)
+            }
+          })
+
+          setDirectEnquiryPendingTrackers(directEnquiryPendingData)
         }
       } catch (error) {
         console.error("Error fetching call tracker data:", error)
@@ -225,9 +278,9 @@ function CallTracker() {
             priority: "Medium",
             stage: "Pending",
             dueDate: "2023-05-20",
-          }
+          },
         ])
-        
+
         setHistoryCallTrackers([
           {
             id: "2",
@@ -239,14 +292,14 @@ function CallTracker() {
             priority: "Low",
             nextCallDate: "15/05/2023",
             nextCallTime: "5:30 PM",
-            holdingDate: "20/05/2023"
-          }
+            holdingDate: "20/05/2023",
+          },
         ])
       } finally {
         setIsLoading(false)
       }
     }
-    
+
     fetchCallTrackerData()
   }, [])
 
@@ -257,9 +310,14 @@ function CallTracker() {
       tracker.leadId.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
-  const filteredHistoryCallTrackers = historyCallTrackers.filter(
+  const filteredHistoryCallTrackers = historyCallTrackers.filter((tracker) =>
+    tracker.enquiryNo.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
+
+  const filteredDirectEnquiryPendingTrackers = directEnquiryPendingTrackers.filter(
     (tracker) =>
-      tracker.enquiryNo.toLowerCase().includes(searchTerm.toLowerCase())
+      tracker.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      tracker.leadId.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
   return (
@@ -284,11 +342,12 @@ function CallTracker() {
             />
           </div>
 
-          <Link to="/call-tracker/new">
-            <button className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
-              <PlusIcon className="inline-block mr-2 h-4 w-4" /> New Call Tracker
-            </button>
-          </Link>
+          <button
+            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+            onClick={() => setShowNewCallTrackerForm(true)}
+          >
+            <PlusIcon className="inline-block mr-2 h-4 w-4" /> Direct Enquiry
+          </button>
         </div>
       </div>
 
@@ -301,16 +360,30 @@ function CallTracker() {
             <div className="inline-flex rounded-md shadow-sm">
               <button
                 onClick={() => setActiveTab("pending")}
-                className={`px-4 py-2 text-sm font-medium rounded-l-md ${
-                  activeTab === "pending" ? "bg-purple-100 text-purple-800" : "bg-white text-slate-700 hover:bg-slate-50"
+                className={`px-4 py-2 text-sm font-medium ${
+                  activeTab === "pending"
+                    ? "bg-purple-100 text-purple-800"
+                    : "bg-white text-slate-700 hover:bg-slate-50"
                 }`}
               >
                 Pending
               </button>
               <button
+                onClick={() => setActiveTab("directEnquiry")}
+                className={`px-4 py-2 text-sm font-medium ${
+                  activeTab === "directEnquiry"
+                    ? "bg-purple-100 text-purple-800"
+                    : "bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                Direct Enquiry Pending
+              </button>
+              <button
                 onClick={() => setActiveTab("history")}
                 className={`px-4 py-2 text-sm font-medium rounded-r-md ${
-                  activeTab === "history" ? "bg-purple-100 text-purple-800" : "bg-white text-slate-700 hover:bg-slate-50"
+                  activeTab === "history"
+                    ? "bg-purple-100 text-purple-800"
+                    : "bg-white text-slate-700 hover:bg-slate-50"
                 }`}
               >
                 History
@@ -325,7 +398,7 @@ function CallTracker() {
           ) : (
             <>
               {activeTab === "pending" && (
-                <div className="rounded-md border">
+                <div className="rounded-md border overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-slate-50">
                       <tr>
@@ -341,12 +414,15 @@ function CallTracker() {
                         >
                           Lead Receiver Name
                         </th>
-                        <th
+                        {/* <th
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
                           Enquiry Status
-                        </th>
+                        </th> */}
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+      Company Name
+    </th>
                         <th
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
@@ -406,11 +482,15 @@ function CallTracker() {
                                     Process <ArrowRightIcon className="ml-1 h-3 w-3 inline" />
                                   </button>
                                 </Link>
-                                <Link to={`/call-tracker/${tracker.id}`}>
-                                  <button className="px-3 py-1 text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-md">
-                                    View
-                                  </button>
-                                </Link>
+                                {/* <button
+                                  onClick={() => {
+                                    setSelectedTracker(tracker)
+                                    setShowPopup(true)
+                                  }}
+                                  className="px-3 py-1 text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-md"
+                                >
+                                  View
+                                </button> */}
                               </div>
                             </td>
                           </tr>
@@ -427,55 +507,59 @@ function CallTracker() {
                 </div>
               )}
 
-              {activeTab === "history" && (
+              {activeTab === "directEnquiry" && (
                 <div className="rounded-md border overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-slate-50">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enquiry No.</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enquiry Status</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">What Did Customer Say</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Stage</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send Quotation No.</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Shared By</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Number</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Value Without Tax</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Value With Tax</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Upload</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Remarks</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Validator Name</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Send Status</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Validation Remark</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send FAQ Video</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send Product Video</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send Offer Video</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send Product Catalog</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send Product Image</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Call Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Call Time</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Is Order Received? Status</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acceptance Via</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Mode</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Terms (In Days)</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Video</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acceptance File Upload</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remark</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Lost Apology Video</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">If No Then Get Relevant Reason Status</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">If No Then Get Relevant Reason Remark</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer Order Hold Reason Category</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Holding Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hold Remark</th>
-                        {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th> */}
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Lead No.
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Lead Source
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Company Name
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          What Did Customer Say
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Current Stage
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredHistoryCallTrackers.length > 0 ? (
-                        filteredHistoryCallTrackers.map((tracker) => (
+                      {filteredDirectEnquiryPendingTrackers.length > 0 ? (
+                        filteredDirectEnquiryPendingTrackers.map((tracker) => (
                           <tr key={tracker.id} className="hover:bg-slate-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.timestamp}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{tracker.enquiryNo}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {tracker.leadId}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {tracker.receiverName}
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span
                                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -486,80 +570,42 @@ function CallTracker() {
                                       : "bg-slate-100 text-slate-800"
                                 }`}
                               >
-                                {tracker.enquiryStatus}
+                                {tracker.leadSource}
                               </span>
                             </td>
-                            <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.customerFeedback}>{tracker.customerFeedback}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.currentStage}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.sendQuotationNo}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.quotationSharedBy}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.quotationNumber}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.valueWithoutTax}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.valueWithTax}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {tracker.quotationUpload && (
-                                <a href={tracker.quotationUpload} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                                  View File
-                                </a>
-                              )}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.quotationRemarks}>{tracker.quotationRemarks}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.validatorName}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.sendStatus}</td>
-                            <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.validationRemark}>{tracker.validationRemark}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.faqVideo}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.productVideo}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.offerVideo}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.productCatalog}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.productImage}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.nextCallDate}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.nextCallTime}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.orderStatus}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.acceptanceVia}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.paymentMode}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.paymentTerms}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {tracker.orderVideo && (
-                                <a href={tracker.orderVideo} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                                  View Video
-                                </a>
-                              )}
+                              {tracker.salespersonName}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {tracker.acceptanceFile && (
-                                <a href={tracker.acceptanceFile} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                                  View File
-                                </a>
-                              )}
+                              <div className="flex items-center">
+                                <BuildingIcon className="h-4 w-4 mr-2 text-slate-400" />
+                                {tracker.companyName}
+                              </div>
                             </td>
-                            <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.orderRemark}>{tracker.orderRemark}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {tracker.apologyVideo && (
-                                <a href={tracker.apologyVideo} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                                  View Video
-                                </a>
-                              )}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.reasonStatus}>{tracker.reasonStatus}</td>
-                            <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.reasonRemark}>{tracker.reasonRemark}</td>
-                            <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.holdReason}>{tracker.holdReason}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.holdingDate}</td>
-                            <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.holdRemark}>{tracker.holdRemark}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                               <div className="flex space-x-2">
-                                {/* <Link to={`/call-tracker/${tracker.id}`}>
-                                  <button className="px-3 py-1 text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-md">
-                                    View
+                                <Link to={`/call-tracker/new?leadId=${tracker.leadId}`}>
+                                  <button className="px-3 py-1 text-xs border border-purple-200 text-purple-600 hover:bg-purple-50 rounded-md">
+                                    Process <ArrowRightIcon className="ml-1 h-3 w-3 inline" />
                                   </button>
-                                </Link> */}
+                                </Link>
+                                <button
+                                  onClick={() => {
+                                    setSelectedTracker(tracker)
+                                    setShowPopup(true)
+                                  }}
+                                  className="px-3 py-1 text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-md"
+                                >
+                                  View
+                                </button>
                               </div>
                             </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={36} className="px-6 py-4 text-center text-sm text-slate-500">
-                            No history found
+                          <td colSpan={6} className="px-6 py-4 text-center text-sm text-slate-500">
+                            No direct enquiry pending trackers found
                           </td>
                         </tr>
                       )}
@@ -567,10 +613,387 @@ function CallTracker() {
                   </table>
                 </div>
               )}
+
+{activeTab === "history" && (
+  <div className="rounded-md border overflow-x-auto">
+    <table className="min-w-full divide-y divide-gray-200">
+      <thead className="bg-slate-50">
+        <tr>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enquiry No.</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enquiry Status</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">What Did Customer Say</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Stage</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send Quotation No.</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Shared By</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Number</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Value Without Tax</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Value With Tax</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Upload</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Remarks</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Validator Name</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Send Status</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Validation Remark</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send FAQ Video</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send Product Video</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send Offer Video</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send Product Catalog</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send Product Image</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Call Date</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Call Time</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Is Order Received? Status</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acceptance Via</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Mode</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Terms (In Days)</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Video</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acceptance File Upload</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remark</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Lost Apology Video</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">If No Then Get Relevant Reason Status</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">If No Then Get Relevant Reason Remark</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer Order Hold Reason Category</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Holding Date</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hold Remark</th>
+        </tr>
+      </thead>
+      <tbody className="bg-white divide-y divide-gray-200">
+        {filteredHistoryCallTrackers.length > 0 ? (
+          filteredHistoryCallTrackers.map((tracker) => (
+            <tr key={tracker.id} className="hover:bg-slate-50">
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.timestamp}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{tracker.enquiryNo}</td>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    tracker.priority === "High"
+                      ? "bg-red-100 text-red-800"
+                      : tracker.priority === "Medium"
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-slate-100 text-slate-800"
+                  }`}
+                >
+                  {tracker.enquiryStatus}
+                </span>
+              </td>
+              <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.customerFeedback}>{tracker.customerFeedback}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.currentStage}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.sendQuotationNo}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.quotationSharedBy}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.quotationNumber}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.valueWithoutTax}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.valueWithTax}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {tracker.quotationUpload && (
+                  <a href={tracker.quotationUpload} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    View File
+                  </a>
+                )}
+              </td>
+              <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.quotationRemarks}>{tracker.quotationRemarks}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.validatorName}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.sendStatus}</td>
+              <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.validationRemark}>{tracker.validationRemark}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.faqVideo}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.productVideo}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.offerVideo}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.productCatalog}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.productImage}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.nextCallDate}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.nextCallTime}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.orderStatus}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.acceptanceVia}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.paymentMode}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.paymentTerms}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {tracker.orderVideo && (
+                  <a href={tracker.orderVideo} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    View Video
+                  </a>
+                )}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {tracker.acceptanceFile && (
+                  <a href={tracker.acceptanceFile} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    View File
+                  </a>
+                )}
+              </td>
+              <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.orderRemark}>{tracker.orderRemark}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {tracker.apologyVideo && (
+                  <a href={tracker.apologyVideo} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    View Video
+                  </a>
+                )}
+              </td>
+              <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.reasonStatus}>{tracker.reasonStatus}</td>
+              <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.reasonRemark}>{tracker.reasonRemark}</td>
+              <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.holdReason}>{tracker.holdReason}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.holdingDate}</td>
+              <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.holdRemark}>{tracker.holdRemark}</td>
+            </tr>
+          ))
+        ) : (
+          <tr>
+            <td colSpan={36} className="px-6 py-4 text-center text-sm text-slate-500">
+              No history found
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+)}
             </>
           )}
         </div>
       </div>
+
+      {/* New Call Tracker Form Modal */}
+      {showNewCallTrackerForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-bold">New Call Tracker</h2>
+                <button onClick={() => setShowNewCallTrackerForm(false)} className="text-gray-500 hover:text-gray-700">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-6 w-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <CallTrackerForm />
+          </div>
+        </div>
+      )}
+
+      {/* View Popup Modal */}
+      {showPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${fadeIn}`}
+            onClick={() => setShowPopup(false)}
+          ></div>
+          <div
+            className={`relative bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-auto ${slideIn}`}
+          >
+            <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-900">
+                {activeTab === "pending" || activeTab === "directEnquiry"
+                  ? `Call Tracker Details: ${selectedTracker?.leadId}`
+                  : `Call Tracker History: ${selectedTracker?.enquiryNo}`}
+              </h3>
+              <button
+                onClick={() => setShowPopup(false)}
+                className="text-gray-500 hover:text-gray-700 focus:outline-none"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {activeTab === "pending" || activeTab === "directEnquiry" ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Column B - Lead ID */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-500">Lead Number</p>
+                    <p className="text-base font-semibold">{selectedTracker?.leadId}</p>
+                  </div>
+
+                  {/* Column C - Receiver Name */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-500">Lead Receiver Name</p>
+                    <p className="text-base">{selectedTracker?.receiverName}</p>
+                  </div>
+
+                  {/* Column D - Lead Source */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-500">Lead Source</p>
+                    <p className="text-base">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          selectedTracker?.priority === "High"
+                            ? "bg-red-100 text-red-800"
+                            : selectedTracker?.priority === "Medium"
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-slate-100 text-slate-800"
+                        }`}
+                      >
+                        {selectedTracker?.leadSource}
+                      </span>
+                    </p>
+                  </div>
+
+                  {/* Column E - Salesperson Name */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-500">Salesperson Name</p>
+                    <p className="text-base">{selectedTracker?.salespersonName}</p>
+                  </div>
+
+                  {/* Column G - Company Name */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-500">Company Name</p>
+                    <p className="text-base">{selectedTracker?.companyName}</p>
+                  </div>
+
+                  {/* Created Date */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-500">Created Date</p>
+                    <p className="text-base">{selectedTracker?.createdAt}</p>
+                  </div>
+
+                  {/* Status */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-500">Status</p>
+                    <p className="text-base">{selectedTracker?.status}</p>
+                  </div>
+
+                  {/* Priority */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-500">Priority</p>
+                    <p className="text-base">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          selectedTracker?.priority === "High"
+                            ? "bg-red-100 text-red-800"
+                            : selectedTracker?.priority === "Medium"
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-slate-100 text-slate-800"
+                        }`}
+                      >
+                        {selectedTracker?.priority}
+                      </span>
+                    </p>
+                  </div>
+
+                  {/* Stage */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-500">Stage</p>
+                    <p className="text-base">{selectedTracker?.stage}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Enquiry No */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-500">Enquiry No.</p>
+                    <p className="text-base font-semibold">{selectedTracker?.enquiryNo}</p>
+                  </div>
+
+                  {/* Timestamp */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-500">Timestamp</p>
+                    <p className="text-base">{selectedTracker?.timestamp}</p>
+                  </div>
+
+                  {/* Enquiry Status */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-500">Enquiry Status</p>
+                    <p className="text-base">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          selectedTracker?.priority === "High"
+                            ? "bg-red-100 text-red-800"
+                            : selectedTracker?.priority === "Medium"
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-slate-100 text-slate-800"
+                        }`}
+                      >
+                        {selectedTracker?.enquiryStatus}
+                      </span>
+                    </p>
+                  </div>
+
+                  {/* Current Stage */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-500">Current Stage</p>
+                    <p className="text-base">{selectedTracker?.currentStage}</p>
+                  </div>
+
+                  {/* Next Call Date */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-500">Next Call Date</p>
+                    <p className="text-base">{selectedTracker?.nextCallDate}</p>
+                  </div>
+
+                  {/* Next Call Time */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-500">Next Call Time</p>
+                    <p className="text-base">{selectedTracker?.nextCallTime}</p>
+                  </div>
+
+                  {/* Holding Date */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-500">Holding Date</p>
+                    <p className="text-base">{selectedTracker?.holdingDate}</p>
+                  </div>
+
+                  {/* Order Status */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-500">Order Status</p>
+                    <p className="text-base">{selectedTracker?.orderStatus}</p>
+                  </div>
+
+                  {/* Payment Mode */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-500">Payment Mode</p>
+                    <p className="text-base">{selectedTracker?.paymentMode}</p>
+                  </div>
+
+                  {/* Payment Terms */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-500">Payment Terms</p>
+                    <p className="text-base">{selectedTracker?.paymentTerms}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Customer Feedback - Full width */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-500">What Did Customer Say</p>
+                <div className="p-4 bg-gray-50 rounded-md">
+                  <p className="text-base">
+                    {activeTab === "pending" || activeTab === "directEnquiry"
+                      ? "No feedback yet"
+                      : selectedTracker?.customerFeedback}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t p-4 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowPopup(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+              >
+                Close
+              </button>
+              {(activeTab === "pending" || activeTab === "directEnquiry") && (
+                <Link to={`/call-tracker/new?leadId=${selectedTracker?.leadId}`}>
+                  <button className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
+                    Process <ArrowRightIcon className="ml-1 h-4 w-4 inline" />
+                  </button>
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

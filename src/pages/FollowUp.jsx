@@ -2,7 +2,12 @@
 
 import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
-import { PlusIcon, SearchIcon, ArrowRightIcon, CalendarIcon, ClockIcon, BuildingIcon } from "../components/Icons"
+import { SearchIcon, ArrowRightIcon } from "../components/Icons"
+
+const slideIn = "animate-in slide-in-from-right duration-300"
+const slideOut = "animate-out slide-out-to-right duration-300"
+const fadeIn = "animate-in fade-in duration-300"
+const fadeOut = "animate-out fade-out duration-300"
 
 function FollowUp() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -10,11 +15,14 @@ function FollowUp() {
   const [pendingFollowUps, setPendingFollowUps] = useState([])
   const [historyFollowUps, setHistoryFollowUps] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [filterType, setFilterType] = useState("all") // New state for filter
+  const [showPopup, setShowPopup] = useState(false)
+  const [selectedFollowUp, setSelectedFollowUp] = useState(null)
 
   // Helper function to determine priority based on lead source
   const determinePriority = (source) => {
     if (!source) return "Low"
-    
+
     const sourceLower = source.toLowerCase()
     if (sourceLower.includes("indiamart")) return "High"
     if (sourceLower.includes("website")) return "Medium"
@@ -22,62 +30,64 @@ function FollowUp() {
   }
 
   // Helper function to format next call time
-const formatNextCallTime = (timeValue) => {
-  if (!timeValue) return ""
-  
-  try {
-    // Check if it's a Date(YYYY,MM,DD,HH,MM,SS) format
-    if (typeof timeValue === 'string' && timeValue.startsWith('Date(')) {
-      // Extract hours and minutes from the Date string
-      const timeString = timeValue.substring(5, timeValue.length - 1)
-      const [year, month, day, hours, minutes, seconds] = timeString.split(',').map(part => parseInt(part.trim()))
-      
-      // Convert to 12-hour format
-      const formattedHours = hours % 12 || 12 // Convert to 12-hour format
-      const period = hours >= 12 ? 'PM' : 'AM'
-      
-      // Pad minutes with leading zero if needed
-      const formattedMinutes = minutes.toString().padStart(2, '0')
-      
-      return `${formattedHours}:${formattedMinutes} ${period}`
+  const formatNextCallTime = (timeValue) => {
+    if (!timeValue) return ""
+
+    try {
+      // Check if it's a Date(YYYY,MM,DD,HH,MM,SS) format
+      if (typeof timeValue === "string" && timeValue.startsWith("Date(")) {
+        // Extract hours and minutes from the Date string
+        const timeString = timeValue.substring(5, timeValue.length - 1)
+        const [year, month, day, hours, minutes, seconds] = timeString
+          .split(",")
+          .map((part) => Number.parseInt(part.trim()))
+
+        // Convert to 12-hour format
+        const formattedHours = hours % 12 || 12 // Convert to 12-hour format
+        const period = hours >= 12 ? "PM" : "AM"
+
+        // Pad minutes with leading zero if needed
+        const formattedMinutes = minutes.toString().padStart(2, "0")
+
+        return `${formattedHours}:${formattedMinutes} ${period}`
+      }
+
+      // If it's already in HH:MM:SS format
+      if (typeof timeValue === "string" && /^\d{2}:\d{2}:\d{2}$/.test(timeValue)) {
+        const [hours, minutes] = timeValue.split(":").map(Number)
+
+        // Convert to 12-hour format
+        const formattedHours = hours % 12 || 12
+        const period = hours >= 12 ? "PM" : "AM"
+
+        // Pad minutes with leading zero if needed
+        const formattedMinutes = minutes.toString().padStart(2, "0")
+
+        return `${formattedHours}:${formattedMinutes} ${period}`
+      }
+
+      // Fallback to original value if parsing fails
+      return timeValue
+    } catch (error) {
+      console.error("Error formatting time:", error)
+      return timeValue
     }
-    
-    // If it's already in HH:MM:SS format
-    if (typeof timeValue === 'string' && /^\d{2}:\d{2}:\d{2}$/.test(timeValue)) {
-      const [hours, minutes] = timeValue.split(':').map(Number)
-      
-      // Convert to 12-hour format
-      const formattedHours = hours % 12 || 12
-      const period = hours >= 12 ? 'PM' : 'AM'
-      
-      // Pad minutes with leading zero if needed
-      const formattedMinutes = minutes.toString().padStart(2, '0')
-      
-      return `${formattedHours}:${formattedMinutes} ${period}`
-    }
-    
-    // Fallback to original value if parsing fails
-    return timeValue
-  } catch (error) {
-    console.error("Error formatting time:", error)
-    return timeValue
   }
-}
 
   // Helper function to calculate next call date (3 days after created date)
   const calculateNextCallDate = (createdDate) => {
     if (!createdDate) return ""
-    
+
     try {
       // Parse the date - assuming format is DD/MM/YYYY
-      const parts = createdDate.split('/')
+      const parts = createdDate.split("/")
       if (parts.length !== 3) return ""
-      
+
       const date = new Date(parts[2], parts[1] - 1, parts[0])
       date.setDate(date.getDate() + 3) // Add 3 days for next call
-      
+
       // Format as YYYY-MM-DD for display
-      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
     } catch (error) {
       console.error("Error calculating next call date:", error)
       return ""
@@ -87,25 +97,25 @@ const formatNextCallTime = (timeValue) => {
   // Helper function to format date to DD/MM/YYYY
   const formatDateToDDMMYYYY = (dateValue) => {
     if (!dateValue) return ""
-    
+
     try {
       // Check if it's a Date object-like string (e.g. "Date(2025,3,22)")
-      if (typeof dateValue === 'string' && dateValue.startsWith('Date(')) {
+      if (typeof dateValue === "string" && dateValue.startsWith("Date(")) {
         // Extract the parts from Date(YYYY,MM,DD) format
         const dateString = dateValue.substring(5, dateValue.length - 1)
-        const [year, month, day] = dateString.split(',').map(part => parseInt(part.trim()))
-        
+        const [year, month, day] = dateString.split(",").map((part) => Number.parseInt(part.trim()))
+
         // JavaScript months are 0-indexed, but we need to display them as 1-indexed
         // Also ensure day and month are padded with leading zeros if needed
-        return `${day.toString().padStart(2, '0')}/${(month + 1).toString().padStart(2, '0')}/${year}`
+        return `${day.toString().padStart(2, "0")}/${(month + 1).toString().padStart(2, "0")}/${year}`
       }
-      
+
       // Handle other date formats if needed
       const date = new Date(dateValue)
       if (!isNaN(date.getTime())) {
-        return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`
+        return `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1).toString().padStart(2, "0")}/${date.getFullYear()}`
       }
-      
+
       // If it's already in the correct format, return as is
       return dateValue
     } catch (error) {
@@ -119,71 +129,73 @@ const formatNextCallTime = (timeValue) => {
     const fetchFollowUpData = async () => {
       try {
         setIsLoading(true)
-        
+
         // Fetch data from FMS sheet for Pending Follow-ups
-        const pendingUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=FMS"
+        const pendingUrl =
+          "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=FMS"
         const pendingResponse = await fetch(pendingUrl)
         const pendingText = await pendingResponse.text()
-        
+
         // Extract the JSON part from the FMS sheet response
-        const pendingJsonStart = pendingText.indexOf('{')
-        const pendingJsonEnd = pendingText.lastIndexOf('}') + 1
+        const pendingJsonStart = pendingText.indexOf("{")
+        const pendingJsonEnd = pendingText.lastIndexOf("}") + 1
         const pendingJsonData = pendingText.substring(pendingJsonStart, pendingJsonEnd)
-        
+
         const pendingData = JSON.parse(pendingJsonData)
-        
+
         // Fetch data from Leads Tracker sheet for History
-        const historyUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=Leads Tracker"
+        const historyUrl =
+          "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=Leads Tracker"
         const historyResponse = await fetch(historyUrl)
         const historyText = await historyResponse.text()
-        
+
         // Extract the JSON part from the Leads Tracker sheet response
-        const historyJsonStart = historyText.indexOf('{')
-        const historyJsonEnd = historyText.lastIndexOf('}') + 1
+        const historyJsonStart = historyText.indexOf("{")
+        const historyJsonEnd = historyText.lastIndexOf("}") + 1
         const historyJsonData = historyText.substring(historyJsonStart, historyJsonEnd)
-        
+
         const historyData = JSON.parse(historyJsonData)
-        
-        // Process Pending Follow-ups from FMS sheet
+
+        // Process Pending Follow-ups from FMS sheet - Modified to use columns B, G, C, D, J, Q, R
         if (pendingData && pendingData.table && pendingData.table.rows) {
           const pendingFollowUpData = []
-          
+
           // Skip the header row (index 0)
-          pendingData.table.rows.slice(0).forEach(row => {
+          pendingData.table.rows.slice(0).forEach((row) => {
             if (row.c) {
               // Check if column K (index 10) has data and column L (index 11) is null
-              const hasColumnK = row.c[12] && row.c[12].v;
-              const isColumnLEmpty = !row.c[13] || row.c[13].v === null || row.c[13].v === "";
-              
+              const hasColumnK = row.c[12] && row.c[12].v
+              const isColumnLEmpty = !row.c[13] || row.c[13].v === null || row.c[13].v === ""
+
               // Only include rows where column K has data and column L is null/empty
               if (hasColumnK && isColumnLEmpty) {
                 const followUpItem = {
                   id: row.c[0] ? row.c[0].v : "",
                   leadId: row.c[1] ? row.c[1].v : "", // Column B - Lead Number
-                  receiverName: row.c[2] ? row.c[2].v : "", // Column C - Lead Receiver Name
+                  companyName: row.c[6] ? row.c[6].v : "", // Column G - Company Name
+                  personName: row.c[8] ? row.c[8].v : "", // Column C - Person Name (Lead Receiver)
                   leadSource: row.c[3] ? row.c[3].v : "", // Column D - Lead Source
-                  salespersonName: row.c[4] ? row.c[4].v : "", // Column E - Salesperson Name
-                  companyName: row.c[17] ? row.c[17].v : "", // Column G - Company Name
+                  location: row.c[9] ? row.c[9].v : "", // Column J - Location
+                  customerSay: row.c[16] ? row.c[16].v : "", // Column Q - What Customer Said
+                  enquiryStatus: row.c[17] ? row.c[17].v : "", // Column R - Enquiry Status
                   createdAt: row.c[0] ? row.c[0].v : "", // Using date from column A
-                  status: "Expected", // Default status for pending
                   priority: determinePriority(row.c[3] ? row.c[3].v : ""), // Determine priority based on source
-                  nextCallDate: calculateNextCallDate(row.c[0] ? row.c[0].v : ""), // Calculate next call date
                 }
-                
+
                 pendingFollowUpData.push(followUpItem)
               }
             }
           })
-          
+
           setPendingFollowUps(pendingFollowUpData)
         }
-        
+
         // Process History Follow-ups from Leads Tracker sheet
         if (historyData && historyData.table && historyData.table.rows) {
           const historyFollowUpData = []
-          
+
           // Start from index 1 to skip header row, process rows starting from index 2 in the sheet
-          historyData.table.rows.slice(0).forEach(row => {
+          historyData.table.rows.slice(0).forEach((row) => {
             if (row.c) {
               const followUpItem = {
                 leadNo: row.c[1] ? row.c[1].v : "", // Column B - Lead No.
@@ -194,9 +206,9 @@ const formatNextCallTime = (timeValue) => {
                 enquiryState: row.c[6] ? row.c[6].v : "", // Column G - Enquiry for State
                 projectName: row.c[7] ? row.c[7].v : "", // Column H - Project Name
                 salesType: row.c[8] ? row.c[8].v : "", // Column I - Sales Type
-                requiredProductDate: row.c[9] ? formatDateToDDMMYYYY(row.c[9] ? row.c[9].v : ""): "", // Column J - Required Product Date
+                requiredProductDate: row.c[9] ? formatDateToDDMMYYYY(row.c[9] ? row.c[9].v : "") : "", // Column J - Required Product Date
                 projectApproxValue: row.c[10] ? row.c[10].v : "", // Column K - Project Approximate Value
-                
+
                 // Item details
                 itemName1: row.c[11] ? row.c[11].v : "", // Column L - Item Name1
                 quantity1: row.c[12] ? row.c[12].v : "", // Column M - Quantity1
@@ -208,16 +220,16 @@ const formatNextCallTime = (timeValue) => {
                 quantity4: row.c[18] ? row.c[18].v : "", // Column S - Quantity4
                 itemName5: row.c[19] ? row.c[19].v : "", // Column T - Item Name5
                 quantity5: row.c[20] ? row.c[20].v : "", // Column U - Quantity5
-                
+
                 nextAction: row.c[21] ? row.c[21].v : "", // Column V - Next Action
-                nextCallDate: row.c[22] ? formatDateToDDMMYYYY(row.c[22] ? row.c[22].v : ""): "", // Column W - Next Call Date
+                nextCallDate: row.c[22] ? formatDateToDDMMYYYY(row.c[22] ? row.c[22].v : "") : "", // Column W - Next Call Date
                 nextCallTime: row.c[23] ? formatNextCallTime(row.c[23].v) : "", // Column X - Next Call Time
               }
-              
+
               historyFollowUpData.push(followUpItem)
             }
           })
-          
+
           setHistoryFollowUps(historyFollowUpData)
         }
       } catch (error) {
@@ -227,17 +239,17 @@ const formatNextCallTime = (timeValue) => {
           {
             id: "1",
             leadId: "LD-001",
-            receiverName: "John Smith",
-            leadSource: "Indiamart",
-            salespersonName: "Sarah Johnson",
             companyName: "ABC Corp",
-            status: "Expected",
-            nextCallDate: "2023-05-20",
+            personName: "John Smith",
+            leadSource: "Indiamart",
+            location: "Mumbai",
+            customerSay: "Interested in product details",
+            enquiryStatus: "New",
             createdAt: "2023-05-15",
             priority: "High",
-          }
+          },
         ])
-        
+
         setHistoryFollowUps([
           {
             leadNo: "LD-001",
@@ -254,28 +266,62 @@ const formatNextCallTime = (timeValue) => {
             quantity1: "10",
             nextAction: "Follow-up call",
             nextCallDate: "20/05/2023",
-            nextCallTime: "10:00 AM"
-          }
+            nextCallTime: "10:00 AM",
+          },
         ])
       } finally {
         setIsLoading(false)
       }
     }
-    
+
     fetchFollowUpData()
   }, [])
 
+
+// Add this function or modify the existing formatDateToDDMMYYYY function
+const formatPopupDate = (dateValue) => {
+  if (!dateValue) return "";
+
+  try {
+    // Check if it's a Date object-like string (e.g. "Date(2025,4,3)")
+    if (typeof dateValue === "string" && dateValue.startsWith("Date(")) {
+      // Extract the parts from Date(YYYY,MM,DD) format
+      const dateString = dateValue.substring(5, dateValue.length - 1);
+      const [year, month, day] = dateString.split(",").map((part) => Number.parseInt(part.trim()));
+      
+      // JavaScript months are 0-indexed, but we need to display them as 1-indexed
+      // Also ensure day and month are padded with leading zeros if needed
+      return `${day.toString().padStart(2, "0")}/${(month + 1).toString().padStart(2, "0")}/${year}`;
+    }
+    
+    // If it's already in the correct format, return as is
+    return dateValue;
+  } catch (error) {
+    console.error("Error formatting popup date:", error);
+    return dateValue; // Return the original value if formatting fails
+  }
+};
+
   // Filter function for search in both sections
-  const filteredPendingFollowUps = pendingFollowUps.filter(
-    (followUp) =>
+  const filteredPendingFollowUps = pendingFollowUps.filter((followUp) => {
+    const matchesSearch =
       followUp.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      followUp.leadId.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+      followUp.leadId.toLowerCase().includes(searchTerm.toLowerCase())
+
+    // Apply filter type for Column R
+    if (filterType === "first") {
+      return matchesSearch && (followUp.enquiryStatus === "" || followUp.enquiryStatus === null)
+    } else if (filterType === "multi") {
+      return matchesSearch && followUp.enquiryStatus === "expected"
+    } else {
+      return matchesSearch
+    }
+  })
 
   const filteredHistoryFollowUps = historyFollowUps.filter(
     (followUp) =>
       followUp.leadNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      followUp.projectName.toLowerCase().includes(searchTerm.toLowerCase())
+      followUp.projectName.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
   return (
@@ -289,6 +335,19 @@ const formatNextCallTime = (timeValue) => {
         </div>
 
         <div className="flex gap-2">
+          {/* Filter Dropdown */}
+          <div>
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+            >
+              <option value="all">All</option>
+              <option value="first">First Followup</option>
+              <option value="multi">Expected</option>
+            </select>
+          </div>
+
           <div className="relative">
             <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
             <input
@@ -300,11 +359,11 @@ const formatNextCallTime = (timeValue) => {
             />
           </div>
 
-          <Link to="/follow-up/new">
+          {/* <Link to="/follow-up/new">
             <button className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500">
               <PlusIcon className="inline-block mr-2 h-4 w-4" /> New Follow-Up
             </button>
-          </Link>
+          </Link> */}
         </div>
       </div>
 
@@ -341,7 +400,7 @@ const formatNextCallTime = (timeValue) => {
           ) : (
             <>
               {activeTab === "pending" && (
-                <div className="rounded-md border">
+                <div className="rounded-md border overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-slate-50">
                       <tr>
@@ -355,31 +414,43 @@ const formatNextCallTime = (timeValue) => {
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
-                          Lead Receiver Name
+                          Company Name
                         </th>
                         <th
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
-                          Status
+                          Person Name
                         </th>
                         <th
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
-                          Sales Co-Ordinator Name
+                          Lead Source
                         </th>
                         <th
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
-                          Enquiry Received Status
+                          Location
                         </th>
                         <th
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                          >
-                            Actions
+                        >
+                          What did customer say
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Enquiry Status
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Actions
                         </th>
                       </tr>
                     </thead>
@@ -391,8 +462,9 @@ const formatNextCallTime = (timeValue) => {
                               {followUp.leadId}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {followUp.receiverName}
+                              {followUp.companyName}
                             </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.personName}</td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span
                                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -406,14 +478,12 @@ const formatNextCallTime = (timeValue) => {
                                 {followUp.leadSource}
                               </span>
                             </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.location}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {followUp.salespersonName}
+                              {followUp.customerSay}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              <div className="flex items-center">
-                                <BuildingIcon className="h-4 w-4 mr-2 text-slate-400" />
-                                {followUp.companyName}
-                              </div>
+                              {followUp.enquiryStatus}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                               <div className="flex space-x-2">
@@ -422,18 +492,22 @@ const formatNextCallTime = (timeValue) => {
                                     Call Now <ArrowRightIcon className="ml-1 h-3 w-3 inline" />
                                   </button>
                                 </Link>
-                                <Link to={`/follow-up/${followUp.id}`}>
-                                  <button className="px-3 py-1 text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-md">
-                                    View
-                                  </button>
-                                </Link>
+                                {/* <button
+                                  onClick={() => {
+                                    setSelectedFollowUp(followUp)
+                                    setShowPopup(true)
+                                  }}
+                                  className="px-3 py-1 text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-md"
+                                >
+                                  View
+                                </button> */}
                               </div>
                             </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={6} className="px-6 py-4 text-center text-sm text-slate-500">
+                          <td colSpan={8} className="px-6 py-4 text-center text-sm text-slate-500">
                             No pending follow-ups found
                           </td>
                         </tr>
@@ -448,29 +522,75 @@ const formatNextCallTime = (timeValue) => {
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-slate-50">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lead No.</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">What did the customer say?</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enquiry Received Status</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enquiry Received Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enquiry for State</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project Name</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sales Type</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Required Product Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project Approximate Value</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name 1</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity 1</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name 2</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity 2</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name 3</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity 3</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name 4</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity 4</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name 5</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity 5</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Action</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Call Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Call Time</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Lead No.
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          What did the customer say?
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Enquiry Received Status
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Enquiry Received Date
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Enquiry for State
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Project Name
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Sales Type
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Required Product Date
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Project Approximate Value
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Item Name 1
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Quantity 1
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Item Name 2
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Quantity 2
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Item Name 3
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Quantity 3
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Item Name 4
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Quantity 4
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Item Name 5
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Quantity 5
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Next Action
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Next Call Date
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Next Call Time
+                        </th>
                         {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th> */}
                       </tr>
                     </thead>
@@ -478,8 +598,12 @@ const formatNextCallTime = (timeValue) => {
                       {filteredHistoryFollowUps.length > 0 ? (
                         filteredHistoryFollowUps.map((followUp, index) => (
                           <tr key={index} className="hover:bg-slate-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{followUp.leadNo}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.customerSay}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {followUp.leadNo}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {followUp.customerSay}
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span
                                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -493,13 +617,25 @@ const formatNextCallTime = (timeValue) => {
                                 {followUp.status}
                               </span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.enquiryReceivedStatus}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.enquiryReceivedDate}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.enquiryState}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.projectName}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {followUp.enquiryReceivedStatus}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {followUp.enquiryReceivedDate}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {followUp.enquiryState}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {followUp.projectName}
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.salesType}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.requiredProductDate}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.projectApproxValue}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {followUp.requiredProductDate}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {followUp.projectApproxValue}
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.itemName1}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.quantity1}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.itemName2}</td>
@@ -511,8 +647,12 @@ const formatNextCallTime = (timeValue) => {
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.itemName5}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.quantity5}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.nextAction}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.nextCallDate}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.nextCallTime}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {followUp.nextCallDate}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {followUp.nextCallTime}
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                               <div className="flex space-x-2">
                                 {/* <Link to={`/follow-up/${followUp.leadNo}`}>
@@ -526,7 +666,9 @@ const formatNextCallTime = (timeValue) => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={24} className="px-6 py-4 text-center text-sm text-slate-500">No history found</td>
+                          <td colSpan={24} className="px-6 py-4 text-center text-sm text-slate-500">
+                            No history found
+                          </td>
                         </tr>
                       )}
                     </tbody>
@@ -537,6 +679,131 @@ const formatNextCallTime = (timeValue) => {
           )}
         </div>
       </div>
+      {/* Popup Modal */}
+      {showPopup && (
+        <div className={`fixed inset-0 z-50 flex items-center justify-center ${fadeIn}`}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowPopup(false)}></div>
+          <div
+            className={`relative bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-auto ${slideIn}`}
+          >
+            <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-900">Follow-up Details: {selectedFollowUp?.leadId}</h3>
+              <button
+                onClick={() => setShowPopup(false)}
+                className="text-gray-500 hover:text-gray-700 focus:outline-none"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Column B - Lead ID */}
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-500">Lead Number</p>
+                  <p className="text-base font-semibold">{selectedFollowUp?.leadId}</p>
+                </div>
+
+                {/* Column C - Person Name */}
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-500">Person Name</p>
+                  <p className="text-base">{selectedFollowUp?.personName}</p>
+                </div>
+
+                {/* Column D - Lead Source */}
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-500">Lead Source</p>
+                  <p className="text-base">
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        selectedFollowUp?.priority === "High"
+                          ? "bg-red-100 text-red-800"
+                          : selectedFollowUp?.priority === "Medium"
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-slate-100 text-slate-800"
+                      }`}
+                    >
+                      {selectedFollowUp?.leadSource}
+                    </span>
+                  </p>
+                </div>
+
+                {/* Column G - Company Name */}
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-500">Company Name</p>
+                  <p className="text-base">{selectedFollowUp?.companyName}</p>
+                </div>
+
+                {/* Column J - Location */}
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-500">Location</p>
+                  <p className="text-base">{selectedFollowUp?.location}</p>
+                </div>
+
+                {/* Column K - Created At (using id as placeholder) */}
+                <div className="space-y-2">
+  <p className="text-sm font-medium text-gray-500">Created Date</p>
+  <p className="text-base">{formatPopupDate(selectedFollowUp?.createdAt)}</p>
+</div>
+
+                {/* Column L - Priority (derived from lead source) */}
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-500">Priority</p>
+                  <p className="text-base">
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        selectedFollowUp?.priority === "High"
+                          ? "bg-red-100 text-red-800"
+                          : selectedFollowUp?.priority === "Medium"
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-slate-100 text-slate-800"
+                      }`}
+                    >
+                      {selectedFollowUp?.priority}
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Customer Say - Full width */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-500">What Customer Said</p>
+                <div className="p-4 bg-gray-50 rounded-md">
+                  <p className="text-base">{selectedFollowUp?.customerSay}</p>
+                </div>
+              </div>
+
+              {/* Enquiry Status - Full width */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-500">Enquiry Status</p>
+                <p className="text-base">{selectedFollowUp?.enquiryStatus}</p>
+              </div>
+            </div>
+
+            <div className="border-t p-4 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowPopup(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
+              >
+                Close
+              </button>
+              <Link to={`/follow-up/new?leadId=${selectedFollowUp?.leadId}&leadNo=${selectedFollowUp?.leadId}`}>
+                <button className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500">
+                  Call Now <ArrowRightIcon className="ml-1 h-4 w-4 inline" />
+                </button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

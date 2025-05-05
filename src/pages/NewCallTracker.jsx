@@ -81,7 +81,7 @@ function NewCallTracker() {
         setIsLoadingDropdown(true)
         
         // Fetch data from DROPDOWN sheet
-        const dropdownUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=DROPDOWN"
+        const dropdownUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=DROPDOWN"
         const response = await fetch(dropdownUrl)
         const text = await response.text()
         
@@ -97,7 +97,7 @@ function NewCallTracker() {
           const options = []
           
           // Skip the header row (index 0)
-          data.table.rows.slice(1).forEach(row => {
+          data.table.rows.slice(0).forEach(row => {
             // Column G is index 6
             if (row.c && row.c[6] && row.c[6].v) {
               options.push(row.c[6].v)
@@ -187,7 +187,7 @@ function NewCallTracker() {
           try {
             const base64Data = reader.result.split(',')[1] // Remove the data:image/...;base64, prefix
             
-            const scriptUrl = "https://script.google.com/macros/s/AKfycbxeo5tv3kAcSDDAheOCP07HaK76zSfq49jFGtZknseg7kPlj2G1O8U2PuiA2fQSuPvKqA/exec"
+            const scriptUrl = "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
             
             const params = {
               action: fileType === "pdf" ? "uploadPDF" : "uploadImage",
@@ -385,7 +385,7 @@ function NewCallTracker() {
       console.log("Row Data to be submitted:", rowData);
       
       // Script URL - replace with your Google Apps Script URL
-      const scriptUrl = "https://script.google.com/macros/s/AKfycbxeo5tv3kAcSDDAheOCP07HaK76zSfq49jFGtZknseg7kPlj2G1O8U2PuiA2fQSuPvKqA/exec"
+      const scriptUrl = "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
       
       // Parameters for Google Apps Script
       const params = {

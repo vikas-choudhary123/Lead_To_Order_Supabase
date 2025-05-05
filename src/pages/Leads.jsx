@@ -8,8 +8,8 @@ function Leads() {
   const [formData, setFormData] = useState({
     receiverName: "",
     source: "",
-    salesCoordinatorName: "", // New field
-    leadAssignTo: "", // New field
+    salesCoordinatorName: "", 
+    leadAssignTo: "", 
     companyName: "",
     phoneNumber: "",
     salespersonName: "",
@@ -19,13 +19,15 @@ function Leads() {
   })
   const [receiverNames, setReceiverNames] = useState([])
   const [leadSources, setLeadSources] = useState([])
-  const [salesCoordinators, setSalesCoordinators] = useState([]) // New state
-  const [leadAssignees, setLeadAssignees] = useState([]) // New state
+  const [salesCoordinators, setSalesCoordinators] = useState([]) 
+  const [leadAssignees, setLeadAssignees] = useState([]) 
+  const [companyOptions, setCompanyOptions] = useState([]) // New state for company dropdown
+  const [companyDetailsMap, setCompanyDetailsMap] = useState({}) // New state to store company details
   const [nextLeadNumber, setNextLeadNumber] = useState("")
   const { showNotification } = useContext(AuthContext)
   
   // Script URL
-  const scriptUrl = "https://script.google.com/macros/s/AKfycbxeo5tv3kAcSDDAheOCP07HaK76zSfq49jFGtZknseg7kPlj2G1O8U2PuiA2fQSuPvKqA/exec"
+  const scriptUrl = "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
 
   // Function to format date as dd/mm/yyyy
   const formatDate = (date) => {
@@ -41,6 +43,8 @@ function Leads() {
       try {
         // Fetch dropdown values from DROPDOWNSHEET
         await fetchDropdownData()
+        // Fetch company data for dropdown and auto-fill
+        await fetchCompanyData()
       } catch (error) {
         console.error("Error during initial data fetch:", error)
       }
@@ -53,7 +57,7 @@ function Leads() {
   const fetchDropdownData = async () => {
     try {
       // Call the Google Apps Script with query parameters to get public access to the DROPDOWNSHEET
-      const publicUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=DROPDOWN"
+      const publicUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=DROPDOWN"
       
       const response = await fetch(publicUrl)
       const text = await response.text()
@@ -112,18 +116,78 @@ function Leads() {
     }
   }
 
+  // New function to fetch company data from DROPDOWN sheet column AP, AQ, AR, AS, AT, AU
+  // New function to fetch company data from DROPDOWN sheet column AP, AQ, AR, AS, AT, AU
+const fetchCompanyData = async () => {
+  try {
+    const publicUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=DROPDOWN"
+    
+    const response = await fetch(publicUrl)
+    const text = await response.text()
+    
+    const jsonStart = text.indexOf('{')
+    const jsonEnd = text.lastIndexOf('}') + 1
+    const jsonData = text.substring(jsonStart, jsonEnd)
+    
+    const data = JSON.parse(jsonData)
+    
+    if (data && data.table && data.table.rows) {
+      const companies = []
+      const detailsMap = {}
+      
+      // Skip the header row
+      data.table.rows.slice(0).forEach(row => {
+        // Add null check for row.c[41] and row.c[41].v
+        if (row.c && row.c[40] && row.c[40].v !== null) {
+          const companyName = row.c[40].v.toString()
+          companies.push(companyName)
+          
+          // Store company details for auto-fill - with null checks for each property
+          detailsMap[companyName] = {
+            salesPerson: (row.c[41] && row.c[41].v !== null) ? row.c[41].v.toString() : "", 
+            phoneNumber: (row.c[42] && row.c[42].v !== null) ? row.c[42].v.toString() : "", 
+            email: (row.c[43] && row.c[43].v !== null) ? row.c[43].v.toString() : "",
+            location: (row.c[44] && row.c[44].v !== null) ? row.c[44].v.toString() : ""
+          }
+        }
+      })
+      
+      setCompanyOptions(companies)
+      setCompanyDetailsMap(detailsMap)
+    }
+  } catch (error) {
+    console.error("Error fetching company data:", error)
+    // Fallback to empty values
+    setCompanyOptions([])
+    setCompanyDetailsMap({})
+  }
+}
+
   const handleChange = (e) => {
     const { id, value } = e.target
     setFormData(prevData => ({
       ...prevData,
       [id]: value
     }))
+
+    // Auto-fill related fields if company is selected
+    if (id === 'companyName' && value) {
+      const companyDetails = companyDetailsMap[value] || {}
+      setFormData(prevData => ({
+        ...prevData,
+        companyName: value,
+        phoneNumber: companyDetails.phoneNumber || "",
+        salespersonName: companyDetails.salesPerson || "",
+        location: companyDetails.location || "",
+        email: companyDetails.email || ""
+      }))
+    }
   }
 
   const generateLeadNumber = async () => {
     try {
       // Get the latest lead number from the FMS sheet
-      const publicUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=FMS"
+      const publicUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=FMS"
       
       const response = await fetch(publicUrl)
       const text = await response.text()
@@ -190,8 +254,8 @@ function Leads() {
         leadNumber, // Generated lead number based on current sheet data
         formData.receiverName,
         formData.source,
-        formData.salesCoordinatorName, // New field
-        formData.leadAssignTo, // New field
+        formData.salesCoordinatorName, 
+        formData.leadAssignTo, 
         formData.companyName,
         formData.phoneNumber,
         formData.salespersonName,
@@ -350,14 +414,18 @@ function Leads() {
                 <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">
                   Company Name
                 </label>
-                <input
+                <select
                   id="companyName"
                   value={formData.companyName}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter company name"
                   required
-                />
+                >
+                  <option value="">Select company</option>
+                  {companyOptions.map((company, index) => (
+                    <option key={index} value={company}>{company}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-2">
@@ -368,8 +436,9 @@ function Leads() {
                   id="phoneNumber"
                   value={formData.phoneNumber}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter phone number"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                  placeholder="Phone number will auto-fill"
+                  readOnly={formData.companyName !== ""}
                   required
                 />
               </div>
@@ -382,8 +451,9 @@ function Leads() {
                   id="salespersonName"
                   value={formData.salespersonName}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter salesperson name"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                  placeholder="Salesperson name will auto-fill"
+                  readOnly={formData.companyName !== ""}
                   required
                 />
               </div>
@@ -396,8 +466,9 @@ function Leads() {
                   id="location"
                   value={formData.location}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter location"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                  placeholder="Location will auto-fill"
+                  readOnly={formData.companyName !== ""}
                   required
                 />
               </div>
@@ -411,8 +482,9 @@ function Leads() {
                   type="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter email address"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                  placeholder="Email will auto-fill"
+                  readOnly={formData.companyName !== ""}
                 />
               </div>
             </div>

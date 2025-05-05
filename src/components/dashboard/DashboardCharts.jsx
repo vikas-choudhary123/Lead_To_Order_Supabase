@@ -54,7 +54,7 @@ function DashboardCharts() {
         setIsLoading(true)
         
         // Fetch data from FMS sheet for leads and lead sources
-        const fmsUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=FMS"
+        const fmsUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=FMS"
         const fmsResponse = await fetch(fmsUrl)
         const fmsText = await fmsResponse.text()
         
@@ -64,8 +64,19 @@ function DashboardCharts() {
         const fmsJsonData = fmsText.substring(fmsJsonStart, fmsJsonEnd)
         const fmsData = JSON.parse(fmsJsonData)
         
-        // Fetch data from Enquiry Tracker sheet for enquiries and orders
-        const enquiryUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=Enquiry Tracker"
+        // Fetch data from Leads Tracker sheet for enquiries (where column E is "yes")
+        const leadsTrackerUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=Leads Tracker"
+        const leadsTrackerResponse = await fetch(leadsTrackerUrl)
+        const leadsTrackerText = await leadsTrackerResponse.text()
+        
+        // Extract JSON from Leads Tracker sheet response
+        const leadsTrackerJsonStart = leadsTrackerText.indexOf('{')
+        const leadsTrackerJsonEnd = leadsTrackerText.lastIndexOf('}') + 1
+        const leadsTrackerJsonData = leadsTrackerText.substring(leadsTrackerJsonStart, leadsTrackerJsonEnd)
+        const leadsTrackerData = JSON.parse(leadsTrackerJsonData)
+        
+        // Fetch data from Enquiry Tracker sheet for orders
+        const enquiryUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=Enquiry Tracker"
         const enquiryResponse = await fetch(enquiryUrl)
         const enquiryText = await enquiryResponse.text()
         
@@ -76,7 +87,7 @@ function DashboardCharts() {
         const enquiryData = JSON.parse(enquiryJsonData)
         
         // Fetch data from Make Quotation sheet for quotations
-        const quotationUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=Make Quotation"
+        const quotationUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=Make Quotation"
         const quotationResponse = await fetch(quotationUrl)
         const quotationText = await quotationResponse.text()
         
@@ -88,6 +99,7 @@ function DashboardCharts() {
         
         // Process data for the Overview chart (monthly data)
         if (fmsData && fmsData.table && fmsData.table.rows && 
+            leadsTrackerData && leadsTrackerData.table && leadsTrackerData.table.rows && 
             enquiryData && enquiryData.table && enquiryData.table.rows) {
             
             // Initialize counters by month
@@ -140,9 +152,9 @@ function DashboardCharts() {
                 }
             })
             
-            // Count enquiries by month (from Enquiry Tracker sheet column A for date, column B for enquiry)
-            enquiryData.table.rows.forEach(row => {
-                if (row.c && row.c[0] && row.c[0].v && row.c[1] && row.c[1].v) {
+            // Count enquiries by month (from Leads Tracker sheet where column E is "yes")
+            leadsTrackerData.table.rows.forEach(row => {
+                if (row.c && row.c[0] && row.c[0].v && row.c[4] && row.c[4].v && row.c[4].v.toString().toLowerCase() === "yes") {
                     // Extract month from date (assuming format is DD/MM/YYYY or Date object)
                     const dateStr = row.c[0].v
                     let month
@@ -171,12 +183,36 @@ function DashboardCharts() {
                     if (month && monthlyData[month]) {
                         monthlyData[month].enquiries++
                     }
+                }
+            })
+            
+            // Count orders from Enquiry Tracker sheet (where column W is "yes")
+            enquiryData.table.rows.forEach(row => {
+                if (row.c && row.c[0] && row.c[0].v && row.c[22] && row.c[22].v && row.c[22].v.toString().toLowerCase() === "yes") {
+                    // Extract month from date
+                    const dateStr = row.c[0].v
+                    let month
                     
-                    // Count orders - where column W (index 22) is "yes"
-                    if (row.c[22] && row.c[22].v && row.c[22].v.toLowerCase() === "yes") {
-                        if (month && monthlyData[month]) {
-                            monthlyData[month].orders++
+                    if (typeof dateStr === 'string') {
+                        if (dateStr.includes('/')) {
+                            const parts = dateStr.split('/')
+                            if (parts.length === 3) {
+                                const monthNum = parseInt(parts[1]) - 1
+                                month = new Date(2000, monthNum, 1).toLocaleString('en-US', { month: 'short' })
+                            }
+                        } else if (dateStr.startsWith('Date(')) {
+                            const matches = dateStr.match(/Date\((\d+),(\d+),(\d+)/)
+                            if (matches && matches.length >= 3) {
+                                const monthNum = parseInt(matches[2])
+                                month = new Date(2000, monthNum, 1).toLocaleString('en-US', { month: 'short' })
+                            }
                         }
+                    } else if (dateStr instanceof Date) {
+                        month = dateStr.toLocaleString('en-US', { month: 'short' })
+                    }
+                    
+                    if (month && monthlyData[month]) {
+                        monthlyData[month].orders++
                     }
                 }
             })
@@ -202,17 +238,19 @@ function DashboardCharts() {
         
         // Process data for the Conversion Funnel
         if (fmsData && fmsData.table && fmsData.table.rows && 
-            enquiryData && enquiryData.table && enquiryData.table.rows && 
-            quotationData && quotationData.table && quotationData.table.rows) {
+            leadsTrackerData && leadsTrackerData.table && leadsTrackerData.table.rows && 
+            quotationData && quotationData.table && quotationData.table.rows &&
+            enquiryData && enquiryData.table && enquiryData.table.rows) {
             
             // Count total leads from FMS sheet
             const totalLeads = fmsData.table.rows.slice(2).filter(row =>
               row.c && row.c[1] && row.c[1].v
-          ).length
-          
-          // Count total enquiries where column K is not null and column L is null
-          // Count total enquiries where column K is not null and column L is null
-          const totalEnquiries = enquiryData.table.rows.filter(row =>                  row.c && row.c[1] && row.c[1].v             ).length 
+            ).length
+            
+            // Count total enquiries from Leads Tracker where column E is "yes"
+            const totalEnquiries = leadsTrackerData.table.rows.filter(row => 
+                row.c && row.c[4] && row.c[4].v && row.c[4].v.toString().toLowerCase() === "yes"
+            ).length
             
             // Count total quotations from Make Quotation sheet
             const totalQuotations = quotationData.table.rows.filter(row => 
@@ -221,7 +259,7 @@ function DashboardCharts() {
             
             // Count total orders from Enquiry Tracker sheet
             const totalOrders = enquiryData.table.rows.filter(row => 
-                row.c && row.c[22] && row.c[22].v && row.c[22].v.toLowerCase() === "yes"
+                row.c && row.c[22] && row.c[22].v && row.c[22].v.toString().toLowerCase() === "yes"
             ).length
             
             // Create conversion data
@@ -253,7 +291,7 @@ function DashboardCharts() {
                   const source = row.c[3].v
                   sourceCounter[source] = (sourceCounter[source] || 0) + 1
               }
-          })
+            })
             
             // Convert to array format for the chart
             const newSourceData = Object.entries(sourceCounter).map(([name, value]) => ({
@@ -285,7 +323,7 @@ function DashboardCharts() {
 
   return (
     <div>
-      <h3 className="text-xl font-bold mb-4">Sales Analytics</h3>
+      <h3 className="text-xl font-bold mb-4">Sales Analytics ( Lead To Order )</h3>
 
       <div className="mb-4">
         <div className="inline-flex rounded-md shadow-sm">

@@ -21,6 +21,12 @@ function Quotation() {
   const [isRevising, setIsRevising] = useState(false);
 const [existingQuotations, setExistingQuotations] = useState([]);
 const [selectedQuotation, setSelectedQuotation] = useState("");
+const [isLoadingQuotation, setIsLoadingQuotation] = useState(false);
+// Add these state variables near the top of your component with other state declarations
+const [productCodes, setProductCodes] = useState([]);
+const [productNames, setProductNames] = useState([]);
+const [productData, setProductData] = useState({}); // To store code-name mappings
+
   
   // State for dropdown data
   const [dropdownData, setDropdownData] = useState({})
@@ -102,6 +108,67 @@ const [selectedQuotation, setSelectedQuotation] = useState("");
     preparedBy: "",
   });
 
+
+  useEffect(() => {
+    const fetchProductData = async () => {
+      try {
+        const dropdownUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=DROPDOWN";
+        const response = await fetch(dropdownUrl);
+        const text = await response.text();
+        
+        // Extract JSON data
+        const jsonStart = text.indexOf('{');
+        const jsonEnd = text.lastIndexOf('}') + 1;
+        const jsonData = JSON.parse(text.substring(jsonStart, jsonEnd));
+        
+        // Process product data (Column BI - index 60 for Code, Column BJ - index 61 for Name)
+        const codes = ["Select Code"];
+        const names = ["Select Product"];
+        const codeNameMap = {};
+        
+        if (jsonData && jsonData.table && jsonData.table.rows) {
+          jsonData.table.rows.forEach((row) => {
+            if (row.c && row.c[60] && row.c[62]) {
+              const code = row.c[60].v;
+              const name = row.c[62].v;
+              
+              if (code && !codes.includes(code)) {
+                codes.push(code);
+              }
+              
+              if (name && !names.includes(name)) {
+                names.push(name);
+              }
+              
+              // Create mapping in both directions
+              codeNameMap[code] = name;
+              codeNameMap[name] = code;
+            }
+          });
+        }
+        
+        setProductCodes(codes);
+        setProductNames(names);
+        setProductData(codeNameMap);
+      } catch (error) {
+        console.error("Error fetching product data:", error);
+        // Fallback data
+        setProductCodes(["Select Code", "CODE1", "CODE2", "CODE3"]);
+        setProductNames(["Select Product", "Product 1", "Product 2", "Product 3"]);
+        setProductData({
+          "CODE1": "Product 1",
+          "Product 1": "CODE1",
+          "CODE2": "Product 2",
+          "Product 2": "CODE2",
+          "CODE3": "Product 3",
+          "Product 3": "CODE3"
+        });
+      }
+    };
+    
+    fetchProductData();
+  }, []);
+
   const handleInputChange = (field, value) => {
     setQuotationData(prev => ({
       ...prev,
@@ -178,38 +245,14 @@ const [selectedQuotation, setSelectedQuotation] = useState("");
     })
   }
 
-  useEffect(() => {
-    const fetchExistingQuotations = async () => {
-      try {
-        const scriptUrl = "https://script.google.com/macros/s/AKfycbxeo5tv3kAcSDDAheOCP07HaK76zSfq49jFGtZknseg7kPlj2G1O8U2PuiA2fQSuPvKqA/exec";
-        const response = await fetch(scriptUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: new URLSearchParams({
-            sheetName: "Make Quotation",
-            action: "getQuotationNumbers"
-          })
-        });
-        
-        const result = await response.json();
-        if (result.success) {
-          setExistingQuotations(result.quotationNumbers);
-        }
-      } catch (error) {
-        console.error("Error fetching quotation numbers:", error);
-      }
-    };
-    
-    fetchExistingQuotations();
-  }, []);
+  // This is the updated useEffect for fetching existing quotations
+// Make sure to add this near the beginning of your component
 
-  const handleQuotationSelect = async (quotationNo) => {
-    setSelectedQuotation(quotationNo);
-    
+useEffect(() => {
+  const fetchExistingQuotations = async () => {
     try {
-      const scriptUrl = "https://script.google.com/macros/s/AKfycbxeo5tv3kAcSDDAheOCP07HaK76zSfq49jFGtZknseg7kPlj2G1O8U2PuiA2fQSuPvKqA/exec";
+      console.log("Fetching existing quotations...");
+      const scriptUrl = "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec";
       const response = await fetch(scriptUrl, {
         method: "POST",
         headers: {
@@ -217,20 +260,172 @@ const [selectedQuotation, setSelectedQuotation] = useState("");
         },
         body: new URLSearchParams({
           sheetName: "Make Quotation",
-          action: "getQuotationData",
-          quotationNo: quotationNo
+          action: "getQuotationNumbers"
         })
       });
       
       const result = await response.json();
-      if (result.success) {
-        // Update the form with the fetched data
-        setQuotationData(result.quotationData);
+      console.log("Quotation numbers result:", result);
+      
+      if (result.success && Array.isArray(result.quotationNumbers)) {
+        setExistingQuotations(result.quotationNumbers);
+      } else {
+        console.error("Invalid response format:", result);
+        setExistingQuotations([]);
       }
     } catch (error) {
-      console.error("Error fetching quotation data:", error);
+      console.error("Error fetching quotation numbers:", error);
+      setExistingQuotations([]);
     }
   };
+  
+  // Call immediately when component mounts
+  fetchExistingQuotations();
+  
+  // Also refetch when isRevising changes to true
+  if (isRevising) {
+    fetchExistingQuotations();
+  }
+}, [isRevising]); // Add isRevising as a dependency
+
+// Update the revising button click handler to ensure it fetches quotations
+const toggleRevising = () => {
+  const newIsRevising = !isRevising;
+  setIsRevising(newIsRevising);
+  
+  // When switching to revising mode, clear the selected quotation
+  if (newIsRevising) {
+    setSelectedQuotation("");
+  }
+};
+
+// Then update your JSX for the revise button to use this handler
+// Replace the onClick in the button with:
+// onClick={toggleRevising}
+
+const handleQuotationSelect = async (quotationNo) => {
+  if (!quotationNo) return;
+  
+  setIsLoadingQuotation(true);
+  setSelectedQuotation(quotationNo);
+
+  try {
+    const scriptUrl = "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec";
+    const response = await fetch(scriptUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        sheetName: "Make Quotation",
+        action: "getQuotationData",
+        quotationNo: quotationNo
+      })
+    });
+    
+    const result = await response.json();
+    console.log("Loaded quotation data:", result);
+
+    if (result.success) {
+      const loadedData = result.quotationData;
+      
+      // Parse the items string into proper items array
+      let items = [];
+      if (loadedData.items && Array.isArray(loadedData.items) && loadedData.items.length > 0) {
+        items = loadedData.items.map((item, index) => ({
+          id: index + 1,
+          ...item
+        }));
+      } else if (loadedData.items && typeof loadedData.items === 'string') {
+        items = loadedData.items.split(';').filter(itemStr => itemStr.trim()).map((itemStr, index) => {
+          const itemParts = itemStr.split('|');
+          return {
+            id: index + 1,
+            code: itemParts[0] || "",
+            name: itemParts[1] || "",
+            gst: Number(itemParts[2]) || 18,
+            qty: Number(itemParts[3]) || 1,
+            units: itemParts[4] || "Nos",
+            rate: Number(itemParts[5]) || 0,
+            discount: Number(itemParts[6]) || 0,
+            flatDiscount: Number(itemParts[7]) || 0,
+            amount: Number(itemParts[8]) || 0
+          };
+        });
+      } else {
+        items = [{
+          id: 1,
+          code: "",
+          name: "",
+          gst: 18,
+          qty: 1,
+          units: "Nos",
+          rate: 0,
+          discount: 0,
+          flatDiscount: 0,
+          amount: 0
+        }];
+      }
+
+      // Calculate totals
+      const subtotal = items.reduce((sum, item) => sum + Number(item.amount), 0);
+      const totalFlatDiscount = Number(loadedData.totalFlatDiscount) || 0;
+      const cgstRate = Number(loadedData.cgstRate) || 9;
+      const sgstRate = Number(loadedData.sgstRate) || 9;
+      const taxableAmount = Math.max(0, subtotal - totalFlatDiscount);
+      const cgstAmount = Number((taxableAmount * (cgstRate / 100)).toFixed(2));
+      const sgstAmount = Number((taxableAmount * (sgstRate / 100)).toFixed(2));
+      const total = Number((taxableAmount + cgstAmount + sgstAmount).toFixed(2));
+
+      // Set the quotationData state with all fields
+      setQuotationData({
+        ...loadedData,
+        items,
+        subtotal,
+        totalFlatDiscount,
+        cgstRate,
+        sgstRate,
+        cgstAmount,
+        sgstAmount,
+        total,
+        // Make sure to include all fields, especially shipTo and state
+        accountNo: loadedData.accountNo || "",
+        bankName: loadedData.bankName || "",
+        bankAddress: loadedData.bankAddress || "",
+        ifscCode: loadedData.ifscCode || "",
+        email: loadedData.email || "",
+        website: loadedData.website || "",
+        pan: loadedData.pan || "",
+        consignorState: loadedData.consignorState || "",
+        consignorName: loadedData.consignorName || "",
+        consignorAddress: loadedData.consignorAddress || "",
+        consignorMobile: loadedData.consignorMobile || "",
+        consignorPhone: loadedData.consignorPhone || "",
+        consignorGSTIN: loadedData.consignorGSTIN || "",
+        consignorStateCode: loadedData.consignorStateCode || "",
+        consigneeName: loadedData.consigneeName || "",
+        consigneeAddress: loadedData.consigneeAddress || "",
+        shipTo: loadedData.shipTo || loadedData.consigneeAddress || "", // Use shipTo if exists, otherwise consigneeAddress
+        consigneeState: loadedData.consigneeState || "",
+        consigneeContactName: loadedData.consigneeContactName || "",
+        consigneeContactNo: loadedData.consigneeContactNo || "",
+        consigneeGSTIN: loadedData.consigneeGSTIN || "",
+        consigneeStateCode: loadedData.consigneeStateCode || "",
+        msmeNumber: loadedData.msmeNumber || "",
+        preparedBy: loadedData.preparedBy || "",
+        notes: Array.isArray(loadedData.notes) ? loadedData.notes : 
+              (loadedData.notes ? [loadedData.notes] : [""])
+      });
+    }
+  } catch (error) {
+    console.error("Error fetching quotation data:", error);
+    alert("Failed to load quotation data");
+  } finally {
+    setIsLoadingQuotation(false);
+  }
+};
+  
+  
 
   // Add a new note
   const addNote = () => {
@@ -280,7 +475,7 @@ const [selectedQuotation, setSelectedQuotation] = useState("");
     const fetchDropdownData = async () => {
       try {
         // Fetch data from Dropdown sheet
-        const dropdownUrl = "https://docs.google.com/spreadsheets/d/14n58u8M3NYiIjW5vT_dKrugmWwOiBsk-hnYB4e3Oyco/gviz/tq?tqx=out:json&sheet=DROPDOWN"
+        const dropdownUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=DROPDOWN"
         const dropdownResponse = await fetch(dropdownUrl)
         const dropdownText = await dropdownResponse.text()
         
@@ -505,6 +700,7 @@ const [selectedQuotation, setSelectedQuotation] = useState("");
         const ifscMatch = bankDetailsText.match(/IFSC CODE: ([^\n]+)/)
         const emailMatch = bankDetailsText.match(/Email: ([^\n]+)/)
         const websiteMatch = bankDetailsText.match(/Website: ([^\n]+)/)
+        const panMatch = bankDetailsText.match(/PAN: ([^\n]+)/) // Add PAN extraction
         
         // Update bank details fields
         if (accountNoMatch) handleInputChange("accountNo", accountNoMatch[1])
@@ -513,6 +709,7 @@ const [selectedQuotation, setSelectedQuotation] = useState("");
         if (ifscMatch) handleInputChange("ifscCode", ifscMatch[1])
         if (emailMatch) handleInputChange("email", emailMatch[1])
         if (websiteMatch) handleInputChange("website", websiteMatch[1])
+        if (panMatch) handleInputChange("pan", panMatch[1]) // Add PAN handling
       }
       
       // Update consigner address from column AC
@@ -537,6 +734,7 @@ const [selectedQuotation, setSelectedQuotation] = useState("");
       handleInputChange("ifscCode", "")
       handleInputChange("email", "")
       handleInputChange("website", "")
+      handleInputChange("pan", "") // Clear PAN field
       handleInputChange("consignorAddress", "")
       handleInputChange("consignorStateCode", "")
       handleInputChange("consignorGSTIN", "")
@@ -613,332 +811,318 @@ const [selectedQuotation, setSelectedQuotation] = useState("");
   }
   
   // Generate PDF
-  const generatePDFFromData = () => {
-    // Create a new jsPDF instance 
-    const doc = new jsPDF('p', 'mm', 'a4')
+  // Generate PDF
+const generatePDFFromData = () => {
+  // Create a new jsPDF instance with landscape orientation for more width
+  const doc = new jsPDF('p', 'mm', 'a4');
   
-    // Page dimensions
-    const pageWidth = 210 // A4 width in mm
-    const pageHeight = 297 // A4 height in mm
-    const margin = 10
-    let currentY = 20 // Starting Y position
-  
-    // Utility function to wrap text
-    const wrapText = (text, maxWidth) => {
-      return doc.splitTextToSize(text || '', maxWidth)
+  // Page dimensions
+  const pageWidth = 210; // A4 width in mm
+  const pageHeight = 297; // A4 height in mm
+  const margin = 10;
+  let currentY = 20; // Starting Y position
+
+  // Utility function to wrap text
+  const wrapText = (text, maxWidth) => {
+    return doc.splitTextToSize(text || '', maxWidth);
+  };
+
+  // Utility function to format currency
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value).replace('₹', '').trim();
+  };
+
+  // Function to check space and add new page if needed
+  const checkSpace = (requiredHeight) => {
+    if (currentY + requiredHeight > pageHeight - margin) {
+      doc.addPage();
+      currentY = margin;
+      addPageHeader();
+      return true;
     }
-  
-    // Utility function to format currency
-    const formatCurrency = (value) => {
-      return new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      }).format(value).replace('₹', '').trim()
-    }
-  
-    // Enhanced ensure space or add new page function
-    const ensureSpaceOrNewPage = (requiredSpace) => {
-      // If less than 30mm of space left on the page, add a new page
-      if (currentY + requiredSpace > pageHeight - 30) {
-        doc.addPage()
-        addPageHeader()
-        currentY = 40
-        return true
+    return false;
+  };
+
+  // Function to add page header
+  const addPageHeader = () => {
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('QUOTATION', pageWidth / 2, currentY, { align: 'center' });
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`Quotation No: ${quotationData.quotationNo}`, margin, currentY + 10);
+    doc.text(`Date: ${quotationData.date}`, pageWidth - margin, currentY + 10, { align: 'right' });
+    
+    currentY += 20;
+  };
+
+  // Add initial page header
+  addPageHeader();
+
+  // Prepare consignor and consignee details
+  const consignorDetails = [
+    `Name: ${quotationData.consignorName}`,
+    `Address: ${quotationData.consignorAddress}`,
+    `GSTIN: ${quotationData.consignorGSTIN || 'N/A'}`,
+    `State Code: ${quotationData.consignorStateCode || 'N/A'}`
+  ];
+
+  const consigneeDetails = [
+    `Name: ${quotationData.consigneeName}`,
+    `Address: ${quotationData.consigneeAddress}`,
+    `GSTIN: ${quotationData.consigneeGSTIN || 'N/A'}`,
+    `State Code: ${quotationData.consigneeStateCode || 'N/A'}`
+  ];
+
+  // Render Consignor & Consignee Details
+  doc.setFont('helvetica', 'bold');
+  doc.text('Consignor Details', margin, currentY);
+  doc.text('Consignee Details', pageWidth / 2 + margin, currentY);
+  doc.setFont('helvetica', 'normal');
+  currentY += 6;
+
+  // Calculate required height for details
+  const detailsHeight = Math.max(
+    consignorDetails.length * 5,
+    consigneeDetails.length * 5
+  );
+
+  checkSpace(detailsHeight + 20);
+
+  // Render consignor details with text wrapping
+  let consignorY = currentY;
+  consignorDetails.forEach((line) => {
+    const wrappedLines = wrapText(line, pageWidth / 2 - margin * 2);
+    wrappedLines.forEach((wrappedLine) => {
+      if (consignorY + 5 > pageHeight - margin) {
+        doc.addPage();
+        consignorY = margin + 20;
       }
-      return false
-    }
-  
-    // Enhanced text rendering with automatic page breaks
-    const renderTextWithBreaks = (lines, startX, startY, lineHeight = 5, maxWidth = pageWidth - margin * 2) => {
-      let y = startY;
-      lines.forEach(line => {
-        // Wrap the text
-        const wrappedLines = wrapText(line, maxWidth);
-        
-        wrappedLines.forEach(wrappedLine => {
-          // Check if we need a new page
-          if (y + lineHeight > pageHeight - 30) {
-            doc.addPage();
-            addPageHeader();
-            y = 40;
-          }
-          
-          // Render the line
-          doc.text(wrappedLine, startX, y);
-          y += lineHeight;
-        });
-      });
-      
-      return y;
-    }
-  
-    // Set document properties
-    doc.setProperties({
-      title: `Quotation ${quotationData.quotationNo}`,
-      author: quotationData.preparedBy
-    })
-  
-    // Set font
-    doc.setFont('helvetica')
-  
-    // Function to add page header
-    const addPageHeader = () => {
-      doc.setTextColor(0, 0, 0) // Black text
-      doc.setFontSize(14)
-      doc.setFont('helvetica', 'bold')
-      doc.text('TAX INVOICE / QUOTATION', pageWidth / 2, 15, { align: 'center' })
-      
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(10)
-      doc.text(`Quotation No: ${quotationData.quotationNo}`, margin, 25)
-      doc.text(`Date: ${quotationData.date}`, pageWidth - margin - 50, 25, { align: 'right' })
-      
-      currentY = 35
-    }
-  
-    // Add initial page header
-    addPageHeader()
-  
-    // Prepare consignor and consignee details
-    const consignorDetailsData = [
-      { label: 'Name:', value: quotationData.consignorName },
-      { label: 'Address:', value: quotationData.consignorAddress },
-      { label: 'GSTIN:', value: quotationData.consignorGSTIN },
-      { label: 'State Code:', value: quotationData.consignorStateCode }
-    ]
-  
-    const consigneeDetailsData = [
-      { label: 'Name:', value: quotationData.consigneeName },
-      { label: 'Address:', value: quotationData.consigneeAddress },
-      { label: 'GSTIN:', value: quotationData.consigneeGSTIN },
-      { label: 'State Code:', value: quotationData.consigneeStateCode }
-    ]
-  
-    // Render Consignor & Consignee Details
-    doc.setFont('helvetica', 'bold')
-    doc.text('Consignor Details', margin, currentY)
-    doc.text('Consignee Details', pageWidth / 2 + margin, currentY)
-    doc.setFont('helvetica', 'normal')
-    currentY += 6
-  
-    // Function to render details with dynamic page breaks
-    const renderDetailsSection = (detailsData, startX, maxWidth) => {
-      let localY = currentY;
-      
-      detailsData.forEach((detail) => {
-        // Wrap value text
-        const wrappedText = wrapText(
-          `${detail.label} ${detail.value}`, 
-          maxWidth
-        )
-        
-        // Check if we need a new page
-        if (localY + wrappedText.length * 5 > pageHeight - 30) {
-          doc.addPage()
-          addPageHeader()
-          localY = 40
-        }
-        
-        // Render wrapped text
-        doc.text(wrappedText, startX, localY)
-        
-        // Move to next position
-        localY += wrappedText.length * 5
-      })
-  
-      return localY;
-    }
-  
-    // Render details with text wrapping
-    const consignorSectionY = renderDetailsSection(
-      consignorDetailsData, 
-      margin, 
-      pageWidth / 2 - margin * 2
-    )
-    const consigneeSectionY = renderDetailsSection(
-      consigneeDetailsData, 
-      pageWidth / 2 + margin, 
-      pageWidth / 2 - margin * 2
-    )
-  
-    // Update current Y to the max of both sections
-    currentY = Math.max(consignorSectionY, consigneeSectionY) + 5
-  
-    // Prepare items data with discount columns
-    const itemsData = quotationData.items.map((item, index) => [
-      index + 1,
-      item.code,
-      item.name,
-      `${item.gst}%`,
-      item.qty,
-      item.units,
-      formatCurrency(item.rate),
-      `${item.discount}%`,  // Discount percentage
-      formatCurrency(item.flatDiscount), // Flat discount amount
-      formatCurrency(item.amount)
-    ])
-  
-    // Ensure space for table
-    ensureSpaceOrNewPage(20 + (itemsData.length * 10))
-  
-    // Use autoTable method with professional styling
-    autoTable(doc, {
+      doc.text(wrappedLine, margin, consignorY);
+      consignorY += 5;
+    });
+  });
+
+  // Render consignee details with text wrapping
+  let consigneeY = currentY;
+  consigneeDetails.forEach((line) => {
+    const wrappedLines = wrapText(line, pageWidth / 2 - margin * 2);
+    wrappedLines.forEach((wrappedLine) => {
+      if (consigneeY + 5 > pageHeight - margin) {
+        doc.addPage();
+        consigneeY = margin + 20;
+      }
+      doc.text(wrappedLine, pageWidth / 2 + margin, consigneeY);
+      consigneeY += 5;
+    });
+  });
+
+  // Update current Y to the max of both sections
+  currentY = Math.max(consignorY, consigneeY) + 10;
+
+  // Prepare items data for the table
+  const itemsData = quotationData.items.map((item, index) => [
+    index + 1,
+    item.code,
+    item.name,
+    `${item.gst}%`,
+    item.qty,
+    item.units,
+    formatCurrency(item.rate),
+    `${item.discount}%`,
+    formatCurrency(item.flatDiscount),
+    formatCurrency(item.amount)
+  ])
+
+  // Calculate required height for the table
+  const rowHeight = 10;
+  const tableHeight = (itemsData.length + 1) * rowHeight; // +1 for header row
+
+  // Check space and add new page if needed
+  checkSpace(tableHeight + 50);
+
+  // Use autoTable with custom settings
+  autoTable(doc, {
     startY: currentY,
     head: [['S.No', 'Code', 'Product Name', 'GST %', 'Qty', 'Units', 'Rate', 'Disc %', 'Flat Disc', 'Amount']],
     body: itemsData,
-    theme: 'plain',
-    styles: { 
-        fontSize: 9,
-        cellPadding: 3,
-        overflow: 'linebreak',
-        lineColor: [200, 200, 200],
-        lineWidth: 0.5
+    margin: { top: currentY },
+    styles: {
+      fontSize: 8,
+      cellPadding: 2,
+      overflow: 'linebreak',
+      lineColor: [200, 200, 200],
+      lineWidth: 0.3
     },
     headStyles: {
-        fillColor: [41, 128, 185],
-        textColor: 255,
-        fontSize: 10,
-        fontStyle: 'bold'
+      fillColor: [41, 128, 185],
+      textColor: 255,
+      fontSize: 9,
+      fontStyle: 'bold',
+      cellPadding: 3
     },
-    // Add this property to auto-calculate column widths
     columnStyles: {
-        0: { halign: 'center' },
-        1: { halign: 'center' },
-        2: { cellOverflow: 'linebreak' },
-        3: { halign: 'center' },
-        4: { halign: 'center' },
-        5: { halign: 'center' },
-        6: { halign: 'right' },
-        7: { halign: 'center' },
-        8: { halign: 'right' },
-        9: { halign: 'right' }
+      0: { cellWidth: 8, halign: 'center' },
+      1: { cellWidth: 15, halign: 'center' },
+      2: { cellWidth: 'auto' },
+      3: { cellWidth: 12, halign: 'center' },
+      4: { cellWidth: 10, halign: 'center' },
+      5: { cellWidth: 12, halign: 'center' },
+      6: { cellWidth: 15, halign: 'right' },
+      7: { cellWidth: 12, halign: 'center' },
+      8: { cellWidth: 15, halign: 'right' },
+      9: { cellWidth: 15, halign: 'right' }
+    },
+    didDrawPage: function(data) {
+      // Reset Y position after table is drawn
+      currentY = data.cursor.y;
     }
-})
+  });
+
+  // Get the final Y position after the table
+  currentY = doc.lastAutoTable.finalY + 10;
+
+  // Financial Summary
+  checkSpace(50);
   
-    // Get the final Y position of the table
-    const finalY = doc.previousAutoTable ? doc.previousAutoTable.finalY : currentY + 30
+  const summaryItems = [
+    { label: 'Subtotal:', value: formatCurrency(quotationData.subtotal) },
+    { label: 'Total Flat Discount:', value: `-${formatCurrency(quotationData.totalFlatDiscount)}` },
+    { label: 'Taxable Amount:', value: formatCurrency(quotationData.subtotal - quotationData.totalFlatDiscount) },
+    { label: `CGST (${quotationData.cgstRate}%):`, value: formatCurrency(quotationData.cgstAmount) },
+    { label: `SGST (${quotationData.sgstRate}%):`, value: formatCurrency(quotationData.sgstAmount) },
+    { label: 'Total:', value: formatCurrency(quotationData.total) }
+  ];
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Financial Summary', margin, currentY);
+  doc.setFont('helvetica', 'normal');
+  currentY += 7;
+
+  summaryItems.forEach(item => {
+    checkSpace(7);
+    doc.text(item.label, margin, currentY);
+    doc.text(item.value, pageWidth - margin - 10, currentY, { align: 'right' });
+    currentY += 7;
+  });
+
+  // Terms & Conditions
+  checkSpace(50);
   
-    // Ensure space for Financial Summary
-    ensureSpaceOrNewPage(60)
-  
-    // Financial Summary Section including total flat discount
-    let summaryY = finalY + 20
-    const financialSummaryItems = [
-      { label: 'Subtotal:', value: formatCurrency(quotationData.subtotal) },
-      { label: 'Total Flat Discount:', value: `-${formatCurrency(quotationData.totalFlatDiscount)}` },
-      { label: 'Taxable Amount:', value: formatCurrency(quotationData.subtotal - quotationData.totalFlatDiscount) },
-      { label: `CGST (${quotationData.cgstRate}%):`, value: formatCurrency(quotationData.cgstAmount) },
-      { label: `SGST (${quotationData.sgstRate}%):`, value: formatCurrency(quotationData.sgstAmount) },
-      { label: 'Total:', value: formatCurrency(quotationData.total) }
-    ]
-  
-    doc.setFont('helvetica', 'bold')
-    doc.text('Financial Summary', margin, summaryY - 10)
-    doc.setFont('helvetica', 'normal')
-  
-    financialSummaryItems.forEach((item) => {
-      // Check and add page if needed
-      if (currentY + 10 > pageHeight - 30) {
-        doc.addPage()
-        addPageHeader()
-        summaryY = 40
-      }
-  
-      doc.text(item.label, margin, summaryY)
-      doc.text(item.value, pageWidth - margin - 20, summaryY, { align: 'right' })
-      summaryY += 7
-      currentY = summaryY
-    })
-  
-    // Terms & Conditions Section
-    ensureSpaceOrNewPage(50)
+  doc.setFont('helvetica', 'bold');
+  doc.text('Terms & Conditions', margin, currentY);
+  doc.setFont('helvetica', 'normal');
+  currentY += 7;
+
+  const terms = [
+    `Validity: ${quotationData.validity}`,
+    `Payment Terms: ${quotationData.paymentTerms}`,
+    `Delivery: ${quotationData.delivery}`,
+    `Freight: ${quotationData.freight}`,
+    `Insurance: ${quotationData.insurance}`,
+    `Taxes: ${quotationData.taxes}`
+  ];
+
+  terms.forEach(term => {
+    const wrappedLines = wrapText(term, pageWidth - margin * 2);
+    wrappedLines.forEach(line => {
+      checkSpace(7);
+      doc.text(line, margin, currentY);
+      currentY += 7;
+    });
+  });
+
+  // Notes
+  if (quotationData.notes && quotationData.notes.length > 0) {
+    checkSpace(20);
     
-    doc.setFont('helvetica', 'bold')
-    doc.text('Terms & Conditions', margin, currentY + 10)
-    doc.setFont('helvetica', 'normal')
-  
-    const termsLines = [
-      `Validity: ${quotationData.validity}`,
-      `Payment Terms: ${quotationData.paymentTerms}`,
-      `Delivery: ${quotationData.delivery}`,
-      `Freight: ${quotationData.freight}`,
-      `Insurance: ${quotationData.insurance}`,
-      `Taxes: ${quotationData.taxes}`
-    ]
-  
-    currentY = renderTextWithBreaks(termsLines, margin, currentY + 20)
-  
-    // Notes Section
-    if (quotationData.notes && quotationData.notes.length > 0) {
-      ensureSpaceOrNewPage(30)
-      
-      doc.setFont('helvetica', 'bold')
-      doc.text('Notes', margin, currentY + 10)
-      doc.setFont('helvetica', 'normal')
-  
-      const noteLines = quotationData.notes
-        .filter(note => note.trim())
-        .map(note => `• ${note}`);
-      
-      currentY = renderTextWithBreaks(noteLines, margin, currentY + 20)
-    }
-  
-    // Bank Details Section
-    ensureSpaceOrNewPage(50)
-    
-    doc.setFont('helvetica', 'bold')
-    doc.text('Bank Details', margin, currentY + 10)
-    doc.setFont('helvetica', 'normal')
-  
-    const bankDetailLines = [
-      `Account No.: ${quotationData.accountNo}`,
-      `Bank Name: ${quotationData.bankName}`,
-      `Bank Address: ${quotationData.bankAddress}`,
-      `IFSC Code: ${quotationData.ifscCode}`,
-      `Email: ${quotationData.email}`,
-      `Website: ${quotationData.website}`,
-      `Company PAN: ${quotationData.pan}`
-    ]
-  
-    currentY = renderTextWithBreaks(bankDetailLines, margin, currentY + 20)
-    
-    // Declaration Section
-    ensureSpaceOrNewPage(40)
-    
-    doc.setFont('helvetica', 'bold')
-    doc.text('Declaration', margin, currentY + 10)
-    doc.setFont('helvetica', 'normal')
-  
-    const declarationLines = [
-      'We declare that this Quotation shows the actual price of the goods described',
-      'and that all particulars are true and correct.'
-    ]
-  
-    renderTextWithBreaks(declarationLines, margin, currentY + 20)
-  
-    doc.setFont('helvetica', 'bold')
-    doc.text(`Prepared By: ${quotationData.preparedBy}`, margin, currentY + 40)
-  
-    // Digital Signature Space
-    doc.setDrawColor(200, 200, 200)
-    doc.line(margin, currentY + 60, pageWidth - margin, currentY + 60)
-    doc.text('Signature', margin, currentY + 67)
-  
-    // Add page numbers
-    const pageCount = doc.internal.getNumberOfPages()
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i)
-      doc.setFontSize(8)
-      doc.setTextColor(100, 100, 100)
-      doc.text(`Page ${i} of ${pageCount}`, pageWidth - 20, pageHeight - 10, { align: 'right' })
-    }
-  
-    // Generate Base64 PDF
-    const base64Data = doc.output('datauristring').split(',')[1]
-    return base64Data
+    doc.setFont('helvetica', 'bold');
+    doc.text('Notes', margin, currentY);
+    doc.setFont('helvetica', 'normal');
+    currentY += 7;
+
+    quotationData.notes.filter(note => note.trim()).forEach(note => {
+      const wrappedLines = wrapText(`• ${note}`, pageWidth - margin * 2);
+      wrappedLines.forEach(line => {
+        checkSpace(7);
+        doc.text(line, margin, currentY);
+        currentY += 7;
+      });
+    });
   }
+
+  // Bank Details
+  checkSpace(50);
+  
+  doc.setFont('helvetica', 'bold');
+  doc.text('Bank Details', margin, currentY);
+  doc.setFont('helvetica', 'normal');
+  currentY += 7;
+
+  const bankDetails = [
+    `Account No.: ${quotationData.accountNo}`,
+    `Bank Name: ${quotationData.bankName}`,
+    `Bank Address: ${quotationData.bankAddress}`,
+    `IFSC Code: ${quotationData.ifscCode}`,
+    `Email: ${quotationData.email}`,
+    `Website: ${quotationData.website}`,
+    `Company PAN: ${quotationData.pan}`
+  ];
+
+  bankDetails.forEach(detail => {
+    const wrappedLines = wrapText(detail, pageWidth - margin * 2);
+    wrappedLines.forEach(line => {
+      checkSpace(7);
+      doc.text(line, margin, currentY);
+      currentY += 7;
+    });
+  });
+
+  // Declaration
+  checkSpace(40);
+  
+  doc.setFont('helvetica', 'bold');
+  doc.text('Declaration', margin, currentY);
+  doc.setFont('helvetica', 'normal');
+  currentY += 7;
+
+  const declaration = [
+    'We declare that this Quotation shows the actual price of the goods described',
+    'and that all particulars are true and correct.'
+  ];
+
+  declaration.forEach(line => {
+    const wrappedLines = wrapText(line, pageWidth - margin * 2);
+    wrappedLines.forEach(wrappedLine => {
+      checkSpace(7);
+      doc.text(wrappedLine, margin, currentY);
+      currentY += 7;
+    });
+  });
+
+  // Prepared By
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Prepared By: ${quotationData.preparedBy}`, margin, currentY + 10);
+
+  // Add page numbers
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Page ${i} of ${pageCount}`, pageWidth - 20, pageHeight - 10, { align: 'right' });
+  }
+
+  // Generate Base64 PDF
+  return doc.output('datauristring').split(',')[1];
+};
 
   // Modified handleSaveQuotation function to submit data in specified order
 // Modified handleSaveQuotation function to include item data after bank details
@@ -959,7 +1143,25 @@ const handleSaveQuotation = async () => {
   try {
     // Generate PDF
     const base64Data = generatePDFFromData()
-    const fileName = `Quotation_${quotationData.quotationNo}.pdf`
+    
+    // Handle revision numbering
+    let finalQuotationNo = quotationData.quotationNo;
+    if (isRevising && selectedQuotation) {
+      // Check if this is the first revision (no -## suffix)
+      if (!finalQuotationNo.match(/-\d{2}$/)) {
+        finalQuotationNo = `${finalQuotationNo}-01`;
+      } else {
+        // Increment the revision number
+        const parts = finalQuotationNo.split('-');
+        const lastPart = parts[parts.length - 1];
+        const revisionNumber = parseInt(lastPart, 10);
+        const newRevision = (revisionNumber + 1).toString().padStart(2, '0');
+        parts[parts.length - 1] = newRevision;
+        finalQuotationNo = parts.join('-');
+      }
+    }
+    
+    const fileName = `Quotation_${finalQuotationNo}.pdf`
     
     // Script URL
     const scriptUrl = "https://script.google.com/macros/s/AKfycbxeo5tv3kAcSDDAheOCP07HaK76zSfq49jFGtZknseg7kPlj2G1O8U2PuiA2fQSuPvKqA/exec"
@@ -997,7 +1199,7 @@ const handleSaveQuotation = async () => {
     // Quotation Details
     const quotationDetails = [
       new Date().toLocaleString(), // timestamp
-      quotationData.quotationNo,
+      finalQuotationNo,
       quotationData.date,
       quotationData.preparedBy
     ]
@@ -1017,6 +1219,7 @@ const handleSaveQuotation = async () => {
     const consigneeDetails = [
       quotationData.consigneeName,
       quotationData.consigneeAddress,
+      quotationData.shipTo || quotationData.consigneeAddress, 
       quotationData.consigneeState,
       quotationData.consigneeContactName,
       quotationData.consigneeContactNo,
@@ -1048,10 +1251,18 @@ const handleSaveQuotation = async () => {
     ]
     
     // Format item data as a single string to include in the main row data
-    // Join all items into a string representation
-    // Format: "Code1|Name1|GST1|Qty1|Units1|Rate1|Disc1|FlatDisc1|Amount1;Code2|Name2|GST2|..."
     const itemsString = quotationData.items.map(item => {
-      return `${item.code}|${item.name}|${item.gst}|${item.qty}|${item.units}|${item.rate}|${item.discount}|${item.flatDiscount}|${item.amount}`;
+      return [
+        item.code || "",
+        item.name || "",
+        item.gst || 0,
+        item.qty || 0,
+        item.units || "Nos",
+        item.rate || 0,
+        item.discount || 0,
+        item.flatDiscount || 0,
+        item.amount || 0
+      ].join("|");
     }).join(";");
     
     // Combine all data in one array with PDF URL as the last element
@@ -1061,8 +1272,8 @@ const handleSaveQuotation = async () => {
       ...consigneeDetails,
       ...termsDetails,
       ...bankDetails,
-      itemsString, // Include items as a string right after bank details
-      pdfUrl // PDF URL as the last column
+      itemsString,
+      pdfUrl
     ]
     
     // 3. Submit main quotation data with items and PDF URL
@@ -1094,20 +1305,20 @@ const handleSaveQuotation = async () => {
     // 4. Also submit each item to the Items sheet separately if needed
     const itemPromises = quotationData.items.map(async (item) => {
       const itemData = [
-        quotationData.quotationNo,   // Quotation Number as reference
-        item.code,                   // Code
-        item.name,                   // Product Name
-        item.gst,                    // GST %
-        item.qty,                    // Qty
-        item.units,                  // Units
-        item.rate,                   // Rate
-        item.discount,               // Disc %
-        item.flatDiscount,           // Flat Disc
-        item.amount                  // Amount
+        finalQuotationNo,   // Use the final quotation number
+        item.code,
+        item.name,
+        item.gst,
+        item.qty,
+        item.units,
+        item.rate,
+        item.discount,
+        item.flatDiscount,
+        item.amount
       ]
       
       const itemParams = {
-        sheetName: "Quotation Items", // Separate sheet for items
+        sheetName: "Quotation Items",
         action: "insert",
         rowData: JSON.stringify(itemData)
       }
@@ -1131,6 +1342,14 @@ const handleSaveQuotation = async () => {
     
     // Set the PDF URL for preview
     setPdfUrl(pdfUrl)
+    
+    // Update the quotation number in state if we revised
+    if (isRevising && selectedQuotation) {
+      setQuotationData(prev => ({
+        ...prev,
+        quotationNo: finalQuotationNo
+      }));
+    }
     
     alert("Quotation saved successfully with all items!")
     
@@ -1199,6 +1418,7 @@ const handleSaveQuotation = async () => {
   }
 }
 
+
   // Helper function to increment quotation number
   const getNextQuotationNumber = async () => {
     // Script URL
@@ -1244,15 +1464,17 @@ const handleSaveQuotation = async () => {
 
   return (
     <div className="container mx-auto py-6 px-4">
-      <h1 className="text-3xl font-bold mb-6 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-        Make Quotation
-      </h1>
-      {/* <button
-    className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md absolute top-20 right-30"
+    <div className="flex justify-between items-center mb-6">
+  <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+    Make Quotation
+  </h1>
+  <button
+    className={`px-4 py-2 rounded-md ${isRevising ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'} text-white`}
     onClick={() => setIsRevising(!isRevising)}
   >
     {isRevising ? 'Cancel Revise' : 'Revise'}
-  </button> */}
+  </button>
+</div>
 
 
       <div className="bg-white rounded-lg shadow border">
@@ -1287,21 +1509,33 @@ const handleSaveQuotation = async () => {
                   <h3 className="text-lg font-medium mb-4">Quotation Details</h3>
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
+                  {/* Replace the existing Quotation No input field with this upgraded version */}
+<div className="space-y-2">
   <label className="block text-sm font-medium">Quotation No.</label>
   {isRevising ? (
-    <select
-      value={selectedQuotation}
-      onChange={(e) => handleQuotationSelect(e.target.value)}
-      className="w-full p-2 border border-gray-300 rounded-md"
-    >
-      <option value="">Select Quotation</option>
-      {existingQuotations.map((quotation) => (
-        <option key={quotation} value={quotation}>
-          {quotation}
-        </option>
-      ))}
-    </select>
+    <div className="flex items-center">
+      <select
+        value={selectedQuotation}
+        onChange={(e) => handleQuotationSelect(e.target.value)}
+        className="w-full p-2 border border-gray-300 rounded-md"
+      >
+        <option value="">Select Quotation to Revise</option>
+        {existingQuotations && existingQuotations.length > 0 ? (
+          existingQuotations.map((quotation) => (
+            <option key={quotation} value={quotation}>
+              {quotation}
+            </option>
+          ))
+        ) : (
+          <option value="" disabled>Loading quotations...</option>
+        )}
+      </select>
+      {isLoadingQuotation && (
+        <div className="ml-2">
+          <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      )}
+    </div>
   ) : (
     <input
       type="text"
@@ -1311,6 +1545,8 @@ const handleSaveQuotation = async () => {
     />
   )}
 </div>
+
+
                       <div className="space-y-2">
                         <label className="block text-sm font-medium">Date</label>
                         <input
@@ -1544,203 +1780,232 @@ const handleSaveQuotation = async () => {
                   </div>
 
                   <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">S No.</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product Name</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">GST %</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty.</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Units</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rate</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Disc %</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Flat Disc</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {quotationData.items.map((item, index) => (
-                          <tr key={item.id}>
-                            <td className="px-4 py-2">{index + 1}</td>
-                            <td className="px-4 py-2">
-                              <input
-                                type="text"
-                                value={item.code}
-                                onChange={(e) => handleItemChange(item.id, "code", e.target.value)}
-                                className="w-24 p-1 border border-gray-300 rounded-md"
-                              />
-                            </td>
-                            <td className="px-4 py-2">
-                              <input
-                                type="text"
-                                value={item.name}
-                                onChange={(e) => handleItemChange(item.id, "name", e.target.value)}
-                                className="w-full p-1 border border-gray-300 rounded-md"
-                                placeholder="Enter item name"
-                                required
-                              />
-                            </td>
-                            <td className="px-4 py-2">
-                              <select
-                                value={item.gst}
-                                onChange={(e) => handleItemChange(item.id, "gst", Number.parseInt(e.target.value))}
-                                className="w-20 p-1 border border-gray-300 rounded-md"
-                              >
-                                <option value="0">0%</option>
-                                <option value="5">5%</option>
-                                <option value="12">12%</option>
-                                <option value="18">18%</option>
-                                <option value="28">28%</option>
-                              </select>
-                            </td>
-                            <td className="px-4 py-2">
-                              <input
-                                type="number"
-                                value={item.qty}
-                                onChange={(e) => handleItemChange(item.id, "qty", Number.parseInt(e.target.value) || 0)}
-                                className="w-16 p-1 border border-gray-300 rounded-md"
-                                placeholder="0"
-                                required
-                              />
-                            </td>
-                            <td className="px-4 py-2">
-                              <select
-                                value={item.units}
-                                onChange={(e) => handleItemChange(item.id, "units", e.target.value)}
-                                className="w-20 p-1 border border-gray-300 rounded-md"
-                              >
-                                <option value="Nos">Nos</option>
-                                <option value="Pcs">Pcs</option>
-                                <option value="Kg">Kg</option>
-                                <option value="Set">Set</option>
-                              </select>
-                            </td>
-                            <td className="px-4 py-2">
-                              <input
-                                type="number"
-                                value={item.rate}
-                                onChange={(e) => handleItemChange(item.id, "rate", Number.parseFloat(e.target.value) || 0)}
-                                className="w-24 p-1 border border-gray-300 rounded-md"
-                                placeholder="0.00"
-                                required
-                              />
-                            </td>
-                            <td className="px-4 py-2">
-                              <input
-                                type="number"
-                                value={item.discount}
-                                onChange={(e) => handleItemChange(item.id, "discount", Number.parseFloat(e.target.value) || 0)}
-                                className="w-20 p-1 border border-gray-300 rounded-md"
-                                placeholder="0%"
-                                min="0"
-                                max="100"
-                              />
-                            </td>
-                            <td className="px-4 py-2">
-                              <input
-                                type="number"
-                                value={item.flatDiscount}
-                                onChange={(e) => handleItemChange(item.id, "flatDiscount", Number.parseFloat(e.target.value) || 0)}
-                                className="w-24 p-1 border border-gray-300 rounded-md"
-                                placeholder="0.00"
-                                min="0"
-                              />
-                            </td>
-                            <td className="px-4 py-2">
-                              <input
-                                type="number"
-                                value={item.amount}
-                                className="w-24 p-1 border border-gray-300 rounded-md bg-gray-50"
-                                readOnly
-                              />
-                            </td>
-                            <td className="px-4 py-2">
-                              <button
-                                className="text-red-500 hover:text-red-700 p-1 rounded-md"
-                                onClick={() => {
-                                  // Remove item
-                                  const newItems = quotationData.items.filter((i) => i.id !== item.id)
-                                  if (newItems.length === 0) return // Don't remove the last item
+                  <table className="min-w-full divide-y divide-gray-200">
+  <thead className="bg-gray-50">
+    <tr>
+      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">S No.</th>
+      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
+      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product Name</th>
+      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">GST %</th>
+      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty.</th>
+      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Units</th>
+      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rate</th>
+      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Disc %</th>
+      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Flat Disc</th>
+      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+    </tr>
+  </thead>
+  <tbody className="bg-white divide-y divide-gray-200">
+    {quotationData.items.map((item, index) => (
+      <tr key={item.id}>
+        <td className="px-4 py-2">{index + 1}</td>
+        <td className="px-4 py-2">
+  <div className="relative">
+    <input
+      type="text"
+      value={item.code}
+      onChange={(e) => {
+        handleItemChange(item.id, "code", e.target.value);
+        // Auto-fill product name if code exists in mapping
+        if (productData[e.target.value]) {
+          handleItemChange(item.id, "name", productData[e.target.value]);
+        }
+      }}
+      list={`code-list-${item.id}`}
+      className="w-24 p-1 border border-gray-300 rounded-md"
+    />
+    <datalist id={`code-list-${item.id}`}>
+      {productCodes.map((code) => (
+        <option key={code} value={code} />
+      ))}
+    </datalist>
+  </div>
+</td>
+<td className="px-4 py-2">
+  <div className="relative">
+    <input
+      type="text"
+      value={item.name}
+      onChange={(e) => {
+        handleItemChange(item.id, "name", e.target.value);
+        // Auto-fill code if product name exists in mapping
+        if (productData[e.target.value]) {
+          handleItemChange(item.id, "code", productData[e.target.value]);
+        }
+      }}
+      list={`name-list-${item.id}`}
+      className="w-full p-1 border border-gray-300 rounded-md"
+      placeholder="Enter item name"
+      required
+    />
+    <datalist id={`name-list-${item.id}`}>
+      {productNames.map((name) => (
+        <option key={name} value={name} />
+      ))}
+    </datalist>
+  </div>
+</td>
+        <td className="px-4 py-2">
+          <select
+            value={item.gst}
+            onChange={(e) => handleItemChange(item.id, "gst", Number.parseInt(e.target.value))}
+            className="w-20 p-1 border border-gray-300 rounded-md"
+          >
+            <option value="0">0%</option>
+            <option value="5">5%</option>
+            <option value="12">12%</option>
+            <option value="18">18%</option>
+            <option value="28">28%</option>
+          </select>
+        </td>
+        <td className="px-4 py-2">
+          <input
+            type="number"
+            value={item.qty}
+            onChange={(e) => handleItemChange(item.id, "qty", Number.parseInt(e.target.value) || 0)}
+            className="w-16 p-1 border border-gray-300 rounded-md"
+            placeholder="0"
+            required
+          />
+        </td>
+        <td className="px-4 py-2">
+          <select
+            value={item.units}
+            onChange={(e) => handleItemChange(item.id, "units", e.target.value)}
+            className="w-20 p-1 border border-gray-300 rounded-md"
+          >
+            <option value="Nos">Nos</option>
+            <option value="Pcs">Pcs</option>
+            <option value="Kg">Kg</option>
+            <option value="Set">Set</option>
 
-                                  // Recalculate totals
-                                  const subtotal = newItems.reduce((sum, i) => sum + i.amount, 0)
-                                  const subtotalAfterDiscount = Math.max(0, subtotal - quotationData.totalFlatDiscount)
-                                  const cgstAmount = subtotalAfterDiscount * (quotationData.cgstRate / 100)
-                                  const sgstAmount = subtotalAfterDiscount * (quotationData.sgstRate / 100)
-                                  const total = subtotalAfterDiscount + cgstAmount + sgstAmount
+            </select>
+        </td>
+        <td className="px-4 py-2">
+          <input
+            type="number"
+            value={item.rate}
+            onChange={(e) => handleItemChange(item.id, "rate", Number.parseFloat(e.target.value) || 0)}
+            className="w-24 p-1 border border-gray-300 rounded-md"
+            placeholder="0.00"
+            required
+          />
+        </td>
+        <td className="px-4 py-2">
+          <input
+            type="number"
+            value={item.discount}
+            onChange={(e) => handleItemChange(item.id, "discount", Number.parseFloat(e.target.value) || 0)}
+            className="w-20 p-1 border border-gray-300 rounded-md"
+            placeholder="0%"
+            min="0"
+            max="100"
+          />
+        </td>
+        <td className="px-4 py-2">
+          <input
+            type="number"
+            value={item.flatDiscount}
+            onChange={(e) => handleItemChange(item.id, "flatDiscount", Number.parseFloat(e.target.value) || 0)}
+            className="w-24 p-1 border border-gray-300 rounded-md"
+            placeholder="0.00"
+            min="0"
+          />
+        </td>
+        <td className="px-4 py-2">
+          <input
+            type="number"
+            value={item.amount}
+            className="w-24 p-1 border border-gray-300 rounded-md bg-gray-50"
+            readOnly
+          />
+        </td>
+        <td className="px-4 py-2">
+          <button
+            className="text-red-500 hover:text-red-700 p-1 rounded-md"
+            onClick={() => {
+              // Remove item
+              const newItems = quotationData.items.filter((i) => i.id !== item.id)
+              if (newItems.length === 0) return // Don't remove the last item
 
-                                  setQuotationData({
-                                    ...quotationData,
-                                    items: newItems,
-                                    subtotal,
-                                    cgstAmount,
-                                    sgstAmount,
-                                    total,
-                                  })
-                                }}
-                                disabled={quotationData.items.length <= 1}
-                              >
-                                <TrashIcon className="h-4 w-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr>
-                          <td colSpan="9" className="px-4 py-2 text-right font-medium">
-                            Subtotal:
-                          </td>
-                          <td className="border p-2">₹{typeof quotationData.subtotal === 'number' ? quotationData.subtotal.toFixed(2) : '0.00'}</td>
-                          <td></td>
-                        </tr>
-                        <tr>
-                          <td colSpan="9" className="px-4 py-2 text-right font-medium">
-                            Total Flat Discount:
-                          </td>
-                          <td className="px-4 py-2">
-                            <input
-                              type="number"
-                              value={quotationData.totalFlatDiscount}
-                              onChange={(e) => handleFlatDiscountChange(e.target.value)}
-                              className="w-24 p-1 border border-gray-300 rounded-md"
-                              min="0"
-                            />
-                          </td>
-                          <td></td>
-                        </tr>
-                        <tr>
-                          <td colSpan="9" className="px-4 py-2 text-right font-medium">
-                            Taxable Amount:
-                          </td>
-                          <td className="px-4 py-2">₹{(quotationData.subtotal - quotationData.totalFlatDiscount).toFixed(2)}</td>
-                          <td></td>
-                        </tr>
-                        <tr>
-                          <td colSpan="9" className="px-4 py-2 text-right font-medium">
-                            CGST ({quotationData.cgstRate}%):
-                          </td>
-                          <td className="px-4 py-2">₹{quotationData.cgstAmount.toFixed(2)}</td>
-                          <td></td>
-                        </tr>
-                        <tr>
-                          <td colSpan="9" className="px-4 py-2 text-right font-medium">
-                            SGST ({quotationData.sgstRate}%):
-                          </td>
-                          <td className="px-4 py-2">₹{quotationData.sgstAmount.toFixed(2)}</td>
-                          <td></td>
-                        </tr>
-                        <tr className="font-bold">
-                          <td colSpan="9" className="px-4 py-2 text-right">
-                            Total:
-                          </td>
-                          <td className="px-4 py-2">₹{quotationData.total.toFixed(2)}</td>
-                          <td></td>
-                        </tr>
-                      </tfoot>
-                    </table>
+              // Recalculate totals
+              const subtotal = newItems.reduce((sum, i) => sum + i.amount, 0)
+              const subtotalAfterDiscount = Math.max(0, subtotal - quotationData.totalFlatDiscount)
+              const cgstAmount = subtotalAfterDiscount * (quotationData.cgstRate / 100)
+              const sgstAmount = subtotalAfterDiscount * (quotationData.sgstRate / 100)
+              const total = subtotalAfterDiscount + cgstAmount + sgstAmount
+
+              setQuotationData({
+                ...quotationData,
+                items: newItems,
+                subtotal,
+                cgstAmount,
+                sgstAmount,
+                total,
+              })
+            }}
+            disabled={quotationData.items.length <= 1}
+          >
+            <TrashIcon className="h-4 w-4" />
+          </button>
+        </td>
+      </tr>
+    ))}
+  </tbody>
+  <tfoot>
+    <tr>
+      <td colSpan="9" className="px-4 py-2 text-right font-medium">
+        Subtotal:
+      </td>
+      <td className="border p-2">₹{typeof quotationData.subtotal === 'number' ? quotationData.subtotal.toFixed(2) : '0.00'}</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td colSpan="9" className="px-4 py-2 text-right font-medium">
+        Total Flat Discount:
+      </td>
+      <td className="px-4 py-2">
+        <input
+          type="number"
+          value={quotationData.totalFlatDiscount}
+          onChange={(e) => handleFlatDiscountChange(e.target.value)}
+          className="w-24 p-1 border border-gray-300 rounded-md"
+          min="0"
+        />
+      </td>
+      <td></td>
+    </tr>
+    <tr>
+      <td colSpan="9" className="px-4 py-2 text-right font-medium">
+        Taxable Amount:
+      </td>
+      <td className="px-4 py-2">₹{(quotationData.subtotal - quotationData.totalFlatDiscount).toFixed(2)}</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td colSpan="9" className="px-4 py-2 text-right font-medium">
+        CGST ({quotationData.cgstRate}%):
+      </td>
+      <td className="px-4 py-2">₹{quotationData.cgstAmount.toFixed(2)}</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td colSpan="9" className="px-4 py-2 text-right font-medium">
+        SGST ({quotationData.sgstRate}%):
+      </td>
+      <td className="px-4 py-2">₹{quotationData.sgstAmount.toFixed(2)}</td>
+      <td></td>
+    </tr>
+    <tr className="font-bold">
+      <td colSpan="9" className="px-4 py-2 text-right">
+        Total:
+      </td>
+      <td className="px-4 py-2">₹{quotationData.total.toFixed(2)}</td>
+      <td></td>
+    </tr>
+  </tfoot>
+</table>
                   </div>
                 </div>
               </div>
@@ -1804,102 +2069,107 @@ const handleSaveQuotation = async () => {
                   </div>
                 </div>
 
-                <h3 className="text-lg font-medium mt-6 mb-4">Notes</h3>
-                <div className="space-y-4">
-                  {quotationData.notes.map((note, index) => (
-                    <div key={index} className="flex items-start gap-2">
-                      <textarea
-                        value={note}
-                        onChange={(e) => handleNoteChange(index, e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded-md"
-                        rows={2}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeNote(index)}
-                        disabled={quotationData.notes.length <= 1}
-                        className="text-red-500 hover:text-red-700 p-1 rounded-md"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    className="px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50"
-                    onClick={addNote}
-                  >
-                    <PlusIcon className="h-4 w-4 inline mr-1" /> Add Note
-                  </button>
-                </div>
+                <div className="bg-white border rounded-lg p-4 shadow-sm">
+  <h3 className="text-lg font-medium mb-4">Notes</h3>
+  <div className="space-y-4">
+    {quotationData.notes.map((note, index) => (
+      <div key={index} className="flex items-start gap-2">
+        <textarea
+          value={note}
+          onChange={(e) => handleNoteChange(index, e.target.value)}
+          className="w-full p-2 border border-gray-300 rounded-md"
+          rows={2}
+        />
+        <button
+          type="button"
+          onClick={() => removeNote(index)}
+          disabled={quotationData.notes.length <= 1}
+          className="text-red-500 hover:text-red-700 p-1 rounded-md"
+        >
+          <TrashIcon className="h-4 w-4" />
+        </button>
+      </div>
+    ))}
+    <button
+      type="button"
+      className="px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50"
+      onClick={addNote}
+    >
+      <PlusIcon className="h-4 w-4 inline mr-1" /> Add Note
+    </button>
+  </div>
+</div>
 
-                <h3 className="text-lg font-medium mt-6 mb-4">Bank Details</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium">Account No.</label>
-                    <input
-                      type="text"
-                      value={quotationData.accountNo}
-                      onChange={(e) => handleInputChange("accountNo", e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium">Bank Name</label>
-                    <input
-                      type="text"
-                      value={quotationData.bankName}
-                      onChange={(e) => handleInputChange("bankName", e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium">Bank Address</label>
-                    <input
-                      type="text"
-                      value={quotationData.bankAddress}
-                      onChange={(e) => handleInputChange("bankAddress", e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium">IFSC Code</label>
-                    <input
-                      type="text"
-                      value={quotationData.ifscCode}
-                      onChange={(e) => handleInputChange("ifscCode", e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium">Email</label>
-                    <input
-                      type="text"
-                      value={quotationData.email}
-                      onChange={(e) => handleInputChange("email", e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium">Website</label>
-                    <input
-                      type="text"
-                      value={quotationData.website}
-                      onChange={(e) => handleInputChange("website", e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium">PAN</label>
-                    <input
-                      type="text"
-                      value={quotationData.pan}
-                      onChange={(e) => handleInputChange("pan", e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                </div>
-              </div>
+
+                <div className="bg-white border rounded-lg p-4 shadow-sm">
+  <h3 className="text-lg font-medium mt-6 mb-4">Bank Details</h3>
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="space-y-2">
+      <label className="block text-sm font-medium">Account No.</label>
+      <input
+        type="text"
+        value={quotationData.accountNo}
+        onChange={(e) => handleInputChange("accountNo", e.target.value)}
+        className="w-full p-2 border border-gray-300 rounded-md"
+      />
+    </div>
+    <div className="space-y-2">
+      <label className="block text-sm font-medium">Bank Name</label>
+      <input
+        type="text"
+        value={quotationData.bankName}
+        onChange={(e) => handleInputChange("bankName", e.target.value)}
+        className="w-full p-2 border border-gray-300 rounded-md"
+      />
+    </div>
+    <div className="space-y-2">
+      <label className="block text-sm font-medium">Bank Address</label>
+      <input
+        type="text"
+        value={quotationData.bankAddress}
+        onChange={(e) => handleInputChange("bankAddress", e.target.value)}
+        className="w-full p-2 border border-gray-300 rounded-md"
+      />
+    </div>
+    <div className="space-y-2">
+      <label className="block text-sm font-medium">IFSC Code</label>
+      <input
+        type="text"
+        value={quotationData.ifscCode}
+        onChange={(e) => handleInputChange("ifscCode", e.target.value)}
+        className="w-full p-2 border border-gray-300 rounded-md"
+      />
+    </div>
+    <div className="space-y-2">
+      <label className="block text-sm font-medium">Email</label>
+      <input
+        type="text"
+        value={quotationData.email}
+        onChange={(e) => handleInputChange("email", e.target.value)}
+        className="w-full p-2 border border-gray-300 rounded-md"
+      />
+    </div>
+    <div className="space-y-2">
+      <label className="block text-sm font-medium">Website</label>
+      <input
+        type="text"
+        value={quotationData.website}
+        onChange={(e) => handleInputChange("website", e.target.value)}
+        className="w-full p-2 border border-gray-300 rounded-md"
+      />
+    </div>
+    <div className="space-y-2">
+      <label className="block text-sm font-medium">PAN</label>
+      <input
+        type="text"
+        value={quotationData.pan}
+        onChange={(e) => handleInputChange("pan", e.target.value)}
+        className="w-full p-2 border border-gray-300 rounded-md"
+      />
+    </div>
+  </div>
+</div>
+</div>
 
               <div className="flex justify-between">
                 <button
@@ -1965,9 +2235,8 @@ const handleSaveQuotation = async () => {
                     <h3 className="font-bold mb-2">Consignor Details</h3>
                     <p>{quotationData.consignorName}</p>
                     <p>{quotationData.consignorAddress}</p>
-                    <p>
-                      GSTIN: {quotationData.consignorGSTIN} State Code: {quotationData.consignorStateCode}
-                    </p>
+                    <p>GSTIN: {quotationData.consignorGSTIN || "N/A"} State Code: {quotationData.consignorStateCode || "N/A"}</p>
+
                   </div>
                   <div>
                     <h3 className="font-bold mb-2">Consignee Details</h3>
@@ -2022,7 +2291,8 @@ const handleSaveQuotation = async () => {
                           <td className="border p-2">₹{item.rate.toFixed(2)}</td>
                           <td className="border p-2">{item.discount}%</td>
                           <td className="border p-2">₹{item.flatDiscount.toFixed(2)}</td>
-                          <td className="border p-2">₹{item.amount.toFixed(2)}</td>
+                          {/* <td className="border p-2">₹{item.amount.toFixed(2)}</td> */}
+                          <td className="border p-2">₹{(item.amount || 0).toFixed(2)}</td>
                         </tr>
                       ))}
                     </tbody>
