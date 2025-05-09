@@ -63,7 +63,9 @@ function NewCallTracker() {
     acceptanceVia: "",
     paymentMode: "",
     paymentTerms: "",
-    orderVideo: null,
+    tranportMode: "",
+    conveyedForRegistration: "",
+    orderVideo: "",
     acceptanceFile: null,
     orderRemark: "",
     apologyVideo: null,
@@ -73,6 +75,39 @@ function NewCallTracker() {
     holdingDate: "",
     holdRemark: "",
   })
+
+  // Add this function inside the NewCallTracker component
+const fetchLatestQuotationNumber = async (enquiryNo) => {
+  try {
+    const scriptUrl = "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
+    const params = {
+      action: "getQuotationNumber",
+      enquiryNo: enquiryNo
+    }
+
+    const urlParams = new URLSearchParams()
+    for (const key in params) {
+      urlParams.append(key, params[key])
+    }
+
+    const response = await fetch(scriptUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: urlParams
+    })
+
+    const result = await response.json()
+    if (result.success && result.quotationNumber) {
+      return result.quotationNumber
+    }
+    return ""
+  } catch (error) {
+    console.error("Error fetching quotation number:", error)
+    return ""
+  }
+}
 
   // Fetch dropdown options from DROPDOWN sheet column G
   useEffect(() => {
@@ -234,10 +269,12 @@ function NewCallTracker() {
     }
   }
 
+  
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setIsSubmitting(true)
-
+  
     try {
       const currentDate = new Date()
       const formattedDate = formatDate(currentDate)
@@ -252,18 +289,18 @@ function NewCallTracker() {
           showNotification("Image uploaded successfully", "success")
         }
       }
-
+  
       // If there are order status files, upload them
       let orderVideoUrl = ""
       let acceptanceFileUrl = ""
       let apologyVideoUrl = ""
       
       if (currentStage === "order-status") {
-        if (orderStatusData.orderVideo) {
-          showNotification("Uploading order video...", "info")
-          orderVideoUrl = await uploadFileToDrive(orderStatusData.orderVideo)
-          showNotification("Order video uploaded successfully", "success")
-        }
+        // if (orderStatusData.orderVideo) {
+        //   showNotification("Uploading order video...", "info")
+        //   orderVideoUrl = await uploadFileToDrive(orderStatusData.orderVideo)
+        //   showNotification("Order video uploaded successfully", "success")
+        // }
         
         if (orderStatusData.acceptanceFile) {
           showNotification("Uploading acceptance file...", "info")
@@ -347,32 +384,36 @@ function NewCallTracker() {
             orderStatusData.acceptanceVia,     // Column X
             orderStatusData.paymentMode,       // Column Y
             orderStatusData.paymentTerms,      // Column Z
-            orderVideoUrl || "",               // Column AA
+            orderStatusData.tranportMode || "", // Column AD (new field)
+            orderStatusData.conveyedForRegistration || "", // Column AE (new field)
+            orderStatusData.orderVideo,               // Column AA
             acceptanceFileUrl || "",           // Column AB
-            orderStatusData.orderRemark        // Column AC
+            orderStatusData.orderRemark,       // Column AC
           )
-          // Add empty values for NO and HOLD columns (AD-AI)
-          rowData.push(...new Array(6).fill(""))
+          // Add empty values for remaining columns (AF-AI)
+          rowData.push(...new Array(4).fill(""))
         } else if (orderStatusData.orderStatus === "no") {
-          // Add empty values for YES columns (X-AC)
-          rowData.push(...new Array(6).fill(""))
-          // Add NO data for columns AD-AF
+          // Add empty values for YES columns (X-AE)
+          rowData.push(...new Array(8).fill(""))
+          // Add NO data for columns AF-AH
           rowData.push(
-            apologyVideoUrl || "",             // Column AD
-            orderStatusData.reasonStatus,      // Column AE
-            orderStatusData.reasonRemark       // Column AF
+            apologyVideoUrl || "",             // Column AF
+            orderStatusData.reasonStatus,      // Column AG
+            orderStatusData.reasonRemark       // Column AH
           )
-          // Add empty values for HOLD columns (AG-AI)
+          // Add empty values for HOLD columns (AI-AL)
           rowData.push(...new Array(3).fill(""))
         } else if (orderStatusData.orderStatus === "hold") {
-          // Add empty values for YES and NO columns (X-AF)
-          rowData.push(...new Array(9).fill(""))
-          // Add HOLD data for columns AG-AI
+          // Add empty values for YES and NO columns (X-AH)
+          rowData.push(...new Array(11).fill(""))
+          // Add HOLD data for columns AI-AL
           rowData.push(
-            orderStatusData.holdReason,        // Column AG
-            orderStatusData.holdingDate,       // Column AH
-            orderStatusData.holdRemark         // Column AI
+            orderStatusData.holdReason,        // Column AI
+            orderStatusData.holdingDate,       // Column AJ
+            orderStatusData.holdRemark         // Column AK
           )
+          // Add empty value for remaining column
+          rowData.push("") // Column AL
         } else {
           // If no status selected, fill all columns with empty
           rowData.push(...new Array(12).fill(""))
@@ -393,7 +434,7 @@ function NewCallTracker() {
         action: "insert",
         rowData: JSON.stringify(rowData)
       }
-
+  
       // Create URL-encoded string for the parameters
       const urlParams = new URLSearchParams()
       for (const key in params) {
@@ -408,7 +449,7 @@ function NewCallTracker() {
         },
         body: urlParams
       })
-
+  
       const result = await response.json()
       
       if (result.success) {
@@ -483,67 +524,100 @@ function NewCallTracker() {
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Current Stage</label>
-              <div className="space-y-1">
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="radio"
-                    id="make-quotation"
-                    name="currentStage"
-                    value="make-quotation"
-                    checked={currentStage === "make-quotation"}
-                    onChange={() => setCurrentStage("make-quotation")}
-                    className="h-4 w-4 text-purple-600 focus:ring-purple-500"
-                  />
-                  <label htmlFor="make-quotation" className="text-sm text-gray-700">
-                    Make Quotation
-                  </label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="radio"
-                    id="quotation-validation"
-                    name="currentStage"
-                    value="quotation-validation"
-                    checked={currentStage === "quotation-validation"}
-                    onChange={() => setCurrentStage("quotation-validation")}
-                    className="h-4 w-4 text-purple-600 focus:ring-purple-500"
-                  />
-                  <label htmlFor="quotation-validation" className="text-sm text-gray-700">
-                    Quotation Validation
-                  </label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="radio"
-                    id="order-expected"
-                    name="currentStage"
-                    value="order-expected"
-                    checked={currentStage === "order-expected"}
-                    onChange={() => setCurrentStage("order-expected")}
-                    className="h-4 w-4 text-purple-600 focus:ring-purple-500"
-                  />
-                  <label htmlFor="order-expected" className="text-sm text-gray-700">
-                    Order Expected
-                  </label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="radio"
-                    id="order-status"
-                    name="currentStage"
-                    value="order-status"
-                    checked={currentStage === "order-status"}
-                    onChange={() => setCurrentStage("order-status")}
-                    className="h-4 w-4 text-purple-600 focus:ring-purple-500"
-                  />
-                  <label htmlFor="order-status" className="text-sm text-gray-700">
-                    Order Status
-                  </label>
-                </div>
-              </div>
-            </div>
+
+<div className="space-y-2">
+  <label className="block text-sm font-medium text-gray-700">Current Stage</label>
+  <div className="space-y-1">
+    <div className="flex items-center space-x-2">
+      <input
+        type="radio"
+        id="make-quotation"
+        name="currentStage"
+        value="make-quotation"
+        checked={currentStage === "make-quotation"}
+        onChange={async (e) => {
+          setCurrentStage(e.target.value)
+        }}
+        className="h-4 w-4 text-purple-600 focus:ring-purple-500"
+      />
+      <label htmlFor="make-quotation" className="text-sm text-gray-700">
+        Make Quotation
+      </label>
+    </div>
+    <div className="flex items-center space-x-2">
+      <input
+        type="radio"
+        id="quotation-validation"
+        name="currentStage"
+        value="quotation-validation"
+        checked={currentStage === "quotation-validation"}
+        onChange={async (e) => {
+          const stage = e.target.value
+          setCurrentStage(stage)
+          
+          if (formData.enquiryNo) {
+            // Fetch the latest quotation number for this enquiry
+            const quotationNumber = await fetchLatestQuotationNumber(formData.enquiryNo)
+            if (quotationNumber) {
+              setValidationData(prev => ({
+                ...prev,
+                validationQuotationNumber: quotationNumber
+              }))
+            }
+          }
+        }}
+        className="h-4 w-4 text-purple-600 focus:ring-purple-500"
+      />
+      <label htmlFor="quotation-validation" className="text-sm text-gray-700">
+        Quotation Validation
+      </label>
+    </div>
+    <div className="flex items-center space-x-2">
+      <input
+        type="radio"
+        id="order-expected"
+        name="currentStage"
+        value="order-expected"
+        checked={currentStage === "order-expected"}
+        onChange={async (e) => {
+          setCurrentStage(e.target.value)
+        }}
+        className="h-4 w-4 text-purple-600 focus:ring-purple-500"
+      />
+      <label htmlFor="order-expected" className="text-sm text-gray-700">
+        Order Expected
+      </label>
+    </div>
+    <div className="flex items-center space-x-2">
+      <input
+        type="radio"
+        id="order-status"
+        name="currentStage"
+        value="order-status"
+        checked={currentStage === "order-status"}
+        onChange={async (e) => {
+          const stage = e.target.value
+          setCurrentStage(stage)
+          
+          if (formData.enquiryNo) {
+            // Fetch the latest quotation number for this enquiry
+            const quotationNumber = await fetchLatestQuotationNumber(formData.enquiryNo)
+            if (quotationNumber) {
+              setOrderStatusData(prev => ({
+                ...prev,
+                orderStatusQuotationNumber: quotationNumber
+              }))
+            }
+          }
+        }}
+        className="h-4 w-4 text-purple-600 focus:ring-purple-500"
+      />
+      <label htmlFor="order-status" className="text-sm text-gray-700">
+        Order Status
+      </label>
+    </div>
+  </div>
+</div>
 
             {currentStage === "make-quotation" && (
               <MakeQuotationForm 

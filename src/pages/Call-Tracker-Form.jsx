@@ -12,8 +12,7 @@ const CallTrackerForm = ({ onClose = () => window.history.back() }) => {
   const [companyOptions, setCompanyOptions] = useState([])
   const [companyDetailsMap, setCompanyDetailsMap] = useState({})
   const [lastEnquiryNo, setLastEnquiryNo] = useState("")
-  // Add a new state for loading
-const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [newCallTrackerData, setNewCallTrackerData] = useState({
     enquiryNo: "",
@@ -23,6 +22,11 @@ const [isSubmitting, setIsSubmitting] = useState(false)
     salesPersonName: "",
     location: "",
     emailAddress: "",
+    shippingAddress: "",
+    enquiryReceiverName: "",
+    enquiryAssignToProject: "",
+    gstNumber: "",
+    isCompanyAutoFilled: true // Added to track auto-fill status
   })
 
   const [enquiryFormData, setEnquiryFormData] = useState({
@@ -34,6 +38,7 @@ const [isSubmitting, setIsSubmitting] = useState(false)
   })
 
   const [items, setItems] = useState([{ id: "1", name: "", quantity: "" }])
+  const [isCompanyAutoFilled, setIsCompanyAutoFilled] = useState(false);
 
   const [expectedFormData, setExpectedFormData] = useState({
     nextAction: "",
@@ -205,16 +210,20 @@ const [isSubmitting, setIsSubmitting] = useState(false)
         
         // Skip the header row
         data.table.rows.slice(0).forEach(row => {
-          if (row.c && row.c[40] && row.c[40].v !== null) {
-            const companyName = row.c[40].v.toString()
+          // Column AX for company name
+          if (row.c && row.c[49] && row.c[49].v !== null) {
+            const companyName = row.c[49].v.toString()
             companies.push(companyName)
             
             // Store company details for auto-fill
             detailsMap[companyName] = {
-              salesPerson: (row.c[41] && row.c[41].v !== null) ? row.c[41].v.toString() : "", 
-              phoneNumber: (row.c[42] && row.c[42].v !== null) ? row.c[42].v.toString() : "", 
-              email: (row.c[43] && row.c[43].v !== null) ? row.c[43].v.toString() : "",
-              location: (row.c[44] && row.c[44].v !== null) ? row.c[44].v.toString() : ""
+              phoneNumber: (row.c[51] && row.c[51].v !== null) ? row.c[51].v.toString() : "", // Column AZ
+              salesPerson: (row.c[50] && row.c[50].v !== null) ? row.c[50].v.toString() : "", // Column AY
+              gstNumber: (row.c[53] && row.c[53].v !== null) ? row.c[53].v.toString() : "", // Column BB
+              billingAddress: (row.c[54] && row.c[54].v !== null) ? row.c[54].v.toString() : "", // Column BC
+              // shippingAddress: (row.c[55] && row.c[55].v !== null) ? row.c[55].v.toString() : "", // Column BD
+              // enquiryReceiverName: (row.c[56] && row.c[56].v !== null) ? row.c[56].v.toString() : "", // Column BE
+              // enquiryAssignToProject: (row.c[57] && row.c[57].v !== null) ? row.c[57].v.toString() : "" // Column BF
             }
           }
         })
@@ -231,10 +240,12 @@ const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Handle company name change and auto-fill other fields
   const handleCompanyChange = (companyName) => {
+    const isAutoFilled = true
     setNewCallTrackerData(prev => ({
       ...prev,
-      companyName: companyName
-    }))
+      companyName: companyName,
+      isCompanyAutoFilled: true // Set to true when a company is selected
+    }));
 
     // Auto-fill related fields if company is selected
     if (companyName) {
@@ -243,8 +254,12 @@ const [isSubmitting, setIsSubmitting] = useState(false)
         ...prev,
         phoneNumber: companyDetails.phoneNumber || "",
         salesPersonName: companyDetails.salesPerson || "",
-        location: companyDetails.location || "",
-        emailAddress: companyDetails.email || ""
+        location: companyDetails.billingAddress || "",
+        gstNumber: companyDetails.gstNumber || "",
+        shippingAddress: companyDetails.shippingAddress || "",
+        enquiryReceiverName: companyDetails.enquiryReceiverName || "",
+        enquiryAssignToProject: companyDetails.enquiryAssignToProject || "",
+        isCompanyAutoFilled: isAutoFilled
       }))
     }
   }
@@ -286,101 +301,105 @@ const [isSubmitting, setIsSubmitting] = useState(false)
   }
 
   // Function to handle form submission
-  const handleSubmit = async () => {
-    setIsSubmitting(true)
-    try {
-      const currentDate = new Date()
-      const formattedDate = formatDateToDDMMYYYY(currentDate)
+  // Function to handle form submission
+const handleSubmit = async () => {
+  setIsSubmitting(true)
+  try {
+    const currentDate = new Date()
+    const formattedDate = formatDateToDDMMYYYY(currentDate)
 
-      // Prepare base row data (columns A-E)
-      const rowData = [
-        formattedDate, // A: Current date
-        newCallTrackerData.enquiryNo, // B: Lead Number
-        newCallTrackerData.leadSource, // C: Lead Source
-        // "hot", // D: Default to "hot" status
-        // "yes", // E: Always "yes" for new call tracker
-        newCallTrackerData.companyName, // F: Company Name
-        newCallTrackerData.phoneNumber, // G: Phone Number
-        newCallTrackerData.salesPersonName, // H: Sales Person Name
-        newCallTrackerData.location, // I: Location
-        newCallTrackerData.emailAddress, // J: Email Address
-      ]
+    // Prepare base row data (columns A-E)
+    const rowData = [
+      formattedDate, // A: Current date
+      newCallTrackerData.enquiryNo, // B: Lead Number
+      newCallTrackerData.leadSource, // C: Lead Source
+      newCallTrackerData.companyName, // F: Company Name
+      newCallTrackerData.phoneNumber, // G: Phone Number
+      newCallTrackerData.salesPersonName, // H: Sales Person Name
+      newCallTrackerData.location, // I: Location
+      newCallTrackerData.emailAddress, // J: Email Address
+      newCallTrackerData.shippingAddress, // K: Shipping Address
+      newCallTrackerData.enquiryReceiverName, // L: Enquiry Receiver Name
+      newCallTrackerData.enquiryAssignToProject, // M: Enquiry Assign to Project
+      newCallTrackerData.gstNumber, // N: GST Number
+    ]
 
-      // Add columns K-P for the enquiry form data
-      rowData.push(
-        enquiryFormData.enquiryDate ? formatDateToDDMMYYYY(enquiryFormData.enquiryDate) : "", // K: Enquiry Received Date
-        enquiryFormData.enquiryState, // L: Enquiry for State
-        enquiryFormData.projectName, // M: Project Name (NOB)
-        enquiryFormData.salesType, // N: Sales Type
-        enquiryFormData.enquiryApproach, // O: Enquiry Approach
-        // "", // P: Project Value (empty)
-      )
+    // Add columns O-S for the enquiry form data
+    rowData.push(
+      enquiryFormData.enquiryDate ? formatDateToDDMMYYYY(enquiryFormData.enquiryDate) : "", // O: Enquiry Received Date
+      enquiryFormData.enquiryState, // P: Enquiry for State
+      enquiryFormData.projectName, // Q: Project Name (NOB)
+      enquiryFormData.salesType, // R: Sales Type
+      enquiryFormData.enquiryApproach, // S: Enquiry Approach
+    )
 
-      // Add item details (columns Q-Z)
-      // Process up to 5 items (name and quantity pairs)
-      const allItems = [...items]
-      
-      // Ensure we have exactly 5 items (adding empty ones if needed)
-      while (allItems.length < 10) {
-        allItems.push({ id: `empty-${allItems.length + 1}`, name: "", quantity: "" })
-      }
-      
-      // Add all 5 items, each with name and quantity
-      allItems.slice(0, 10).forEach(item => {
-        rowData.push(item.name) // Item name
-        rowData.push(item.quantity) // Quantity
-      })
-
-      // Add expected form data
-      // rowData.push(
-      //   expectedFormData.nextAction || "", // Next Action
-      //   expectedFormData.nextCallDate || "", // Next Call Date
-      //   expectedFormData.nextCallTime || "" // Next Call Time
-      // )
-
-      // Add enquiry number in the last column
-      // rowData.push(newCallTrackerData.enquiryNo) // Enquiry No.
-
-      console.log("Row Data to be submitted:", rowData)
-
-      // Submit data to Google Sheets using fetch
-      const scriptUrl = "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
-      
-      // Parameters for Google Apps Script
-      const params = {
-        sheetName: "ENQUIRY TO ORDER",
-        action: "insert",
-        rowData: JSON.stringify(rowData)
-      }
-
-      // Create URL-encoded string for the parameters
-      const urlParams = new URLSearchParams()
-      for (const key in params) {
-        urlParams.append(key, params[key])
-      }
-      
-      // Send the data
-      const response = await fetch(scriptUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: urlParams
-      })
-
-      const result = await response.json()
-      
-      if (result.success) {
-        alert("Data submitted successfully!")
-        onClose() // Close the form after successful submission
-      } else {
-        alert("Error submitting data: " + (result.error || "Unknown error"))
-      }
-    } catch (error) {
-      console.error("Error submitting form:", error)
-      alert("Error submitting form: " + error.message)
+    // Add item details (columns T-AC)
+    // Process up to 5 items (name and quantity pairs)
+    const allItems = [...items]
+    
+    // Ensure we have exactly 5 items (adding empty ones if needed)
+    while (allItems.length < 5) {
+      allItems.push({ id: `empty-${allItems.length + 1}`, name: "", quantity: "" })
     }
+    
+    // Add all 5 items, each with name and quantity
+    allItems.slice(0, 5).forEach(item => {
+      rowData.push(item.name) // Item name
+      rowData.push(item.quantity) // Quantity
+    })
+
+    // Add expected form data
+    rowData.push(
+      expectedFormData.nextAction || "", // Next Action
+      expectedFormData.nextCallDate || "", // Next Call Date
+      expectedFormData.nextCallTime || "" // Next Call Time
+    )
+
+    // Add enquiry number in the last column
+    rowData.push(newCallTrackerData.enquiryNo) // Enquiry No.
+
+    console.log("Row Data to be submitted:", rowData)
+
+    // Submit data to Google Sheets using fetch
+    const scriptUrl = "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
+    
+    // Parameters for Google Apps Script
+    const params = {
+      sheetName: "ENQUIRY TO ORDER",
+      action: "insert",
+      rowData: JSON.stringify(rowData)
+    }
+
+    // Create URL-encoded string for the parameters
+    const urlParams = new URLSearchParams()
+    for (const key in params) {
+      urlParams.append(key, params[key])
+    }
+    
+    // Send the data
+    const response = await fetch(scriptUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: urlParams
+    })
+
+    const result = await response.json()
+    
+    if (result.success) {
+      alert("Data submitted successfully!")
+      onClose() // Close the form after successful submission
+    } else {
+      alert("Error submitting data: " + (result.error || "Unknown error"))
+    }
+  } catch (error) {
+    console.error("Error submitting form:", error)
+    alert("Error submitting form: " + error.message)
+  } finally {
+    setIsSubmitting(false)
   }
+}
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -469,14 +488,14 @@ const [isSubmitting, setIsSubmitting] = useState(false)
                 placeholder="Phone number will auto-fill"
                 value={newCallTrackerData.phoneNumber}
                 onChange={(e) => setNewCallTrackerData({ ...newCallTrackerData, phoneNumber: e.target.value })}
-                readOnly={newCallTrackerData.companyName !== ""}
+                readOnly={isCompanyAutoFilled && newCallTrackerData.companyName !== ""}
                 required
               />
             </div>
 
             <div className="space-y-2">
               <label htmlFor="salesPersonName" className="block text-sm font-medium text-gray-700">
-                Sales Person Name
+                Person Name
               </label>
               <input
                 id="salesPersonName"
@@ -484,14 +503,14 @@ const [isSubmitting, setIsSubmitting] = useState(false)
                 placeholder="Sales person name will auto-fill"
                 value={newCallTrackerData.salesPersonName}
                 onChange={(e) => setNewCallTrackerData({ ...newCallTrackerData, salesPersonName: e.target.value })}
-                readOnly={newCallTrackerData.companyName !== ""}
+                readOnly={isCompanyAutoFilled && newCallTrackerData.companyName !== ""}
                 required
               />
             </div>
 
             <div className="space-y-2">
               <label htmlFor="location" className="block text-sm font-medium text-gray-700">
-                Location
+                Billing Address
               </label>
               <input
                 id="location"
@@ -499,7 +518,7 @@ const [isSubmitting, setIsSubmitting] = useState(false)
                 placeholder="Location will auto-fill"
                 value={newCallTrackerData.location}
                 onChange={(e) => setNewCallTrackerData({ ...newCallTrackerData, location: e.target.value })}
-                readOnly={newCallTrackerData.companyName !== ""}
+                readOnly={isCompanyAutoFilled && newCallTrackerData.companyName !== ""}
                 required
               />
             </div>
@@ -515,9 +534,82 @@ const [isSubmitting, setIsSubmitting] = useState(false)
                 placeholder="Email will auto-fill"
                 value={newCallTrackerData.emailAddress}
                 onChange={(e) => setNewCallTrackerData({ ...newCallTrackerData, emailAddress: e.target.value })}
-                readOnly={newCallTrackerData.companyName !== ""}
+                readOnly={isCompanyAutoFilled && newCallTrackerData.companyName !== ""}
               />
             </div>
+
+            <div className="space-y-2">
+            <label htmlFor="shippingAddress" className="block text-sm font-medium text-gray-700">
+              Shipping Address
+            </label>
+            <input
+              id="shippingAddress"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="Enter shipping address"
+              value={newCallTrackerData.shippingAddress}
+              onChange={(e) => setNewCallTrackerData({ 
+                ...newCallTrackerData, 
+                shippingAddress: e.target.value,
+                isCompanyAutoFilled: false // Allow manual editing
+              })}
+              readOnly={isCompanyAutoFilled && newCallTrackerData.companyName !== ""}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="enquiryReceiverName" className="block text-sm font-medium text-gray-700">
+              Enquiry Receiver Name
+            </label>
+            <input
+              id="enquiryReceiverName"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="Enter enquiry receiver name"
+              value={newCallTrackerData.enquiryReceiverName}
+              onChange={(e) => setNewCallTrackerData({ 
+                ...newCallTrackerData, 
+                enquiryReceiverName: e.target.value,
+                isCompanyAutoFilled: false // Allow manual editing
+              })}
+              readOnly={isCompanyAutoFilled && newCallTrackerData.companyName !== ""}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="enquiryAssignToProject" className="block text-sm font-medium text-gray-700">
+              Enquiry Assign to Project
+            </label>
+            <input
+              id="enquiryAssignToProject"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="Enter project assignment"
+              value={newCallTrackerData.enquiryAssignToProject}
+              onChange={(e) => setNewCallTrackerData({ 
+                ...newCallTrackerData, 
+                enquiryAssignToProject: e.target.value,
+                isCompanyAutoFilled: false // Allow manual editing
+              })}
+              readOnly={isCompanyAutoFilled && newCallTrackerData.companyName !== ""}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="gstNumber" className="block text-sm font-medium text-gray-700">
+              GST Number
+            </label>
+            <input
+              id="gstNumber"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="Enter GST number"
+              value={newCallTrackerData.gstNumber}
+              onChange={(e) => setNewCallTrackerData({ 
+                ...newCallTrackerData, 
+                gstNumber: e.target.value,
+                isCompanyAutoFilled: false // Allow manual editing
+              })}
+              readOnly={newCallTrackerData.isCompanyAutoFilled && newCallTrackerData.companyName !== ""}
+            />
+          </div>
+
           </div>
 
           {/* Enquiry Details section */}

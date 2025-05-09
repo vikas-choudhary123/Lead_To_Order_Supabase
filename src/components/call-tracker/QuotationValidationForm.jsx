@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react"
 
-function QuotationValidationForm({ formData, onFieldChange }) {
+function QuotationValidationForm({ formData, onFieldChange, enquiryNo }) {
   const [sendStatusOptions, setSendStatusOptions] = useState([])
+  const [validatorNameOptions, setValidatorNameOptions] = useState([])
   const [isLoading, setIsLoading] = useState(false)
+  const [quotationNumbers, setQuotationNumbers] = useState([])
+  const [isLoadingQuotations, setIsLoadingQuotations] = useState(false)
   
-  // Fetch dropdown options from DROPDOWN sheet column F
+  // Fetch dropdown options from DROPDOWN sheet
   useEffect(() => {
-    const fetchSendStatusOptions = async () => {
+    const fetchDropdownOptions = async () => {
       try {
         setIsLoading(true)
         
@@ -22,31 +25,139 @@ function QuotationValidationForm({ formData, onFieldChange }) {
         
         const data = JSON.parse(jsonData)
         
-        // Extract column F values (skip header row)
+        // Extract column values (skip header row)
         if (data && data.table && data.table.rows) {
-          const options = []
+          const sendStatusOpts = []
+          const validatorNameOpts = []
           
           // Skip the header row (index 0)
-          data.table.rows.slice(1).forEach(row => {
-            // Column F is index 5
+          data.table.rows.slice(0).forEach(row => {
+            // Column F (index 5) for send status
             if (row.c && row.c[5] && row.c[5].v) {
-              options.push(row.c[5].v)
+              sendStatusOpts.push(row.c[5].v)
+            }
+            // Column B (index 1) for validator names
+            if (row.c && row.c[63] && row.c[63].v) {
+              validatorNameOpts.push(row.c[63].v)
             }
           })
           
-          setSendStatusOptions(options)
+          setSendStatusOptions(sendStatusOpts)
+          setValidatorNameOptions(validatorNameOpts)
         }
       } catch (error) {
         console.error("Error fetching dropdown options:", error)
         // Fallback options if fetch fails
         setSendStatusOptions(["mail", "whatsapp", "both"])
+        setValidatorNameOptions([])
       } finally {
         setIsLoading(false)
       }
     }
     
-    fetchSendStatusOptions()
+    fetchDropdownOptions()
   }, [])
+
+  // Fetch quotation numbers for the given enquiry number
+  // useEffect(() => {
+  //   const fetchQuotationNumbers = async () => {
+  //     if (!enquiryNo) return
+      
+  //     try {
+  //       setIsLoadingQuotations(true)
+        
+  //       // Fetch data from FMS sheet or use the dedicated endpoint
+  //       const scriptUrl = "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
+        
+  //       const params = {
+  //         action: "getQuotationNumber",
+  //         enquiryNo: enquiryNo
+  //       }
+
+  //       const urlParams = new URLSearchParams()
+  //       for (const key in params) {
+  //         urlParams.append(key, params[key])
+  //       }
+        
+  //       const response = await fetch(scriptUrl, {
+  //         method: "POST",
+  //         headers: {
+  //           "Content-Type": "application/x-www-form-urlencoded"
+  //         },
+  //         body: urlParams
+  //       })
+
+  //       const result = await response.json()
+        
+  //       if (result.success && result.quotationNumber) {
+  //         setQuotationNumbers([result.quotationNumber])
+          
+  //         // If form field is empty, auto-fill with the first match
+  //         if (!formData.validationQuotationNumber) {
+  //           onFieldChange('validationQuotationNumber', result.quotationNumber)
+  //         }
+  //       }
+  //     } catch (error) {
+  //       console.error("Error fetching quotation numbers:", error)
+  //     } finally {
+  //       setIsLoadingQuotations(false)
+  //     }
+  //   }
+    
+  //   fetchQuotationNumbers()
+  // }, [enquiryNo, formData.validationQuotationNumber, onFieldChange])
+
+  useEffect(() => {
+    const fetchQuotationNumbers = async () => {
+      if (!enquiryNo) return
+      
+      try {
+        setIsLoadingQuotations(true)
+        
+        // Fetch data from FMS sheet
+        const fmsUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=FMS"
+        const response = await fetch(fmsUrl)
+        const text = await response.text()
+        
+        // Extract the JSON part from the response
+        const jsonStart = text.indexOf('{')
+        const jsonEnd = text.lastIndexOf('}') + 1
+        const jsonData = text.substring(jsonStart, jsonEnd)
+        
+        const data = JSON.parse(jsonData)
+        
+        // Find matching quotation numbers where column B matches the enquiry number
+        if (data && data.table && data.table.rows) {
+          const matchingQuotations = []
+          
+          data.table.rows.forEach(row => {
+            // Column B is index 1 (enquiry number) and column H is index 7 (quotation number)
+            if (row.c && 
+                row.c[1] && 
+                row.c[1].v && 
+                row.c[1].v.toString() === enquiryNo.toString() &&
+                row.c[60] && 
+                row.c[60].v) {
+              matchingQuotations.push(row.c[60].v)
+            }
+          })
+          
+          setQuotationNumbers(matchingQuotations)
+          
+          // If we found matches and the form field is empty, auto-fill with the first match
+          if (matchingQuotations.length > 0 && !formData.validationQuotationNumber) {
+            onFieldChange('validationQuotationNumber', matchingQuotations[0])
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching quotation numbers:", error)
+      } finally {
+        setIsLoadingQuotations(false)
+      }
+    }
+    
+    fetchQuotationNumbers()
+  }, [enquiryNo, formData.validationQuotationNumber, onFieldChange])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -63,30 +174,60 @@ function QuotationValidationForm({ formData, onFieldChange }) {
           <label htmlFor="validationQuotationNumber" className="block text-sm font-medium text-gray-700">
             Quotation Number
           </label>
-          <input
-            id="validationQuotationNumber"
-            name="validationQuotationNumber"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-            placeholder="Enter quotation number"
-            value={formData.validationQuotationNumber || ""}
-            onChange={handleChange}
-            required
-          />
+          {isLoadingQuotations ? (
+            <div className="flex items-center space-x-2">
+              <input
+                id="validationQuotationNumber"
+                name="validationQuotationNumber"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="Loading quotation numbers..."
+                value={formData.validationQuotationNumber || ""}
+                onChange={handleChange}
+                disabled
+                required
+              />
+              <div className="text-sm text-gray-500">Loading...</div>
+            </div>
+          ) : (
+            <input
+              id="validationQuotationNumber"
+              name="validationQuotationNumber"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="Enter quotation number"
+              value={formData.validationQuotationNumber || ""}
+              onChange={handleChange}
+              required
+            />
+          )}
+          {enquiryNo && quotationNumbers.length > 0 && !isLoadingQuotations && (
+            <div className="text-xs text-green-600 mt-1">
+              {quotationNumbers.length === 1 
+                ? "Found matching quotation" 
+                : `Found ${quotationNumbers.length} matching quotations`}
+            </div>
+          )}
+          {enquiryNo && quotationNumbers.length === 0 && !isLoadingQuotations && (
+            <div className="text-xs text-orange-500 mt-1">No matching quotations found for enquiry #{enquiryNo}</div>
+          )}
         </div>
 
         <div className="space-y-2">
           <label htmlFor="validatorName" className="block text-sm font-medium text-gray-700">
             Quotation Validator Name
           </label>
-          <input
+          <select
             id="validatorName"
             name="validatorName"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-            placeholder="Enter validator name"
             value={formData.validatorName || ""}
             onChange={handleChange}
             required
-          />
+          >
+            <option value="">Select validator</option>
+            {validatorNameOptions.map((option, index) => (
+              <option key={index} value={option}>{option}</option>
+            ))}
+          </select>
         </div>
       </div>
 

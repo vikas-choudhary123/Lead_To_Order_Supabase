@@ -82,8 +82,8 @@ function DashboardMetrics() {
           pendingFollowups = fmsData.table.rows.filter((row, index) => 
             index >= 2 && 
             row.c && 
-            row.c[12] && row.c[12].v && 
-            (!row.c[13] || !row.c[13].v)
+            row.c[27] && row.c[27].v && 
+            (!row.c[28] || !row.c[28].v)
           ).length
         }
         
@@ -117,8 +117,8 @@ function DashboardMetrics() {
           // Count pending enquiries where column AH (index 33) is not null and column AI (index 34) is null
           pendingEnquiry = enquiryData.table.rows.filter(row => 
             row.c && 
-            row.c[33] && row.c[33].v && 
-            (!row.c[34] || !row.c[34].v)
+            row.c[37] && row.c[37].v && 
+            (!row.c[38] || !row.c[38].v)
           ).length
           
         }

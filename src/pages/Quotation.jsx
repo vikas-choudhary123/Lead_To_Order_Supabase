@@ -1164,7 +1164,7 @@ const handleSaveQuotation = async () => {
     const fileName = `Quotation_${finalQuotationNo}.pdf`
     
     // Script URL
-    const scriptUrl = "https://script.google.com/macros/s/AKfycbxeo5tv3kAcSDDAheOCP07HaK76zSfq49jFGtZknseg7kPlj2G1O8U2PuiA2fQSuPvKqA/exec"
+    const scriptUrl = "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
     
     // 1. Upload PDF to Google Drive and get URL
     const pdfParams = {
@@ -1422,7 +1422,7 @@ const handleSaveQuotation = async () => {
   // Helper function to increment quotation number
   const getNextQuotationNumber = async () => {
     // Script URL
-    const scriptUrl = "https://script.google.com/macros/s/AKfycbxeo5tv3kAcSDDAheOCP07HaK76zSfq49jFGtZknseg7kPlj2G1O8U2PuiA2fQSuPvKqA/exec"
+    const scriptUrl = "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
     
     try {
       // Prepare parameters to get the last quotation number

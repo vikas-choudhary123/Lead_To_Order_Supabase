@@ -8,7 +8,10 @@ function OrderStatusForm({ formData, onFieldChange }) {
   const [paymentModeOptions, setPaymentModeOptions] = useState([])
   const [reasonStatusOptions, setReasonStatusOptions] = useState([])
   const [holdReasonOptions, setHoldReasonOptions] = useState([])
+  const [paymentTermsOptions, setPaymentTermsOptions] = useState([])
+  const [conveyedOptions, setConveyedOptions] = useState([])
   const [isLoadingDropdowns, setIsLoadingDropdowns] = useState(false)
+  const [orderVideoError, setOrderVideoError] = useState("")
 
   // Fetch dropdown options from DROPDOWN sheet
   useEffect(() => {
@@ -37,9 +40,13 @@ function OrderStatusForm({ formData, onFieldChange }) {
           const reasonOptions = []
           // For Hold Reason options (column K = index 10)
           const holdOptions = []
+          // For Payment Terms options (column BS = index 71)
+          const paymentTermsOptions = []
+          // For Conveyed options (column BT = index 72)
+          const conveyedOptions = []
           
           // Skip the header row (index 0)
-          data.table.rows.slice(1).forEach(row => {
+          data.table.rows.slice(0).forEach(row => {
             // Extract column H values (index 7)
             if (row.c && row.c[7] && row.c[7].v) {
               acceptanceOptions.push(row.c[7].v)
@@ -59,12 +66,24 @@ function OrderStatusForm({ formData, onFieldChange }) {
             if (row.c && row.c[10] && row.c[10].v) {
               holdOptions.push(row.c[10].v)
             }
+            
+            // Extract column BS values (index 71)
+            if (row.c && row.c[70] && row.c[70].v) {
+              paymentTermsOptions.push(row.c[70].v)
+            }
+            
+            // Extract column BT values (index 72)
+            if (row.c && row.c[71] && row.c[71].v) {
+              conveyedOptions.push(row.c[71].v)
+            }
           })
           
           setAcceptanceViaOptions(acceptanceOptions)
           setPaymentModeOptions(paymentOptions)
           setReasonStatusOptions(reasonOptions)
           setHoldReasonOptions(holdOptions)
+          setPaymentTermsOptions(paymentTermsOptions)
+          setConveyedOptions(conveyedOptions)
         }
       } catch (error) {
         console.error("Error fetching dropdown options:", error)
@@ -73,6 +92,8 @@ function OrderStatusForm({ formData, onFieldChange }) {
         setPaymentModeOptions(["cash", "check", "bank-transfer", "credit-card"])
         setReasonStatusOptions(["price", "competitor", "timeline", "specifications", "other"])
         setHoldReasonOptions(["budget", "approval", "project-delay", "reconsideration", "other"])
+        setPaymentTermsOptions(["30", "45", "60", "90"])
+        setConveyedOptions(["Yes", "No"])
       } finally {
         setIsLoadingDropdowns(false)
       }
@@ -89,6 +110,13 @@ function OrderStatusForm({ formData, onFieldChange }) {
   const handleFileChange = (e) => {
     const { name } = e.target
     const file = e.target.files[0]
+    
+    if (name === "orderVideo" && !file) {
+      setOrderVideoError("Order Video is mandatory")
+    } else {
+      setOrderVideoError("")
+    }
+    
     if (file) {
       onFieldChange(name, file)
     }
@@ -214,33 +242,71 @@ function OrderStatusForm({ formData, onFieldChange }) {
 
             <div className="space-y-2">
               <label htmlFor="paymentTerms" className="block text-sm font-medium text-gray-700">
-                Payment Terms (In Days)
+                Payment Terms
               </label>
-              <input
+              <select
                 id="paymentTerms"
                 name="paymentTerms"
-                type="number"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                placeholder="Enter days"
                 value={formData.paymentTerms || ""}
                 onChange={handleChange}
                 required
+              >
+                <option value="">Select payment terms</option>
+                {paymentTermsOptions.map((option, index) => (
+                  <option key={index} value={option}>{option} days</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="transportMode" className="block text-sm font-medium text-gray-700">
+                Transport Mode
+              </label>
+              <input
+                id="transportMode"
+                name="transportMode"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="Enter transport mode"
+                value={formData.transportMode || ""}
+                onChange={handleChange}
               />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="conveyedForRegistration" className="block text-sm font-medium text-gray-700">
+                CONVEYED FOR REGISTRATION FORM
+              </label>
+              <select
+                id="conveyedForRegistration"
+                name="conveyedForRegistration"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                value={formData.conveyedForRegistration || ""}
+                onChange={handleChange}
+              >
+                <option value="">Select option</option>
+                {conveyedOptions.map((option, index) => (
+                  <option key={index} value={option.toLowerCase()}>{option}</option>
+                ))}
+              </select>
             </div>
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="orderVideo" className="block text-sm font-medium text-gray-700">
-              Order Video (If Order Received)
-            </label>
-            <input
-              id="orderVideo"
-              name="orderVideo"
-              type="file"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              onChange={handleFileChange}
-            />
-          </div>
+  <label htmlFor="orderVideo" className="block text-sm font-medium text-gray-700">
+    Order Video (If Order Received)
+  </label>
+  <select
+    id="orderVideo"
+    name="orderVideo"
+    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+    onChange={handleChange}
+  >
+    <option value="">Select an option</option>
+    <option value="yes">Yes</option>
+    <option value="no">No</option>
+  </select>
+</div>
 
           <div className="space-y-2">
             <label htmlFor="acceptanceFile" className="block text-sm font-medium text-gray-700">

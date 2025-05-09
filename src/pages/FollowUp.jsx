@@ -164,20 +164,20 @@ function FollowUp() {
           pendingData.table.rows.slice(0).forEach((row) => {
             if (row.c) {
               // Check if column K (index 10) has data and column L (index 11) is null
-              const hasColumnK = row.c[12] && row.c[12].v
-              const isColumnLEmpty = !row.c[13] || row.c[13].v === null || row.c[13].v === ""
+              const hasColumnK = row.c[27] && row.c[27].v
+              const isColumnLEmpty = !row.c[28] || row.c[28].v === null || row.c[28].v === ""
 
               // Only include rows where column K has data and column L is null/empty
               if (hasColumnK && isColumnLEmpty) {
                 const followUpItem = {
                   id: row.c[0] ? row.c[0].v : "",
                   leadId: row.c[1] ? row.c[1].v : "", // Column B - Lead Number
-                  companyName: row.c[6] ? row.c[6].v : "", // Column G - Company Name
-                  personName: row.c[8] ? row.c[8].v : "", // Column C - Person Name (Lead Receiver)
+                  companyName: row.c[4] ? row.c[4].v : "", // Column G - Company Name
+                  personName: row.c[6] ? row.c[6].v : "", // Column C - Person Name (Lead Receiver)
                   leadSource: row.c[3] ? row.c[3].v : "", // Column D - Lead Source
-                  location: row.c[9] ? row.c[9].v : "", // Column J - Location
-                  customerSay: row.c[16] ? row.c[16].v : "", // Column Q - What Customer Said
-                  enquiryStatus: row.c[17] ? row.c[17].v : "", // Column R - Enquiry Status
+                  location: row.c[7] ? row.c[7].v : "", // Column J - Location
+                  customerSay: row.c[31] ? row.c[31].v : "", // Column Q - What Customer Said
+                  enquiryStatus: row.c[32] ? row.c[32].v : "", // Column R - Enquiry Status
                   createdAt: row.c[0] ? row.c[0].v : "", // Using date from column A
                   priority: determinePriority(row.c[3] ? row.c[3].v : ""), // Determine priority based on source
                 }
