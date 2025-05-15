@@ -13,6 +13,8 @@ const CallTrackerForm = ({ onClose = () => window.history.back() }) => {
   const [companyDetailsMap, setCompanyDetailsMap] = useState({})
   const [lastEnquiryNo, setLastEnquiryNo] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [receiverOptions, setReceiverOptions] = useState([])
+const [assignToProjectOptions, setAssignToProjectOptions] = useState([])
 
   const [newCallTrackerData, setNewCallTrackerData] = useState({
     enquiryNo: "",
@@ -134,6 +136,8 @@ const CallTrackerForm = ({ onClose = () => window.history.back() }) => {
         const productItems = []   // Column AJ (index 35) - Product Categories
         const nobItems = []       // Column AL (index 37) - NOB Options
         const approachOptions = [] // Column AM (index 38) - Enquiry Approach
+        const receivers = []      // Column BW (index 74) - Enquiry Receiver Name Options
+        const assignToProjects = [] // Column BX (index 75) - Enquiry Assign to Project Options
         
         // Skip the header row
         data.table.rows.slice(0).forEach(row => {
@@ -154,8 +158,8 @@ const CallTrackerForm = ({ onClose = () => window.history.back() }) => {
             }
             
             // Column AJ (Product Categories) - index 35
-            if (row.c[35] && row.c[35].v) {
-              productItems.push(row.c[35].v.toString())
+            if (row.c[76] && row.c[76].v) {
+              productItems.push(row.c[76].v.toString())
             }
             
             // Column AL (NOB Options) - index 37
@@ -167,6 +171,16 @@ const CallTrackerForm = ({ onClose = () => window.history.back() }) => {
             if (row.c[38] && row.c[38].v) {
               approachOptions.push(row.c[38].v.toString())
             }
+            
+            // Column BW (Enquiry Receiver Name) - index 74
+            if (row.c[74] && row.c[74].v) {
+              receivers.push(row.c[74].v.toString())
+            }
+            
+            // Column BX (Enquiry Assign to Project) - index 75
+            if (row.c[75] && row.c[75].v) {
+              assignToProjects.push(row.c[75].v.toString())
+            }
           }
         })
         
@@ -177,6 +191,8 @@ const CallTrackerForm = ({ onClose = () => window.history.back() }) => {
         setProductCategories([...new Set(productItems.filter(Boolean))])
         setNobOptions([...new Set(nobItems.filter(Boolean))])
         setEnquiryApproachOptions([...new Set(approachOptions.filter(Boolean))])
+        setReceiverOptions([...new Set(receivers.filter(Boolean))])
+        setAssignToProjectOptions([...new Set(assignToProjects.filter(Boolean))])
       }
     } catch (error) {
       console.error("Error fetching dropdown values:", error)
@@ -187,6 +203,8 @@ const CallTrackerForm = ({ onClose = () => window.history.back() }) => {
       setSalesTypes(["NBD", "CRR", "NBD_CRR"])
       setEnquiryApproachOptions(["Approach 1", "Approach 2", "Approach 3"])
       setProductCategories(["Product 1", "Product 2", "Product 3"])
+      setReceiverOptions(["Receiver 1", "Receiver 2", "Receiver 3"])
+      setAssignToProjectOptions(["Project 1", "Project 2", "Project 3"])
     }
   }
 
@@ -557,40 +575,52 @@ const handleSubmit = async () => {
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="enquiryReceiverName" className="block text-sm font-medium text-gray-700">
-              Enquiry Receiver Name
-            </label>
-            <input
-              id="enquiryReceiverName"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              placeholder="Enter enquiry receiver name"
-              value={newCallTrackerData.enquiryReceiverName}
-              onChange={(e) => setNewCallTrackerData({ 
-                ...newCallTrackerData, 
-                enquiryReceiverName: e.target.value,
-                isCompanyAutoFilled: false // Allow manual editing
-              })}
-              readOnly={isCompanyAutoFilled && newCallTrackerData.companyName !== ""}
-            />
-          </div>
+  <label htmlFor="enquiryReceiverName" className="block text-sm font-medium text-gray-700">
+    Enquiry Receiver Name
+  </label>
+  <select
+    id="enquiryReceiverName"
+    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+    value={newCallTrackerData.enquiryReceiverName}
+    onChange={(e) => setNewCallTrackerData({ 
+      ...newCallTrackerData, 
+      enquiryReceiverName: e.target.value,
+      isCompanyAutoFilled: false // Allow manual selection
+    })}
+    disabled={isCompanyAutoFilled && newCallTrackerData.companyName !== ""}
+  >
+    <option value="">Select receiver</option>
+    {receiverOptions.map((receiver, index) => (
+      <option key={index} value={receiver}>
+        {receiver}
+      </option>
+    ))}
+  </select>
+</div>
 
-          <div className="space-y-2">
-            <label htmlFor="enquiryAssignToProject" className="block text-sm font-medium text-gray-700">
-              Enquiry Assign to Project
-            </label>
-            <input
-              id="enquiryAssignToProject"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              placeholder="Enter project assignment"
-              value={newCallTrackerData.enquiryAssignToProject}
-              onChange={(e) => setNewCallTrackerData({ 
-                ...newCallTrackerData, 
-                enquiryAssignToProject: e.target.value,
-                isCompanyAutoFilled: false // Allow manual editing
-              })}
-              readOnly={isCompanyAutoFilled && newCallTrackerData.companyName !== ""}
-            />
-          </div>
+<div className="space-y-2">
+  <label htmlFor="enquiryAssignToProject" className="block text-sm font-medium text-gray-700">
+    Enquiry Assign to Project
+  </label>
+  <select
+    id="enquiryAssignToProject"
+    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+    value={newCallTrackerData.enquiryAssignToProject}
+    onChange={(e) => setNewCallTrackerData({ 
+      ...newCallTrackerData, 
+      enquiryAssignToProject: e.target.value,
+      isCompanyAutoFilled: false // Allow manual selection
+    })}
+    disabled={isCompanyAutoFilled && newCallTrackerData.companyName !== ""}
+  >
+    <option value="">Select project</option>
+    {assignToProjectOptions.map((project, index) => (
+      <option key={index} value={project}>
+        {project}
+      </option>
+    ))}
+  </select>
+</div>
 
           <div className="space-y-2">
             <label htmlFor="gstNumber" className="block text-sm font-medium text-gray-700">

@@ -12,6 +12,7 @@ function OrderStatusForm({ formData, onFieldChange }) {
   const [conveyedOptions, setConveyedOptions] = useState([])
   const [isLoadingDropdowns, setIsLoadingDropdowns] = useState(false)
   const [orderVideoError, setOrderVideoError] = useState("")
+  const [transportModeOptions, setTransportModeOptions] = useState([])
 
   // Fetch dropdown options from DROPDOWN sheet
   useEffect(() => {
@@ -44,6 +45,8 @@ function OrderStatusForm({ formData, onFieldChange }) {
           const paymentTermsOptions = []
           // For Conveyed options (column BT = index 72)
           const conveyedOptions = []
+          // For Transport Mode options (column BN = index 65)
+          const transportOptions = []
           
           // Skip the header row (index 0)
           data.table.rows.slice(0).forEach(row => {
@@ -76,6 +79,11 @@ function OrderStatusForm({ formData, onFieldChange }) {
             if (row.c && row.c[71] && row.c[71].v) {
               conveyedOptions.push(row.c[71].v)
             }
+            
+            // Extract column BN values (index 65)
+            if (row.c && row.c[65] && row.c[65].v) {
+              transportOptions.push(row.c[65].v)
+            }
           })
           
           setAcceptanceViaOptions(acceptanceOptions)
@@ -84,6 +92,7 @@ function OrderStatusForm({ formData, onFieldChange }) {
           setHoldReasonOptions(holdOptions)
           setPaymentTermsOptions(paymentTermsOptions)
           setConveyedOptions(conveyedOptions)
+          setTransportModeOptions(transportOptions)
         }
       } catch (error) {
         console.error("Error fetching dropdown options:", error)
@@ -94,6 +103,7 @@ function OrderStatusForm({ formData, onFieldChange }) {
         setHoldReasonOptions(["budget", "approval", "project-delay", "reconsideration", "other"])
         setPaymentTermsOptions(["30", "45", "60", "90"])
         setConveyedOptions(["Yes", "No"])
+        setTransportModeOptions(["Road", "Air", "Sea", "Rail"])
       } finally {
         setIsLoadingDropdowns(false)
       }
@@ -260,18 +270,22 @@ function OrderStatusForm({ formData, onFieldChange }) {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="transportMode" className="block text-sm font-medium text-gray-700">
-                Transport Mode
-              </label>
-              <input
-                id="transportMode"
-                name="transportMode"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                placeholder="Enter transport mode"
-                value={formData.transportMode || ""}
-                onChange={handleChange}
-              />
-            </div>
+  <label htmlFor="transportMode" className="block text-sm font-medium text-gray-700">
+    Transport Mode
+  </label>
+  <select
+    id="transportMode"
+    name="transportMode"
+    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+    value={formData.transportMode || ""}
+    onChange={handleChange}
+  >
+    <option value="">Select transport mode</option>
+    {transportModeOptions.map((option, index) => (
+      <option key={index} value={option.toLowerCase()}>{option}</option>
+    ))}
+  </select>
+</div>
 
             <div className="space-y-2">
               <label htmlFor="conveyedForRegistration" className="block text-sm font-medium text-gray-700">

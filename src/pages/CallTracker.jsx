@@ -251,29 +251,38 @@ function CallTracker() {
         // Process Direct Enquiry Pending from ENQUIRY TO ORDER sheet
         if (directEnquiryData && directEnquiryData.table && directEnquiryData.table.rows) {
           const directEnquiryPendingData = []
-
+        
           // Skip the header row (index 0)
           directEnquiryData.table.rows.slice(1).forEach((row, index) => {
-            // Only show rows where column AH (index 33) is not null and column AI (index 34) is null
+            // Only show rows where column AH (index 37) is not null and column AI (index 38) is null
             if (row.c && row.c[37] && row.c[37].v && (!row.c[38] || !row.c[38].v)) {
-              const directEnquiryItem = {
-                id: index + 1,
-                leadId: row.c[1] ? row.c[1].v : "", // Column B - Lead Number
-                receiverName: row.c[2] ? row.c[2].v : "", // Column C - Lead Receiver Name
-                leadSource: row.c[3] ? row.c[3].v : "", // Column D - Lead Source
-                salespersonName: row.c[41] ? row.c[41].v : "", // Column E - Salesperson Name
-                companyName: row.c[42] ? row.c[42].v : "", // Column G - Company Name
-                createdAt: row.c[0] ? formatDateToDDMMYYYY(row.c[0].v) : "", // Using date from column A
-                status: "Expected", // Default status for pending
-                priority: determinePriority(row.c[3] ? row.c[3].v : ""), // Determine priority based on source
-                stage: "Pending", // Default stage
-                dueDate: "", // You might want to add logic to calculate due date
+              // Get the assigned user from column BX (index 75) 
+              const assignedUser = row.c[75] ? row.c[75].v : ""
+              
+              // For admin users, include all rows; for regular users, filter by their username
+              const shouldInclude = isAdmin() || (currentUser && assignedUser === currentUser.username)
+              
+              if (shouldInclude) {
+                const directEnquiryItem = {
+                  id: index + 1,
+                  leadId: row.c[1] ? row.c[1].v : "", // Column B - Lead Number
+                  receiverName: row.c[2] ? row.c[2].v : "", // Column C - Lead Receiver Name
+                  leadSource: row.c[3] ? row.c[3].v : "", // Column D - Lead Source
+                  salespersonName: row.c[41] ? row.c[41].v : "", // Column E - Salesperson Name
+                  companyName: row.c[42] ? row.c[42].v : "", // Column G - Company Name
+                  createdAt: row.c[0] ? formatDateToDDMMYYYY(row.c[0].v) : "", // Using date from column A
+                  status: "Expected", // Default status for pending
+                  priority: determinePriority(row.c[3] ? row.c[3].v : ""), // Determine priority based on source
+                  stage: "Pending", // Default stage
+                  dueDate: "", // You might want to add logic to calculate due date
+                  assignedTo: assignedUser // Add assigned user to the tracker item
+                }
+        
+                directEnquiryPendingData.push(directEnquiryItem)
               }
-
-              directEnquiryPendingData.push(directEnquiryItem)
             }
           })
-
+        
           setDirectEnquiryPendingTrackers(directEnquiryPendingData)
         }
       } catch (error) {

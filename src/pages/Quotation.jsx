@@ -3,6 +3,8 @@
 // import { useState } from "react"
 import { FileTextIcon, PlusIcon, TrashIcon, DownloadIcon, SaveIcon, ShareIcon, CopyIcon, EyeIcon } from "../components/Icons"
 import { useState, useEffect } from "react"
+import image1 from "../assests/WhatsApp Image 2025-05-14 at 4.11.43 PM.jpeg"
+import imageform from "../assests/WhatsApp Image 2025-05-14 at 4.11.54 PM.jpeg"
 
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -64,6 +66,7 @@ const [productData, setProductData] = useState({}); // To store code-name mappin
         id: 1,
         code: "",
         name: "",
+        description: "",
         gst: 18,
         qty: 1,
         units: "Nos",
@@ -121,16 +124,20 @@ const [productData, setProductData] = useState({}); // To store code-name mappin
         const jsonEnd = text.lastIndexOf('}') + 1;
         const jsonData = JSON.parse(text.substring(jsonStart, jsonEnd));
         
-        // Process product data (Column BI - index 60 for Code, Column BJ - index 61 for Name)
+        // Process product data 
+        // (Column BI - index 60 for Code, Column BJ - index 61 for Name,
+        // Column CA - index 78 for Description, Column BZ - index 77 for Rate)
         const codes = ["Select Code"];
         const names = ["Select Product"];
-        const codeNameMap = {};
+        const productDataMap = {};
         
         if (jsonData && jsonData.table && jsonData.table.rows) {
           jsonData.table.rows.forEach((row) => {
             if (row.c && row.c[60] && row.c[62]) {
               const code = row.c[60].v;
               const name = row.c[62].v;
+              const description = row.c[78] ? row.c[78].v : "";
+              const rate = row.c[77] ? row.c[77].v : 0;
               
               if (code && !codes.includes(code)) {
                 codes.push(code);
@@ -140,28 +147,38 @@ const [productData, setProductData] = useState({}); // To store code-name mappin
                 names.push(name);
               }
               
-              // Create mapping in both directions
-              codeNameMap[code] = name;
-              codeNameMap[name] = code;
+              // Store all product details including description and rate
+              productDataMap[code] = {
+                name: name,
+                description: description,
+                rate: rate
+              };
+              
+              // Also create reverse mapping (name to code)
+              productDataMap[name] = {
+                code: code,
+                description: description,
+                rate: rate
+              };
             }
           });
         }
         
         setProductCodes(codes);
         setProductNames(names);
-        setProductData(codeNameMap);
+        setProductData(productDataMap);
       } catch (error) {
         console.error("Error fetching product data:", error);
         // Fallback data
         setProductCodes(["Select Code", "CODE1", "CODE2", "CODE3"]);
         setProductNames(["Select Product", "Product 1", "Product 2", "Product 3"]);
         setProductData({
-          "CODE1": "Product 1",
-          "Product 1": "CODE1",
-          "CODE2": "Product 2",
-          "Product 2": "CODE2",
-          "CODE3": "Product 3",
-          "Product 3": "CODE3"
+          "CODE1": { name: "Product 1", description: "Description 1", rate: 100 },
+          "CODE2": { name: "Product 2", description: "Description 2", rate: 200 },
+          "CODE3": { name: "Product 3", description: "Description 3", rate: 300 },
+          "Product 1": { code: "CODE1", description: "Description 1", rate: 100 },
+          "Product 2": { code: "CODE2", description: "Description 2", rate: 200 },
+          "Product 3": { code: "CODE3", description: "Description 3", rate: 300 }
         });
       }
     };
@@ -343,13 +360,14 @@ const handleQuotationSelect = async (quotationNo) => {
             id: index + 1,
             code: itemParts[0] || "",
             name: itemParts[1] || "",
-            gst: Number(itemParts[2]) || 18,
-            qty: Number(itemParts[3]) || 1,
-            units: itemParts[4] || "Nos",
-            rate: Number(itemParts[5]) || 0,
-            discount: Number(itemParts[6]) || 0,
-            flatDiscount: Number(itemParts[7]) || 0,
-            amount: Number(itemParts[8]) || 0
+            description: itemParts[2] || "", // Add description field
+            gst: Number(itemParts[3]) || 18,
+            qty: Number(itemParts[4]) || 1,
+            units: itemParts[5] || "Nos",
+            rate: Number(itemParts[6]) || 0,
+            discount: Number(itemParts[7]) || 0,
+            flatDiscount: Number(itemParts[8]) || 0,
+            amount: Number(itemParts[9]) || 0
           };
         });
       } else {
@@ -932,6 +950,7 @@ const generatePDFFromData = () => {
     index + 1,
     item.code,
     item.name,
+    item.description, // Add description
     `${item.gst}%`,
     item.qty,
     item.units,
@@ -951,7 +970,7 @@ const generatePDFFromData = () => {
   // Use autoTable with custom settings
   autoTable(doc, {
     startY: currentY,
-    head: [['S.No', 'Code', 'Product Name', 'GST %', 'Qty', 'Units', 'Rate', 'Disc %', 'Flat Disc', 'Amount']],
+    head: [['S.No', 'Code', 'Product Name', 'Description', 'GST %', 'Qty', 'Units', 'Rate', 'Disc %', 'Flat Disc', 'Amount']],
     body: itemsData,
     margin: { top: currentY },
     styles: {
@@ -969,16 +988,17 @@ const generatePDFFromData = () => {
       cellPadding: 3
     },
     columnStyles: {
-      0: { cellWidth: 8, halign: 'center' },
+      0: { cellWidth: 6, halign: 'center' },
       1: { cellWidth: 15, halign: 'center' },
       2: { cellWidth: 'auto' },
-      3: { cellWidth: 12, halign: 'center' },
+      3: { cellWidth: 'auto' }, // Description column
       4: { cellWidth: 10, halign: 'center' },
-      5: { cellWidth: 12, halign: 'center' },
-      6: { cellWidth: 15, halign: 'right' },
-      7: { cellWidth: 12, halign: 'center' },
-      8: { cellWidth: 15, halign: 'right' },
-      9: { cellWidth: 15, halign: 'right' }
+      5: { cellWidth: 8, halign: 'center' },
+      6: { cellWidth: 10, halign: 'center' },
+      7: { cellWidth: 12, halign: 'right' },
+      8: { cellWidth: 10, halign: 'center' },
+      9: { cellWidth: 12, halign: 'right' },
+      10: { cellWidth: 15, halign: 'right' }
     },
     didDrawPage: function(data) {
       // Reset Y position after table is drawn
@@ -1251,19 +1271,21 @@ const handleSaveQuotation = async () => {
     ]
     
     // Format item data as a single string to include in the main row data
-    const itemsString = quotationData.items.map(item => {
-      return [
-        item.code || "",
-        item.name || "",
-        item.gst || 0,
-        item.qty || 0,
-        item.units || "Nos",
-        item.rate || 0,
-        item.discount || 0,
-        item.flatDiscount || 0,
-        item.amount || 0
-      ].join("|");
-    }).join(";");
+   // In the handleSaveQuotation function, update the itemsString formation:
+const itemsString = quotationData.items.map(item => {
+  return [
+    item.code || "",
+    item.name || "",
+    item.description || "", // Add description
+    item.gst || 0,
+    item.qty || 0,
+    item.units || "Nos",
+    item.rate || 0,
+    item.discount || 0,
+    item.flatDiscount || 0,
+    item.amount || 0
+  ].join("|");
+}).join(";");
     
     // Combine all data in one array with PDF URL as the last element
     const mainRowData = [
@@ -1303,39 +1325,41 @@ const handleSaveQuotation = async () => {
     }
     
     // 4. Also submit each item to the Items sheet separately if needed
-    const itemPromises = quotationData.items.map(async (item) => {
-      const itemData = [
-        finalQuotationNo,   // Use the final quotation number
-        item.code,
-        item.name,
-        item.gst,
-        item.qty,
-        item.units,
-        item.rate,
-        item.discount,
-        item.flatDiscount,
-        item.amount
-      ]
-      
-      const itemParams = {
-        sheetName: "Quotation Items",
-        action: "insert",
-        rowData: JSON.stringify(itemData)
-      }
-      
-      const itemUrlParams = new URLSearchParams()
-      for (const key in itemParams) {
-        itemUrlParams.append(key, itemParams[key])
-      }
-      
-      return fetch(scriptUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: itemUrlParams
-      })
-    })
+    // Inside handleSaveQuotation function, replace the itemPromises section:
+const itemPromises = quotationData.items.map(async (item) => {
+  const itemData = [
+    finalQuotationNo,   // Use the final quotation number
+    item.code,
+    item.name,
+    item.description,  // Include description
+    item.gst,
+    item.qty,
+    item.units,
+    item.rate,
+    item.discount,
+    item.flatDiscount,
+    item.amount
+  ]
+  
+  const itemParams = {
+    sheetName: "Quotation Items",
+    action: "insert",
+    rowData: JSON.stringify(itemData)
+  }
+  
+  const itemUrlParams = new URLSearchParams()
+  for (const key in itemParams) {
+    itemUrlParams.append(key, itemParams[key])
+  }
+  
+  return fetch(scriptUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: itemUrlParams
+  })
+})
     
     // Wait for all item submissions to complete
     await Promise.all(itemPromises)
@@ -1464,8 +1488,9 @@ const handleSaveQuotation = async () => {
 
   return (
     <div className="container mx-auto py-6 px-4">
-    <div className="flex justify-between items-center mb-6">
-  <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+   <div className="flex justify-between items-center mb-6">
+  <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent flex items-center">
+    <img src={image1} alt="Logo" className="h-20 w-25 mr-3" />
     Make Quotation
   </h1>
   <button
@@ -1783,10 +1808,11 @@ const handleSaveQuotation = async () => {
                   <table className="min-w-full divide-y divide-gray-200">
   <thead className="bg-gray-50">
     <tr>
-      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">S No.</th>
-      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
-      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product Name</th>
-      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">GST %</th>
+    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">S No.</th>
+    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
+    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product Name</th>
+    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">GST %</th>
       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty.</th>
       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Units</th>
       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rate</th>
@@ -1799,53 +1825,70 @@ const handleSaveQuotation = async () => {
   <tbody className="bg-white divide-y divide-gray-200">
     {quotationData.items.map((item, index) => (
       <tr key={item.id}>
-        <td className="px-4 py-2">{index + 1}</td>
-        <td className="px-4 py-2">
-  <div className="relative">
-    <input
-      type="text"
-      value={item.code}
-      onChange={(e) => {
-        handleItemChange(item.id, "code", e.target.value);
-        // Auto-fill product name if code exists in mapping
-        if (productData[e.target.value]) {
-          handleItemChange(item.id, "name", productData[e.target.value]);
-        }
-      }}
-      list={`code-list-${item.id}`}
-      className="w-24 p-1 border border-gray-300 rounded-md"
-    />
-    <datalist id={`code-list-${item.id}`}>
-      {productCodes.map((code) => (
-        <option key={code} value={code} />
-      ))}
-    </datalist>
-  </div>
-</td>
-<td className="px-4 py-2">
-  <div className="relative">
-    <input
-      type="text"
-      value={item.name}
-      onChange={(e) => {
-        handleItemChange(item.id, "name", e.target.value);
-        // Auto-fill code if product name exists in mapping
-        if (productData[e.target.value]) {
-          handleItemChange(item.id, "code", productData[e.target.value]);
-        }
-      }}
-      list={`name-list-${item.id}`}
-      className="w-full p-1 border border-gray-300 rounded-md"
-      placeholder="Enter item name"
-      required
-    />
-    <datalist id={`name-list-${item.id}`}>
-      {productNames.map((name) => (
-        <option key={name} value={name} />
-      ))}
-    </datalist>
-  </div>
-</td>
+     <td className="px-4 py-2">{index + 1}</td>
+  <td className="px-4 py-2">
+    <div className="relative">
+      <input
+        type="text"
+        value={item.code}
+        onChange={(e) => {
+          handleItemChange(item.id, "code", e.target.value);
+          // Auto-fill product name, description and rate if code exists in mapping
+          if (productData[e.target.value]) {
+            const productInfo = productData[e.target.value];
+            handleItemChange(item.id, "name", productInfo.name);
+            handleItemChange(item.id, "description", productInfo.description);
+            handleItemChange(item.id, "rate", productInfo.rate);
+          }
+        }}
+        list={`code-list-${item.id}`}
+        className="w-24 p-1 border border-gray-300 rounded-md"
+      />
+      <datalist id={`code-list-${item.id}`}>
+        {productCodes.map((code) => (
+          <option key={code} value={code} />
+        ))}
+      </datalist>
+    </div>
+  </td>
+  <td className="px-4 py-2">
+    <div className="relative">
+      <input
+        type="text"
+        value={item.name}
+        onChange={(e) => {
+          handleItemChange(item.id, "name", e.target.value);
+          // Auto-fill code, description and rate if product name exists in mapping
+          if (productData[e.target.value]) {
+            const productInfo = productData[e.target.value];
+            handleItemChange(item.id, "code", productInfo.code);
+            handleItemChange(item.id, "description", productInfo.description);
+            handleItemChange(item.id, "rate", productInfo.rate);
+          }
+        }}
+        list={`name-list-${item.id}`}
+        className="w-full p-1 border border-gray-300 rounded-md"
+        placeholder="Enter item name"
+        required
+      />
+      <datalist id={`name-list-${item.id}`}>
+        {productNames.map((name) => (
+          <option key={name} value={name} />
+        ))}
+      </datalist>
+    </div>
+  </td>
+  <td className="px-4 py-2">
+    <div className="relative">
+      <input
+        type="text"
+        value={item.description || ""}
+        onChange={(e) => handleItemChange(item.id, "description", e.target.value)}
+        className="w-full p-1 border border-gray-300 rounded-md"
+        placeholder="Enter description"
+      />
+    </div>
+  </td>
         <td className="px-4 py-2">
           <select
             value={item.gst}
@@ -2101,71 +2144,90 @@ const handleSaveQuotation = async () => {
 </div>
 
 
-                <div className="bg-white border rounded-lg p-4 shadow-sm">
-  <h3 className="text-lg font-medium mt-6 mb-4">Bank Details</h3>
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-    <div className="space-y-2">
-      <label className="block text-sm font-medium">Account No.</label>
-      <input
-        type="text"
-        value={quotationData.accountNo}
-        onChange={(e) => handleInputChange("accountNo", e.target.value)}
-        className="w-full p-2 border border-gray-300 rounded-md"
-      />
+<div className="bg-white border rounded-lg p-4 shadow-sm">
+  <h3 className="text-lg font-medium mb-6 text-center">Bank Details</h3>
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+    {/* Logo container with border and styling */}
+    <div className="flex items-center justify-center p-6 rounded-lg border border-gray-200">
+      <img src={imageform} alt="ManiQuip Logo" className="max-h-100 w-auto object-contain" />
     </div>
-    <div className="space-y-2">
-      <label className="block text-sm font-medium">Bank Name</label>
-      <input
-        type="text"
-        value={quotationData.bankName}
-        onChange={(e) => handleInputChange("bankName", e.target.value)}
-        className="w-full p-2 border border-gray-300 rounded-md"
-      />
-    </div>
-    <div className="space-y-2">
-      <label className="block text-sm font-medium">Bank Address</label>
-      <input
-        type="text"
-        value={quotationData.bankAddress}
-        onChange={(e) => handleInputChange("bankAddress", e.target.value)}
-        className="w-full p-2 border border-gray-300 rounded-md"
-      />
-    </div>
-    <div className="space-y-2">
-      <label className="block text-sm font-medium">IFSC Code</label>
-      <input
-        type="text"
-        value={quotationData.ifscCode}
-        onChange={(e) => handleInputChange("ifscCode", e.target.value)}
-        className="w-full p-2 border border-gray-300 rounded-md"
-      />
-    </div>
-    <div className="space-y-2">
-      <label className="block text-sm font-medium">Email</label>
-      <input
-        type="text"
-        value={quotationData.email}
-        onChange={(e) => handleInputChange("email", e.target.value)}
-        className="w-full p-2 border border-gray-300 rounded-md"
-      />
-    </div>
-    <div className="space-y-2">
-      <label className="block text-sm font-medium">Website</label>
-      <input
-        type="text"
-        value={quotationData.website}
-        onChange={(e) => handleInputChange("website", e.target.value)}
-        className="w-full p-2 border border-gray-300 rounded-md"
-      />
-    </div>
-    <div className="space-y-2">
-      <label className="block text-sm font-medium">PAN</label>
-      <input
-        type="text"
-        value={quotationData.pan}
-        onChange={(e) => handleInputChange("pan", e.target.value)}
-        className="w-full p-2 border border-gray-300 rounded-md"
-      />
+    
+    {/* Separator line for visual clarity on mobile */}
+    <div className="md:hidden w-full border-t border-gray-200 my-4"></div>
+    
+    {/* Bank details section with better styling */}
+    <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+      <div className="grid grid-cols-1 gap-4">
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">Account No.</label>
+          <input
+            type="text"
+            value={quotationData.accountNo}
+            onChange={(e) => handleInputChange("accountNo", e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">Bank Name</label>
+          <input
+            type="text"
+            value={quotationData.bankName}
+            onChange={(e) => handleInputChange("bankName", e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">Bank Address</label>
+          <input
+            type="text"
+            value={quotationData.bankAddress}
+            onChange={(e) => handleInputChange("bankAddress", e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">IFSC Code</label>
+          <input
+            type="text"
+            value={quotationData.ifscCode}
+            onChange={(e) => handleInputChange("ifscCode", e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">Email</label>
+          <input
+            type="text"
+            value={quotationData.email}
+            onChange={(e) => handleInputChange("email", e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">Website</label>
+          <input
+            type="text"
+            value={quotationData.website}
+            onChange={(e) => handleInputChange("website", e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">PAN</label>
+          <input
+            type="text"
+            value={quotationData.pan}
+            onChange={(e) => handleInputChange("pan", e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -2260,43 +2322,45 @@ const handleSaveQuotation = async () => {
       </div>
       <div>
         <h3 className="font-bold mb-2">Ship To</h3>
-        <p>{quotationData.shipTo || quotationData.consigneeAddress || "N/A"}</p>
+        <p>{quotationData.shipTo || "N/A"}</p>
       </div>
     </div>
 
     {/* Items Table with Comprehensive Details */}
     <div className="overflow-x-auto mt-4">
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="bg-gray-100 border">
-            <th className="border p-2 text-left">S No.</th>
-            <th className="border p-2 text-left">Code</th>
-            <th className="border p-2 text-left">Product Name</th>
-            <th className="border p-2 text-left">GST %</th>
-            <th className="border p-2 text-left">Qty</th>
-            <th className="border p-2 text-left">Units</th>
-            <th className="border p-2 text-left">Rate</th>
-            <th className="border p-2 text-left">Disc %</th>
-            <th className="border p-2 text-left">Flat Disc</th>
-            <th className="border p-2 text-left">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {quotationData.items.map((item, index) => (
-            <tr key={item.id} className="border">
-              <td className="border p-2">{index + 1}</td>
-              <td className="border p-2">{item.code || "N/A"}</td>
-              <td className="border p-2">{item.name || "N/A"}</td>
-              <td className="border p-2">{item.gst}%</td>
-              <td className="border p-2">{item.qty}</td>
-              <td className="border p-2">{item.units}</td>
-              <td className="border p-2">₹{Number(item.rate).toFixed(2)}</td>
-              <td className="border p-2">{item.discount}%</td>
-              <td className="border p-2">₹{Number(item.flatDiscount).toFixed(2)}</td>
-              <td className="border p-2">₹{Number(item.amount).toFixed(2)}</td>
-            </tr>
-          ))}
-        </tbody>
+  <table className="w-full border-collapse">
+    <thead>
+      <tr className="bg-gray-100 border">
+        <th className="border p-2 text-left">S No.</th>
+        <th className="border p-2 text-left">Code</th>
+        <th className="border p-2 text-left">Product Name</th>
+        <th className="border p-2 text-left">Description</th>
+        <th className="border p-2 text-left">GST %</th>
+        <th className="border p-2 text-left">Qty</th>
+        <th className="border p-2 text-left">Units</th>
+        <th className="border p-2 text-left">Rate</th>
+        <th className="border p-2 text-left">Disc %</th>
+        <th className="border p-2 text-left">Flat Disc</th>
+        <th className="border p-2 text-left">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {quotationData.items.map((item, index) => (
+        <tr key={item.id} className="border">
+          <td className="border p-2">{index + 1}</td>
+          <td className="border p-2">{item.code || "N/A"}</td>
+          <td className="border p-2">{item.name || "N/A"}</td>
+          <td className="border p-2">{item.description || "N/A"}</td>
+          <td className="border p-2">{item.gst}%</td>
+          <td className="border p-2">{item.qty}</td>
+          <td className="border p-2">{item.units}</td>
+          <td className="border p-2">₹{Number(item.rate).toFixed(2)}</td>
+          <td className="border p-2">{item.discount}%</td>
+          <td className="border p-2">₹{Number(item.flatDiscount).toFixed(2)}</td>
+          <td className="border p-2">₹{Number(item.amount).toFixed(2)}</td>
+        </tr>
+      ))}
+    </tbody>
         <tfoot>
           <tr className="border">
             <td colSpan="9" className="border p-2 text-right font-bold">Subtotal</td>

@@ -32,6 +32,9 @@ function Leads() {
   const [creditDaysOptions, setCreditDaysOptions] = useState([]) // New state for credit days dropdown
   const [creditLimitOptions, setCreditLimitOptions] = useState([]) // New state for credit limit dropdown
   const { showNotification } = useContext(AuthContext)
+  const [designationOptions, setDesignationOptions] = useState([])
+  const [nobOptions, setNobOptions] = useState([]) // New state for nature of business dropdown
+  const [stateOptions, setStateOptions] = useState([]) 
   
   // Script URL
   const scriptUrl = "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
@@ -76,12 +79,15 @@ function Leads() {
       
       const data = JSON.parse(jsonData)
       
-      // Extract columns A, B, BQ (credit days), and BR (credit limit)
+      // Extract columns A, B, C (states), BQ (credit days), BR (credit limit), BV (designations), and AL (nature of business)
       if (data && data.table && data.table.rows) {
         const receivers = []
         const sources = []
+        const states = []     // New array for state options
         const creditDays = []
         const creditLimits = []
+        const designations = [] // Array for designations
+        const nobs = [] // Array for nature of business options
         
         // Skip the first row (index 0) which contains headers
         data.table.rows.slice(0).forEach(row => {
@@ -95,6 +101,12 @@ function Leads() {
             sources.push(row.c[1].v.toString())
           }
           
+          // Column C (states) - skip empty values
+          // Column index 2 (0-based, so C is 2)
+          if (row.c && row.c[2] && row.c[2].v) {
+            states.push(row.c[2].v.toString())
+          }
+          
           // Column BQ (credit days) - skip empty values
           // Column index 67 (0-based, so BQ is 67)
           if (row.c && row.c[68] && row.c[68].v) {
@@ -106,20 +118,38 @@ function Leads() {
           if (row.c && row.c[69] && row.c[69].v) {
             creditLimits.push(row.c[69].v.toString())
           }
+          
+          // Column BV (designations) - skip empty values
+          // Column index 73 (0-based, so BV is 73)
+          if (row.c && row.c[73] && row.c[73].v) {
+            designations.push(row.c[73].v.toString())
+          }
+          
+          // Column AL (nature of business) - skip empty values
+          // Column index 37 (0-based, so AL is 37)
+          if (row.c && row.c[37] && row.c[37].v) {
+            nobs.push(row.c[37].v.toString())
+          }
         })
         
         setReceiverNames(receivers)
         setLeadSources(sources)
+        setStateOptions(states)     // Set the state options
         setCreditDaysOptions(creditDays)
         setCreditLimitOptions(creditLimits)
+        setDesignationOptions(designations) // Set the designation options
+        setNobOptions(nobs) // Set the nature of business options
       }
     } catch (error) {
       console.error("Error fetching dropdown values:", error)
       // Fallback to default values if needed
       setReceiverNames(["John Smith", "Sarah Johnson", "Michael Brown"])
       setLeadSources(["Indiamart", "Justdial", "Social Media", "Website", "Referral", "Other"])
+      setStateOptions(["Andhra Pradesh", "Assam", "Bihar", "Delhi", "Gujarat", "Haryana", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Punjab", "Rajasthan", "Tamil Nadu", "Telangana", "Uttar Pradesh", "West Bengal"]) // Default state options
       setCreditDaysOptions(["7 days", "15 days", "30 days", "45 days", "60 days"])
       setCreditLimitOptions(["₹50,000", "₹100,000", "₹500,000", "₹1,000,000"])
+      setDesignationOptions(["Manager", "Director", "CEO", "CFO", "Proprietor"]) // Default designations
+      setNobOptions(["Manufacturing", "Trading", "Service", "Retail"]) // Default NOB options
     }
   }
 
@@ -543,18 +573,21 @@ const handleSubmit = async (e) => {
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="state" className="block text-sm font-medium text-gray-700">
-                  State
-                </label>
-                <input
-                  id="state"
-                  value={formData.state}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter state"
-                  // required
-                />
-              </div>
+  <label htmlFor="state" className="block text-sm font-medium text-gray-700">
+    State
+  </label>
+  <select
+    id="state"
+    value={formData.state}
+    onChange={handleChange}
+    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+  >
+    <option value="">Select state</option>
+    {stateOptions.map((state, index) => (
+      <option key={index} value={state}>{state}</option>
+    ))}
+  </select>
+</div>
             </div>
 
             {/* Address Field */}
@@ -614,15 +647,19 @@ const handleSubmit = async (e) => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-700">Designation</label>
-                      <input
-                        value={person.designation}
-                        onChange={(e) => handleContactPersonChange(index, 'designation', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Designation"
-                        required
-                      />
-                    </div>
+  <label className="block text-sm font-medium text-gray-700">Designation</label>
+  <select
+    value={person.designation}
+    onChange={(e) => handleContactPersonChange(index, 'designation', e.target.value)}
+    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+    required
+  >
+    <option value="">Select designation</option>
+    {designationOptions.map((designation, idx) => (
+      <option key={idx} value={designation}>{designation}</option>
+    ))}
+  </select>
+</div>
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700">Phone Number</label>
                       <input
@@ -640,19 +677,23 @@ const handleSubmit = async (e) => {
 
             {/* Additional Fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label htmlFor="nob" className="block text-sm font-medium text-gray-700">
-                  Nature of Business (NOB)
-                </label>
-                <input
-                  id="nob"
-                  value={formData.nob}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Nature of business"
-                  required
-                />
-              </div>
+            <div className="space-y-2">
+  <label htmlFor="nob" className="block text-sm font-medium text-gray-700">
+    Nature of Business (NOB)
+  </label>
+  <select
+    id="nob"
+    value={formData.nob}
+    onChange={handleChange}
+    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+    required
+  >
+    <option value="">Select nature of business</option>
+    {nobOptions.map((option, index) => (
+      <option key={index} value={option}>{option}</option>
+    ))}
+  </select>
+</div>
 
               <div className="space-y-2">
                 <label htmlFor="gst" className="block text-sm font-medium text-gray-700">
