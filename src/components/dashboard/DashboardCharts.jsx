@@ -1,6 +1,9 @@
+
+
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useContext } from "react"
+import { AuthContext } from "../../App" // Import AuthContext
 import {
   BarChart,
   Bar,
@@ -41,6 +44,7 @@ const fallbackSourceData = [
 ]
 
 function DashboardCharts() {
+  const { currentUser, userType, isAdmin } = useContext(AuthContext) // Get user info and admin function
   const [activeTab, setActiveTab] = useState("overview")
   const [leadData, setLeadData] = useState(fallbackLeadData)
   const [conversionData, setConversionData] = useState(fallbackConversionData)
@@ -118,101 +122,130 @@ function DashboardCharts() {
                 Dec: { leads: 0, enquiries: 0, orders: 0 }
             }
             
-            // Count leads by month (from FMS sheet column A for date, column B for lead)
+            // Count leads by month (filtering by user)
             fmsData.table.rows.forEach(row => {
                 if (row.c && row.c[0] && row.c[0].v && row.c[1] && row.c[1].v) {
-                    // Extract month from date (assuming format is DD/MM/YYYY)
-                    const dateStr = row.c[0].v
-                    let month
+                    // Get the assigned user from column CH (index 88)
+                    const assignedUser = row.c[88] ? row.c[88].v : ""
                     
-                    // Handle different date formats
-                    if (typeof dateStr === 'string') {
-                        if (dateStr.includes('/')) {
-                            // Format: DD/MM/YYYY
-                            const parts = dateStr.split('/')
-                            if (parts.length === 3) {
-                                const monthNum = parseInt(parts[1]) - 1 // 0-indexed
-                                month = new Date(2000, monthNum, 1).toLocaleString('en-US', { month: 'short' })
+                    // Check if this row should be included based on user permissions
+                    const shouldInclude = isAdmin() || (currentUser && assignedUser === currentUser.username)
+                    
+                    // Only process rows that match the user filter
+                    if (shouldInclude) {
+                        // Extract month from date (assuming format is DD/MM/YYYY)
+                        const dateStr = row.c[0].v
+                        let month
+                        
+                        // Handle different date formats
+                        if (typeof dateStr === 'string') {
+                            if (dateStr.includes('/')) {
+                                // Format: DD/MM/YYYY
+                                const parts = dateStr.split('/')
+                                if (parts.length === 3) {
+                                    const monthNum = parseInt(parts[1]) - 1 // 0-indexed
+                                    month = new Date(2000, monthNum, 1).toLocaleString('en-US', { month: 'short' })
+                                }
+                            } else if (dateStr.startsWith('Date(')) {
+                                // Format: Date(YYYY,MM,DD)
+                                const matches = dateStr.match(/Date\((\d+),(\d+),(\d+)/)
+                                if (matches && matches.length >= 3) {
+                                    const monthNum = parseInt(matches[2])
+                                    month = new Date(2000, monthNum, 1).toLocaleString('en-US', { month: 'short' })
+                                }
                             }
-                        } else if (dateStr.startsWith('Date(')) {
-                            // Format: Date(YYYY,MM,DD)
-                            const matches = dateStr.match(/Date\((\d+),(\d+),(\d+)/)
-                            if (matches && matches.length >= 3) {
-                                const monthNum = parseInt(matches[2])
-                                month = new Date(2000, monthNum, 1).toLocaleString('en-US', { month: 'short' })
-                            }
+                        } else if (dateStr instanceof Date) {
+                            month = dateStr.toLocaleString('en-US', { month: 'short' })
                         }
-                    } else if (dateStr instanceof Date) {
-                        month = dateStr.toLocaleString('en-US', { month: 'short' })
-                    }
-                    
-                    if (month && monthlyData[month]) {
-                        monthlyData[month].leads++
+                        
+                        if (month && monthlyData[month]) {
+                            monthlyData[month].leads++
+                        }
                     }
                 }
             })
             
-            // Count enquiries by month (from Leads Tracker sheet where column E is "yes")
+            // Count enquiries by month (filtering by user)
             leadsTrackerData.table.rows.forEach(row => {
                 if (row.c && row.c[0] && row.c[0].v && row.c[4] && row.c[4].v && row.c[4].v.toString().toLowerCase() === "yes") {
-                    // Extract month from date (assuming format is DD/MM/YYYY or Date object)
-                    const dateStr = row.c[0].v
-                    let month
+                    // Assuming the Leads Tracker sheet has a user assignment column (adjust index as needed)
+                    // Here, I'm assuming column Z (index 25) contains the username
+                    const assignedUser = row.c[25] ? row.c[25].v : ""
                     
-                    // Handle different date formats
-                    if (typeof dateStr === 'string') {
-                        if (dateStr.includes('/')) {
-                            // Format: DD/MM/YYYY
-                            const parts = dateStr.split('/')
-                            if (parts.length === 3) {
-                                const monthNum = parseInt(parts[1]) - 1 // 0-indexed
-                                month = new Date(2000, monthNum, 1).toLocaleString('en-US', { month: 'short' })
+                    // Check if this row should be included based on user permissions
+                    const shouldInclude = isAdmin() || (currentUser && assignedUser === currentUser.username)
+                    
+                    // Only process rows that match the user filter
+                    if (shouldInclude) {
+                        // Extract month from date
+                        const dateStr = row.c[0].v
+                        let month
+                        
+                        // Handle different date formats
+                        if (typeof dateStr === 'string') {
+                            if (dateStr.includes('/')) {
+                                // Format: DD/MM/YYYY
+                                const parts = dateStr.split('/')
+                                if (parts.length === 3) {
+                                    const monthNum = parseInt(parts[1]) - 1 // 0-indexed
+                                    month = new Date(2000, monthNum, 1).toLocaleString('en-US', { month: 'short' })
+                                }
+                            } else if (dateStr.startsWith('Date(')) {
+                                // Format: Date(YYYY,MM,DD)
+                                const matches = dateStr.match(/Date\((\d+),(\d+),(\d+)/)
+                                if (matches && matches.length >= 3) {
+                                    const monthNum = parseInt(matches[2])
+                                    month = new Date(2000, monthNum, 1).toLocaleString('en-US', { month: 'short' })
+                                }
                             }
-                        } else if (dateStr.startsWith('Date(')) {
-                            // Format: Date(YYYY,MM,DD)
-                            const matches = dateStr.match(/Date\((\d+),(\d+),(\d+)/)
-                            if (matches && matches.length >= 3) {
-                                const monthNum = parseInt(matches[2])
-                                month = new Date(2000, monthNum, 1).toLocaleString('en-US', { month: 'short' })
-                            }
+                        } else if (dateStr instanceof Date) {
+                            month = dateStr.toLocaleString('en-US', { month: 'short' })
                         }
-                    } else if (dateStr instanceof Date) {
-                        month = dateStr.toLocaleString('en-US', { month: 'short' })
-                    }
-                    
-                    if (month && monthlyData[month]) {
-                        monthlyData[month].enquiries++
+                        
+                        if (month && monthlyData[month]) {
+                            monthlyData[month].enquiries++
+                        }
                     }
                 }
             })
             
-            // Count orders from Enquiry Tracker sheet (where column W is "yes")
+            // Count orders from Enquiry Tracker sheet (filtering by user)
             enquiryData.table.rows.forEach(row => {
                 if (row.c && row.c[0] && row.c[0].v && row.c[22] && row.c[22].v && row.c[22].v.toString().toLowerCase() === "yes") {
-                    // Extract month from date
-                    const dateStr = row.c[0].v
-                    let month
+                    // Assuming the Enquiry Tracker sheet has a user assignment column (adjust index as needed)
+                    // Here, I'm assuming column AJ (index 35) contains the username
+                    const assignedUser = row.c[35] ? row.c[35].v : ""
                     
-                    if (typeof dateStr === 'string') {
-                        if (dateStr.includes('/')) {
-                            const parts = dateStr.split('/')
-                            if (parts.length === 3) {
-                                const monthNum = parseInt(parts[1]) - 1
-                                month = new Date(2000, monthNum, 1).toLocaleString('en-US', { month: 'short' })
+                    // Check if this row should be included based on user permissions
+                    const shouldInclude = isAdmin() || (currentUser && assignedUser === currentUser.username)
+                    
+                    // Only process rows that match the user filter
+                    if (shouldInclude) {
+                        // Extract month from date
+                        const dateStr = row.c[0].v
+                        let month
+                        
+                        if (typeof dateStr === 'string') {
+                            if (dateStr.includes('/')) {
+                                const parts = dateStr.split('/')
+                                if (parts.length === 3) {
+                                    const monthNum = parseInt(parts[1]) - 1
+                                    month = new Date(2000, monthNum, 1).toLocaleString('en-US', { month: 'short' })
+                                }
+                            } else if (dateStr.startsWith('Date(')) {
+                                const matches = dateStr.match(/Date\((\d+),(\d+),(\d+)/)
+                                if (matches && matches.length >= 3) {
+                                    const monthNum = parseInt(matches[2])
+                                    month = new Date(2000, monthNum, 1).toLocaleString('en-US', { month: 'short' })
+                                }
                             }
-                        } else if (dateStr.startsWith('Date(')) {
-                            const matches = dateStr.match(/Date\((\d+),(\d+),(\d+)/)
-                            if (matches && matches.length >= 3) {
-                                const monthNum = parseInt(matches[2])
-                                month = new Date(2000, monthNum, 1).toLocaleString('en-US', { month: 'short' })
-                            }
+                        } else if (dateStr instanceof Date) {
+                            month = dateStr.toLocaleString('en-US', { month: 'short' })
                         }
-                    } else if (dateStr instanceof Date) {
-                        month = dateStr.toLocaleString('en-US', { month: 'short' })
-                    }
-                    
-                    if (month && monthlyData[month]) {
-                        monthlyData[month].orders++
+                        
+                        if (month && monthlyData[month]) {
+                            monthlyData[month].orders++
+                        }
                     }
                 }
             })
@@ -236,225 +269,273 @@ function DashboardCharts() {
             }
         }
         
-        // Process data for the Conversion Funnel
+        // Process data for the Conversion Funnel (filtering by user)
         if (fmsData && fmsData.table && fmsData.table.rows && 
             leadsTrackerData && leadsTrackerData.table && leadsTrackerData.table.rows && 
             quotationData && quotationData.table && quotationData.table.rows &&
             enquiryData && enquiryData.table && enquiryData.table.rows) {
             
-            // Count total leads from FMS sheet
-            const totalLeads = fmsData.table.rows.slice(2).filter(row =>
-              row.c && row.c[1] && row.c[1].v
-            ).length
-            
-            // Count total enquiries from Leads Tracker where column E is "yes"
-            const totalEnquiries = leadsTrackerData.table.rows.filter(row => 
-                row.c && row.c[4] && row.c[4].v && row.c[4].v.toString().toLowerCase() === "yes"
-            ).length
-            
-            // Count total quotations from Make Quotation sheet
-            const totalQuotations = quotationData.table.rows.filter(row => 
-                row.c && row.c[1] && row.c[1].v
-            ).length
-            
-            // Count total orders from Enquiry Tracker sheet
-            const totalOrders = enquiryData.table.rows.filter(row => 
-                row.c && row.c[22] && row.c[22].v && row.c[22].v.toString().toLowerCase() === "yes"
-            ).length
-            
-            // Create conversion data
-            const newConversionData = [
-                { name: "Leads", value: totalLeads, color: "#4f46e5" },
-                { name: "Enquiries", value: totalEnquiries, color: "#8b5cf6" },
-                { name: "Quotations", value: totalQuotations, color: "#d946ef" },
-                { name: "Orders", value: totalOrders, color: "#ec4899" }
-            ]
-            
-            setConversionData(newConversionData)
-        }
-        
-        // Process data for the Lead Sources chart
-        if (fmsData && fmsData.table && fmsData.table.rows) {
-            // Count leads by source from FMS sheet column D (index 3)
-            const sourceCounter = {}
-            const colors = {
-                "Indiamart": "#06b6d4",
-                "Justdial": "#0ea5e9",
-                "Social Media": "#3b82f6",
-                "Website": "#6366f1",
-                "Referrals": "#8b5cf6",
-                // Add more colors for other sources if needed
-            }
-            
-            fmsData.table.rows.slice(2).forEach(row => {
-              if (row.c && row.c[3] && row.c[3].v) {
-                  const source = row.c[3].v
-                  sourceCounter[source] = (sourceCounter[source] || 0) + 1
-              }
-            })
-            
-            // Convert to array format for the chart
-            const newSourceData = Object.entries(sourceCounter).map(([name, value]) => ({
-                name,
-                value,
-                color: colors[name] || "#9ca3af" // Use gray as default if color not defined
-            }))
-            
-            // Sort by value (descending)
-            newSourceData.sort((a, b) => b.value - a.value)
-            
-            // Update state if we have data
-            if (newSourceData.length > 0) {
-                setSourceData(newSourceData)
-            }
-        }
-        
-      } catch (error) {
-        console.error("Error fetching chart data:", error)
-        setError(error.message)
-        // Fallback to demo data is already handled since we initialized state with it
-      } finally {
-        setIsLoading(false)
+            // Count total leads from FMS sheet (filtered by user)
+              // Continuation of the code from where it left off
+
+            const totalLeads = fmsData.table.rows.filter(row => {
+              // Get the assigned user from column CH (index 88)
+              const assignedUser = row.c && row.c[88] ? row.c[88].v : ""
+              
+              // Check if this row should be included based on user permissions
+              const shouldInclude = isAdmin() || (currentUser && assignedUser === currentUser.username)
+              
+              // Count rows with data in column B (index 1)
+              return row.c && row.c[1] && row.c[1].v && shouldInclude
+          }).length
+          
+          // Count total enquiries from Leads Tracker where column E is "yes" (filtered by user)
+          const totalEnquiries = leadsTrackerData.table.rows.filter(row => {
+              // Assuming column Z (index 25) contains the username
+              const assignedUser = row.c && row.c[25] ? row.c[25].v : ""
+              
+              // Check if this row should be included based on user permissions
+              const shouldInclude = isAdmin() || (currentUser && assignedUser === currentUser.username)
+              
+              return row.c && 
+                     row.c[4] && 
+                     row.c[4].v && 
+                     row.c[4].v.toString().toLowerCase() === "yes" &&
+                     shouldInclude
+          }).length
+          
+          // Count total quotations from Make Quotation sheet (filtered by user)
+          const totalQuotations = quotationData.table.rows.filter(row => {
+              // Assuming column Z (index 25) contains the username
+              const assignedUser = row.c && row.c[25] ? row.c[25].v : ""
+              
+              // Check if this row should be included based on user permissions
+              const shouldInclude = isAdmin() || (currentUser && assignedUser === currentUser.username)
+              
+              return row.c && row.c[1] && row.c[1].v && shouldInclude
+          }).length
+          
+          // Count total orders from Enquiry Tracker sheet (filtered by user)
+          const totalOrders = enquiryData.table.rows.filter(row => {
+              // Assuming column AJ (index 35) contains the username
+              const assignedUser = row.c && row.c[35] ? row.c[35].v : ""
+              
+              // Check if this row should be included based on user permissions
+              const shouldInclude = isAdmin() || (currentUser && assignedUser === currentUser.username)
+              
+              return row.c && 
+                     row.c[22] && 
+                     row.c[22].v && 
+                     row.c[22].v.toString().toLowerCase() === "yes" &&
+                     shouldInclude
+          }).length
+          
+          // Create conversion data
+          const newConversionData = [
+              { name: "Leads", value: totalLeads, color: "#4f46e5" },
+              { name: "Enquiries", value: totalEnquiries, color: "#8b5cf6" },
+              { name: "Quotations", value: totalQuotations, color: "#d946ef" },
+              { name: "Orders", value: totalOrders, color: "#ec4899" }
+          ]
+          
+          setConversionData(newConversionData)
       }
+      
+      // Process data for the Lead Sources chart (filtering by user)
+      if (fmsData && fmsData.table && fmsData.table.rows) {
+          // Count leads by source from FMS sheet column D (index 3)
+          const sourceCounter = {}
+          const colors = {
+              "Indiamart": "#06b6d4",
+              "Justdial": "#0ea5e9",
+              "Social Media": "#3b82f6",
+              "Website": "#6366f1",
+              "Referrals": "#8b5cf6",
+              // Add more colors for other sources if needed
+          }
+          
+          fmsData.table.rows.slice(2).forEach(row => {
+              if (row.c && row.c[3] && row.c[3].v) {
+                  // Get the assigned user from column CH (index 88)
+                  const assignedUser = row.c[88] ? row.c[88].v : ""
+                  
+                  // Check if this row should be included based on user permissions
+                  const shouldInclude = isAdmin() || (currentUser && assignedUser === currentUser.username)
+                  
+                  // Only count sources for rows that match the user filter
+                  if (shouldInclude) {
+                      const source = row.c[3].v
+                      sourceCounter[source] = (sourceCounter[source] || 0) + 1
+                  }
+              }
+          })
+          
+          // Convert to array format for the chart
+          const newSourceData = Object.entries(sourceCounter).map(([name, value]) => ({
+              name,
+              value,
+              color: colors[name] || "#9ca3af" // Use gray as default if color not defined
+          }))
+          
+          // Sort by value (descending)
+          newSourceData.sort((a, b) => b.value - a.value)
+          
+          // Update state if we have data
+          if (newSourceData.length > 0) {
+              setSourceData(newSourceData)
+          }
+      }
+      
+    } catch (error) {
+      console.error("Error fetching chart data:", error)
+      setError(error.message)
+      // Fallback to demo data is already handled since we initialized state with it
+    } finally {
+      setIsLoading(false)
     }
-    
-    fetchData()
-  }, [])
+  }
+  
+  fetchData()
+}, [currentUser, isAdmin]) // Add dependencies for user context
 
-  return (
-    <div>
-      <h3 className="text-xl font-bold mb-4">Sales Analytics ( Lead To Order )</h3>
+return (
+  <div>
+    <div className="flex justify-between items-center mb-4">
+      <h3 className="text-xl font-bold">Sales Analytics ( Lead To Order )</h3>
+      {/* Display admin view indicator similar to FollowUp page */}
+      {isAdmin() && <p className="text-green-600 font-semibold">Admin View: Showing all data</p>}
+    </div>
 
-      <div className="mb-4">
-        <div className="inline-flex rounded-md shadow-sm">
-          <button
-            onClick={() => setActiveTab("overview")}
-            className={`px-4 py-2 text-sm font-medium rounded-l-md ${
-              activeTab === "overview" ? "bg-slate-100 text-slate-900" : "bg-white text-slate-700 hover:bg-slate-50"
-            }`}
-          >
-            Overview
-          </button>
-          <button
-            onClick={() => setActiveTab("conversion")}
-            className={`px-4 py-2 text-sm font-medium ${
-              activeTab === "conversion" ? "bg-slate-100 text-slate-900" : "bg-white text-slate-700 hover:bg-slate-50"
-            }`}
-          >
-            Conversion
-          </button>
-          <button
-            onClick={() => setActiveTab("sources")}
-            className={`px-4 py-2 text-sm font-medium rounded-r-md ${
-              activeTab === "sources" ? "bg-slate-100 text-slate-900" : "bg-white text-slate-700 hover:bg-slate-50"
-            }`}
-          >
-            Lead Sources
-          </button>
-        </div>
+    <div className="mb-4">
+      <div className="inline-flex rounded-md shadow-sm">
+        <button
+          onClick={() => setActiveTab("overview")}
+          className={`px-4 py-2 text-sm font-medium rounded-l-md ${
+            activeTab === "overview" ? "bg-slate-100 text-slate-900" : "bg-white text-slate-700 hover:bg-slate-50"
+          }`}
+        >
+          Overview
+        </button>
+        <button
+          onClick={() => setActiveTab("conversion")}
+          className={`px-4 py-2 text-sm font-medium ${
+            activeTab === "conversion" ? "bg-slate-100 text-slate-900" : "bg-white text-slate-700 hover:bg-slate-50"
+          }`}
+        >
+          Conversion
+        </button>
+        <button
+          onClick={() => setActiveTab("sources")}
+          className={`px-4 py-2 text-sm font-medium rounded-r-md ${
+            activeTab === "sources" ? "bg-slate-100 text-slate-900" : "bg-white text-slate-700 hover:bg-slate-50"
+          }`}
+        >
+          Lead Sources
+        </button>
       </div>
+    </div>
 
-      {isLoading ? (
-        <div className="h-[350px] flex items-center justify-center">
-          <p className="text-slate-500">Loading chart data...</p>
-        </div>
-      ) : error ? (
-        <div className="h-[350px] flex items-center justify-center">
-          <p className="text-red-500">Error loading data. Using fallback data.</p>
-        </div>
-      ) : (
-        <div className="h-[350px]">
-          {activeTab === "overview" && (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={leadData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="leads" name="Leads" fill="#4f46e5" />
-                <Bar dataKey="enquiries" name="Enquiries" fill="#8b5cf6" />
-                <Bar dataKey="orders" name="Orders" fill="#ec4899" />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+    {isLoading ? (
+      <div className="h-[350px] flex items-center justify-center">
+        <p className="text-slate-500">Loading chart data...</p>
+      </div>
+    ) : error ? (
+      <div className="h-[350px] flex items-center justify-center">
+        <p className="text-red-500">Error loading data. Using fallback data.</p>
+      </div>
+    ) : (
+      <div className="h-[350px]">
+        {activeTab === "overview" && (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={leadData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="month" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="leads" name="Leads" fill="#4f46e5" />
+              <Bar dataKey="enquiries" name="Enquiries" fill="#8b5cf6" />
+              <Bar dataKey="orders" name="Orders" fill="#ec4899" />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
 
-          {activeTab === "conversion" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
-              <div className="h-full w-full flex items-center justify-center">
-                <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
-                    <Pie
-                      data={conversionData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                      label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
-                    >
-                      {conversionData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend layout="horizontal" verticalAlign="bottom" align="center" />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+        {activeTab === "conversion" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
+            <div className="h-full w-full flex items-center justify-center">
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={conversionData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                  >
+                    {conversionData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend layout="horizontal" verticalAlign="bottom" align="center" />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
 
-              <div className="flex flex-col justify-center overflow-y-auto max-h-[350px]">
-                <h4 className="text-lg font-medium mb-4">Conversion Funnel</h4>
-                <div className="space-y-4">
-                  {conversionData.map((item, index) => (
-                    <div key={index} className="space-y-1">
-                      <div className="flex justify-between">
-                        <span className="text-sm font-medium">{item.name}</span>
-                        <span className="text-sm font-medium">{item.value}</span>
-                      </div>
-                      <div className="w-full bg-slate-200 rounded-full h-2.5">
-                        <div
-                          className="h-2.5 rounded-full"
-                          style={{
-                            width: `${(item.value / (conversionData[0].value || 1)) * 100}%`,
-                            backgroundColor: item.color,
-                          }}
-                        ></div>
-                      </div>
+            <div className="flex flex-col justify-center overflow-y-auto max-h-[350px]">
+              <h4 className="text-lg font-medium mb-4">Conversion Funnel</h4>
+              <div className="space-y-4">
+                {conversionData.map((item, index) => (
+                  <div key={index} className="space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-sm font-medium">{item.name}</span>
+                      <span className="text-sm font-medium">{item.value}</span>
                     </div>
-                  ))}
-                </div>
+                    <div className="w-full bg-slate-200 rounded-full h-2.5">
+                      <div
+                        className="h-2.5 rounded-full"
+                        style={{
+                          width: `${(item.value / (conversionData[0].value || 1)) * 100}%`,
+                          backgroundColor: item.color,
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {activeTab === "sources" && (
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={sourceData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={true}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                  label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
-                >
-                  {sourceData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value, name) => [value, name]} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      )}
-    </div>
-  )
+        {activeTab === "sources" && (
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={sourceData}
+                cx="50%"
+                cy="50%"
+                labelLine={true}
+                outerRadius={100}
+                fill="#8884d8"
+                dataKey="value"
+                label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+              >
+                {sourceData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value, name) => [value, name]} />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    )}
+  </div>
+)
 }
 
 export default DashboardCharts

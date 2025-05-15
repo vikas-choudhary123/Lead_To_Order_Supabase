@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useContext } from "react"
 import { Link } from "react-router-dom"
 import { PlusIcon, SearchIcon, ArrowRightIcon, BuildingIcon } from "../components/Icons"
+import { AuthContext } from "../App" // Import AuthContext just like in the FollowUp component
 import CallTrackerForm from "./Call-Tracker-Form"
 
 // Animation classes
@@ -12,6 +13,7 @@ const fadeIn = "animate-in fade-in duration-300"
 const fadeOut = "animate-out fade-out duration-300"
 
 function CallTracker() {
+  const { currentUser, userType, isAdmin } = useContext(AuthContext) // Get user info and admin function
   const [searchTerm, setSearchTerm] = useState("")
   const [activeTab, setActiveTab] = useState("pending")
   const [pendingCallTrackers, setPendingCallTrackers] = useState([])
@@ -158,23 +160,32 @@ function CallTracker() {
 
           // Skip the header row (index 0)
           pendingData.table.rows.slice(2).forEach((row, index) => {
-            // MODIFIED: Only show rows where column AJ (index 35) is not null and column AK (index 36) is null
+            // Only show rows where column AJ (index 35) is not null and column AK (index 36) is null
             if (row.c && row.c[52] && row.c[52].v && (!row.c[53] || !row.c[53].v)) {
-              const callTrackerItem = {
-                id: index + 1,
-                leadId: row.c[1] ? row.c[1].v : "", // Column B - Lead Number
-                receiverName: row.c[2] ? row.c[2].v : "", // Column C - Lead Receiver Name
-                leadSource: row.c[4] ? row.c[4].v : "", // Column D - Lead Source
-                salespersonName: row.c[56] ? row.c[56].v : "", // Column E - Salesperson Name
-                companyName: row.c[57] ? row.c[57].v : "", // Column G - Company Name
-                createdAt: row.c[0] ? formatDateToDDMMYYYY(row.c[0].v) : "", // Using date from column A
-                status: "Expected", // Default status for pending
-                priority: determinePriority(row.c[3] ? row.c[3].v : ""), // Determine priority based on source
-                stage: "Pending", // Default stage
-                dueDate: "", // You might want to add logic to calculate due date
-              }
+              // Get the assigned user from column CC (index 88) like in the FollowUp component
+              const assignedUser = row.c[88] ? row.c[88].v : ""
+              
+              // For admin users, include all rows; for regular users, filter by their username
+              const shouldInclude = isAdmin() || (currentUser && assignedUser === currentUser.username)
+              
+              if (shouldInclude) {
+                const callTrackerItem = {
+                  id: index + 1,
+                  leadId: row.c[1] ? row.c[1].v : "", // Column B - Lead Number
+                  receiverName: row.c[2] ? row.c[2].v : "", // Column C - Lead Receiver Name
+                  leadSource: row.c[4] ? row.c[4].v : "", // Column D - Lead Source
+                  salespersonName: row.c[56] ? row.c[56].v : "", // Column E - Salesperson Name
+                  companyName: row.c[57] ? row.c[57].v : "", // Column G - Company Name
+                  createdAt: row.c[0] ? formatDateToDDMMYYYY(row.c[0].v) : "", // Using date from column A
+                  status: "Expected", // Default status for pending
+                  priority: determinePriority(row.c[3] ? row.c[3].v : ""), // Determine priority based on source
+                  stage: "Pending", // Default stage
+                  dueDate: "", // You might want to add logic to calculate due date
+                  assignedTo: assignedUser // Add assigned user to the tracker item
+                }
 
-              pendingCallTrackerData.push(callTrackerItem)
+                pendingCallTrackerData.push(callTrackerItem)
+              }
             }
           })
 
@@ -216,15 +227,17 @@ function CallTracker() {
                 acceptanceVia: row.c[23] ? row.c[23].v : "", // Column X - Acceptance Via
                 paymentMode: row.c[24] ? row.c[24].v : "", // Column Y - Payment Mode
                 paymentTerms: row.c[25] ? row.c[25].v : "", // Column Z - Payment Terms
-                orderVideo: row.c[26] ? row.c[26].v : "", // Column AA - Order Video
-                acceptanceFile: row.c[27] ? row.c[27].v : "", // Column AB - Acceptance File
-                orderRemark: row.c[28] ? row.c[28].v : "", // Column AC - Remark
-                apologyVideo: row.c[29] ? row.c[29].v : "", // Column AD - Apology Video
-                reasonStatus: row.c[30] ? row.c[30].v : "", // Column AE - Reason Status
-                reasonRemark: row.c[31] ? row.c[31].v : "", // Column AF - Reason Remark
-                holdReason: row.c[32] ? row.c[32].v : "", // Column AG - Hold Reason
-                holdingDate: formatDateToDDMMYYYY(row.c[33] ? row.c[33].v : ""), // Column AH - Holding Date
-                holdRemark: row.c[34] ? row.c[34].v : "", // Column AI - Hold Remark
+                transportMode: row.c[26] ? row.c[26].v : "", // Column Z - Payment Terms
+                registrationFrom: row.c[27] ? row.c[27].v : "", // Column Z - Payment Terms
+                orderVideo: row.c[28] ? row.c[28].v : "", // Column AA - Order Video
+                acceptanceFile: row.c[29] ? row.c[29].v : "", // Column AB - Acceptance File
+                orderRemark: row.c[30] ? row.c[30].v : "", // Column AC - Remark
+                apologyVideo: row.c[31] ? row.c[31].v : "", // Column AD - Apology Video
+                reasonStatus: row.c[32] ? row.c[32].v : "", // Column AE - Reason Status
+                reasonRemark: row.c[33] ? row.c[33].v : "", // Column AF - Reason Remark
+                holdReason: row.c[34] ? row.c[34].v : "", // Column AG - Hold Reason
+                holdingDate: formatDateToDDMMYYYY(row.c[35] ? row.c[35].v : ""), // Column AH - Holding Date
+                holdRemark: row.c[36] ? row.c[36].v : "", // Column AI - Hold Remark
                 priority: determinePriority(row.c[2] ? row.c[2].v : ""), // Determine priority based on status
               }
 
@@ -300,8 +313,9 @@ function CallTracker() {
       }
     }
 
+
     fetchCallTrackerData()
-  }, [])
+  }, [currentUser, isAdmin]) // Add isAdmin to dependencies like in FollowUp
 
   // Filter function for search in both sections
   const filteredPendingCallTrackers = pendingCallTrackers.filter(
@@ -328,6 +342,7 @@ function CallTracker() {
             Call Tracker
           </h1>
           <p className="text-slate-600 mt-1">Track the progress of enquiries through the sales pipeline</p>
+          {isAdmin() && <p className="text-green-600 font-semibold mt-1">Admin View: Showing all data</p>}
         </div>
 
         <div className="flex gap-2">
@@ -406,6 +421,12 @@ function CallTracker() {
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
+                          Actions
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
                           Lead No.
                         </th>
                         <th
@@ -414,39 +435,53 @@ function CallTracker() {
                         >
                           Lead Receiver Name
                         </th>
-                        {/* <th
+                        <th
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
-                          Enquiry Status
-                        </th> */}
+                          Lead Source
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Salesperson Name
+                        </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-      Company Name
-    </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          What Did Customer Say
+                          Company Name
                         </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Current Stage
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Actions
-                        </th>
+                        {isAdmin() && (
+                          <th
+                            scope="col"
+                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                          >
+                            Assigned To
+                          </th>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {filteredPendingCallTrackers.length > 0 ? (
                         filteredPendingCallTrackers.map((tracker) => (
                           <tr key={tracker.id} className="hover:bg-slate-50">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <div className="flex space-x-2">
+                                <Link to={`/call-tracker/new?leadId=${tracker.leadId}`}>
+                                  <button className="px-3 py-1 text-xs border border-purple-200 text-purple-600 hover:bg-purple-50 rounded-md">
+                                    Process <ArrowRightIcon className="ml-1 h-3 w-3 inline" />
+                                  </button>
+                                </Link>
+                                <button
+                                  onClick={() => {
+                                    setSelectedTracker(tracker)
+                                    setShowPopup(true)
+                                  }}
+                                  className="px-3 py-1 text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-md"
+                                >
+                                  View
+                                </button>
+                              </div>
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                               {tracker.leadId}
                             </td>
@@ -475,29 +510,16 @@ function CallTracker() {
                                 {tracker.companyName}
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                              <div className="flex space-x-2">
-                                <Link to={`/call-tracker/new?leadId=${tracker.leadId}`}>
-                                  <button className="px-3 py-1 text-xs border border-purple-200 text-purple-600 hover:bg-purple-50 rounded-md">
-                                    Process <ArrowRightIcon className="ml-1 h-3 w-3 inline" />
-                                  </button>
-                                </Link>
-                                {/* <button
-                                  onClick={() => {
-                                    setSelectedTracker(tracker)
-                                    setShowPopup(true)
-                                  }}
-                                  className="px-3 py-1 text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-md"
-                                >
-                                  View
-                                </button> */}
-                              </div>
-                            </td>
+                            {isAdmin() && (
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {tracker.assignedTo}
+                              </td>
+                            )}
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={6} className="px-6 py-4 text-center text-sm text-slate-500">
+                          <td colSpan={isAdmin() ? 7 : 6} className="px-6 py-4 text-center text-sm text-slate-500">
                             No pending call trackers found
                           </td>
                         </tr>
@@ -512,6 +534,12 @@ function CallTracker() {
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-slate-50">
                       <tr>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Actions
+                        </th>
                         <th
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
@@ -542,18 +570,30 @@ function CallTracker() {
                         >
                           Current Stage
                         </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Actions
-                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {filteredDirectEnquiryPendingTrackers.length > 0 ? (
                         filteredDirectEnquiryPendingTrackers.map((tracker) => (
                           <tr key={tracker.id} className="hover:bg-slate-50">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <div className="flex space-x-2">
+                                <Link to={`/call-tracker/new?leadId=${tracker.leadId}`}>
+                                  <button className="px-3 py-1 text-xs border border-purple-200 text-purple-600 hover:bg-purple-50 rounded-md">
+                                    Process <ArrowRightIcon className="ml-1 h-3 w-3 inline" />
+                                  </button>
+                                </Link>
+                                <button
+                                  onClick={() => {
+                                    setSelectedTracker(tracker)
+                                    setShowPopup(true)
+                                  }}
+                                  className="px-3 py-1 text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-md"
+                                >
+                                  View
+                                </button>
+                              </div>
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                               {tracker.leadId}
                             </td>
@@ -580,24 +620,6 @@ function CallTracker() {
                               <div className="flex items-center">
                                 <BuildingIcon className="h-4 w-4 mr-2 text-slate-400" />
                                 {tracker.companyName}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                              <div className="flex space-x-2">
-                                <Link to={`/call-tracker/new?leadId=${tracker.leadId}`}>
-                                  <button className="px-3 py-1 text-xs border border-purple-200 text-purple-600 hover:bg-purple-50 rounded-md">
-                                    Process <ArrowRightIcon className="ml-1 h-3 w-3 inline" />
-                                  </button>
-                                </Link>
-                                <button
-                                  onClick={() => {
-                                    setSelectedTracker(tracker)
-                                    setShowPopup(true)
-                                  }}
-                                  className="px-3 py-1 text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-md"
-                                >
-                                  View
-                                </button>
                               </div>
                             </td>
                           </tr>
@@ -645,6 +667,8 @@ function CallTracker() {
           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acceptance Via</th>
           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Mode</th>
           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Terms (In Days)</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transport Mode</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CONVEYED FOR REGISTRATION FORM</th>
           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Video</th>
           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acceptance File Upload</th>
           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remark</th>
@@ -704,19 +728,13 @@ function CallTracker() {
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.acceptanceVia}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.paymentMode}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.paymentTerms}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.transportMode}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.registrationFrom}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {tracker.orderVideo && (
-                  <a href={tracker.orderVideo} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                    View Video
-                  </a>
-                )}
+                {tracker.orderVideo}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {tracker.acceptanceFile && (
-                  <a href={tracker.acceptanceFile} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                    View File
-                  </a>
-                )}
+                {tracker.acceptanceFile}
               </td>
               <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.orderRemark}>{tracker.orderRemark}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

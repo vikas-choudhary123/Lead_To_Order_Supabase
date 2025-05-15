@@ -405,7 +405,7 @@ const handleQuotationSelect = async (quotationNo) => {
         consignorStateCode: loadedData.consignorStateCode || "",
         consigneeName: loadedData.consigneeName || "",
         consigneeAddress: loadedData.consigneeAddress || "",
-        shipTo: loadedData.shipTo || loadedData.consigneeAddress || "", // Use shipTo if exists, otherwise consigneeAddress
+        shipTo: loadedData.shipTo || "", // Use shipTo if exists, otherwise consigneeAddress
         consigneeState: loadedData.consigneeState || "",
         consigneeContactName: loadedData.consigneeContactName || "",
         consigneeContactNo: loadedData.consigneeContactNo || "",
@@ -2213,278 +2213,287 @@ const handleSaveQuotation = async () => {
             <div className="space-y-6">
               {/* The main quotation preview that will be captured for PDF */}
               <div id="quotation-preview" className="bg-white border p-6 rounded-lg">
-                <div className="flex justify-between items-start border-b pb-4">
-                  <div className="w-1/3">
-                    <p className="font-bold">{quotationData.consignorName}</p>
-                    <p className="text-sm">{quotationData.consignorAddress}</p>
-                    <p className="text-sm">Mobile: {quotationData.consignorMobile}</p>
-                    <p className="text-sm">Phone: {quotationData.consignorPhone}</p>
-                  </div>
-                  <div className="w-1/3 text-center">
-                    <h1 className="text-xl font-bold">QUOTATION</h1>
-                  </div>
-                  <div className="w-1/3 text-right">
-                    <p className="font-bold">Quo No: {quotationData.quotationNo}</p>
-                    <p>Date: {quotationData.date}</p>
-                  </div>
-                </div>
+    <div className="flex justify-between items-start border-b pb-4">
+      <div className="w-1/3">
+        <p className="font-bold">{quotationData.consignorName || "Consignor Name"}</p>
+        <p className="text-sm">{quotationData.consignorAddress || "Consignor Address"}</p>
+        <p className="text-sm">Mobile: {quotationData.consignorMobile || "N/A"}</p>
+        <p className="text-sm">Phone: {quotationData.consignorPhone || "N/A"}</p>
+        <p className="text-sm">GSTIN: {quotationData.consignorGSTIN || "N/A"}</p>
+        <p className="text-sm">State Code: {quotationData.consignorStateCode || "N/A"}</p>
+      </div>
+      <div className="w-1/3 text-center">
+        <h1 className="text-xl font-bold">QUOTATION</h1>
+      </div>
+      <div className="w-1/3 text-right">
+        <p className="font-bold">Quo No: {quotationData.quotationNo}</p>
+        <p>Date: {quotationData.date}</p>
+        <p>Prepared By: {quotationData.preparedBy || "N/A"}</p>
+      </div>
+    </div>
 
-                {/* Consignor and Consignee Details */}
-                <div className="grid grid-cols-2 gap-4 border-b pb-4">
-                  <div>
-                    <h3 className="font-bold mb-2">Consignor Details</h3>
-                    <p>{quotationData.consignorName}</p>
-                    <p>{quotationData.consignorAddress}</p>
-                    <p>GSTIN: {quotationData.consignorGSTIN || "N/A"} State Code: {quotationData.consignorStateCode || "N/A"}</p>
+    {/* Consignor and Consignee Details */}
+    <div className="grid grid-cols-2 gap-4 border-b pb-4">
+      <div>
+        <h3 className="font-bold mb-2">Consignor Details</h3>
+        <p>{quotationData.consignorName || "N/A"}</p>
+        <p>{quotationData.consignorAddress || "N/A"}</p>
+        <p>GSTIN: {quotationData.consignorGSTIN || "N/A"}</p>
+        <p>State Code: {quotationData.consignorStateCode || "N/A"}</p>
+        <p>MSME Number: {quotationData.msmeNumber || "N/A"}</p>
+      </div>
+      <div>
+        <h3 className="font-bold mb-2">Consignee Details</h3>
+        <p>Company Name: {quotationData.consigneeName || "N/A"}</p>
+        <p>Contact Name: {quotationData.consigneeContactName || "N/A"}</p>
+        <p>Contact No.: {quotationData.consigneeContactNo || "N/A"}</p>
+        <p>State: {quotationData.consigneeState || "N/A"}</p>
+        <p>GSTIN: {quotationData.consigneeGSTIN || "N/A"}</p>
+        <p>State Code: {quotationData.consigneeStateCode || "N/A"}</p>
+      </div>
+    </div>
 
-                  </div>
-                  <div>
-                    <h3 className="font-bold mb-2">Consignee Details</h3>
-                    <p>Reference Name: {quotationData.consigneeName || "Please enter company name"}</p>
-                    <p>Contact Name: {quotationData.consigneeContactName || "Not specified"}</p>
-                    <p>Contact No.: {quotationData.consigneeContactNo || "Not specified"}</p>
-                    <p>{quotationData.consigneeState}</p>
-                    <p>MSME Number- {quotationData.msmeNumber}</p>
-                  </div>
-                </div>
+    <div className="grid grid-cols-2 gap-4 border-b pb-4">
+      <div>
+        <h3 className="font-bold mb-2">Bill To</h3>
+        <p>{quotationData.consigneeAddress || "N/A"}</p>
+      </div>
+      <div>
+        <h3 className="font-bold mb-2">Ship To</h3>
+        <p>{quotationData.shipTo || quotationData.consigneeAddress || "N/A"}</p>
+      </div>
+    </div>
 
-                <div className="grid grid-cols-2 gap-4 border-b pb-4">
-                  <div>
-                    <h3 className="font-bold mb-2">Bill To</h3>
-                    <p>{quotationData.consigneeAddress || "Please enter address"}</p>
-                    <p>
-                      GSTIN: {quotationData.consigneeGSTIN || "N/A"} State Code: {quotationData.consigneeStateCode}
-                    </p>
-                  </div>
-                  <div>
-                    <h3 className="font-bold mb-2">Ship To</h3>
-                    <p>{quotationData.shipTo || quotationData.consigneeAddress || "Please enter address"}</p>
-                  </div>
-                </div>
+    {/* Items Table with Comprehensive Details */}
+    <div className="overflow-x-auto mt-4">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="bg-gray-100 border">
+            <th className="border p-2 text-left">S No.</th>
+            <th className="border p-2 text-left">Code</th>
+            <th className="border p-2 text-left">Product Name</th>
+            <th className="border p-2 text-left">GST %</th>
+            <th className="border p-2 text-left">Qty</th>
+            <th className="border p-2 text-left">Units</th>
+            <th className="border p-2 text-left">Rate</th>
+            <th className="border p-2 text-left">Disc %</th>
+            <th className="border p-2 text-left">Flat Disc</th>
+            <th className="border p-2 text-left">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {quotationData.items.map((item, index) => (
+            <tr key={item.id} className="border">
+              <td className="border p-2">{index + 1}</td>
+              <td className="border p-2">{item.code || "N/A"}</td>
+              <td className="border p-2">{item.name || "N/A"}</td>
+              <td className="border p-2">{item.gst}%</td>
+              <td className="border p-2">{item.qty}</td>
+              <td className="border p-2">{item.units}</td>
+              <td className="border p-2">₹{Number(item.rate).toFixed(2)}</td>
+              <td className="border p-2">{item.discount}%</td>
+              <td className="border p-2">₹{Number(item.flatDiscount).toFixed(2)}</td>
+              <td className="border p-2">₹{Number(item.amount).toFixed(2)}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="border">
+            <td colSpan="9" className="border p-2 text-right font-bold">Subtotal</td>
+            <td className="border p-2 font-bold">₹{Number(quotationData.subtotal).toFixed(2)}</td>
+          </tr>
+          <tr className="border">
+            <td colSpan="9" className="border p-2 text-right">Total Flat Discount</td>
+            <td className="border p-2">-₹{Number(quotationData.totalFlatDiscount).toFixed(2)}</td>
+          </tr>
+          <tr className="border">
+            <td colSpan="9" className="border p-2 text-right">Taxable Amount</td>
+            <td className="border p-2">₹{Number(quotationData.subtotal - quotationData.totalFlatDiscount).toFixed(2)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
 
-                {/* Items Table with Discount Columns */}
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="bg-gray-100 border">
-                        <th className="border p-2 text-left">S No.</th>
-                        <th className="border p-2 text-left">Code</th>
-                        <th className="border p-2 text-left">Product Name</th>
-                        <th className="border p-2 text-left">GST</th>
-                        <th className="border p-2 text-left">Qty.</th>
-                        <th className="border p-2 text-left">Units</th>
-                        <th className="border p-2 text-left">Rate</th>
-                        <th className="border p-2 text-left">Disc %</th>
-                        <th className="border p-2 text-left">Flat Disc</th>
-                        <th className="border p-2 text-left">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {quotationData.items.map((item, index) => (
-                        <tr key={item.id} className="border">
-                          <td className="border p-2">{index + 1}</td>
-                          <td className="border p-2">{item.code}</td>
-                          <td className="border p-2">{item.name || "No name specified"}</td>
-                          <td className="border p-2">{item.gst}%</td>
-                          <td className="border p-2">{item.qty}</td>
-                          <td className="border p-2">{item.units}</td>
-                          <td className="border p-2">₹{item.rate.toFixed(2)}</td>
-                          <td className="border p-2">{item.discount}%</td>
-                          <td className="border p-2">₹{item.flatDiscount.toFixed(2)}</td>
-                          {/* <td className="border p-2">₹{item.amount.toFixed(2)}</td> */}
-                          <td className="border p-2">₹{(item.amount || 0).toFixed(2)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="border">
-                        <td colSpan="9" className="border p-2 text-right font-bold">
-                          SUBTOTAL
-                        </td>
-                        <td className="border p-2 font-bold">₹{quotationData.subtotal.toFixed(2)}</td>
-                      </tr>
-                      <tr className="border">
-                        <td colSpan="9" className="border p-2 text-right">
-                          Total Flat Discount
-                        </td>
-                        <td className="border p-2">-₹{quotationData.totalFlatDiscount.toFixed(2)}</td>
-                      </tr>
-                      <tr className="border">
-                        <td colSpan="9" className="border p-2 text-right">
-                          Taxable Amount
-                        </td>
-                        <td className="border p-2">₹{(quotationData.subtotal - quotationData.totalFlatDiscount).toFixed(2)}</td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
+    {/* Tax Details */}
+    <div className="grid grid-cols-2 gap-4 mt-4">
+      <div>
+        <h3 className="font-bold mb-2">Tax Breakdown</h3>
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-gray-100 border">
+              <th className="border p-2 text-left">Tax Type</th>
+              <th className="border p-2 text-left">Rate</th>
+              <th className="border p-2 text-left">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border">
+              <td className="border p-2">CGST</td>
+              <td className="border p-2">{quotationData.cgstRate}%</td>
+              <td className="border p-2">₹{Number(quotationData.cgstAmount).toFixed(2)}</td>
+            </tr>
+            <tr className="border">
+              <td className="border p-2">SGST</td>
+              <td className="border p-2">{quotationData.sgstRate}%</td>
+              <td className="border p-2">₹{Number(quotationData.sgstAmount).toFixed(2)}</td>
+            </tr>
+            <tr className="border font-bold">
+              <td className="border p-2">Total Tax</td>
+              <td className="border p-2">{quotationData.cgstRate + quotationData.sgstRate}%</td>
+              <td className="border p-2">₹{Number(quotationData.cgstAmount + quotationData.sgstAmount).toFixed(2)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div className="flex flex-col justify-between">
+        <div>
+          <p className="font-bold">Amount Chargeable (in words)</p>
+          <p className="capitalize">
+            Rupees {Number(quotationData.total) > 0 
+              ? new Intl.NumberFormat('en-IN', {
+                  style: 'currency', 
+                  currency: 'INR', 
+                  minimumFractionDigits: 2
+                }).format(quotationData.total).replace('₹', '').trim() + ' Only'
+              : 'Zero Only'}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="font-bold text-xl">Grand Total: ₹{Number(quotationData.total).toFixed(2)}</p>
+        </div>
+      </div>
+    </div>
 
-                {/* Tax Details */}
-                <div className="grid grid-cols-2 gap-4 mt-4">
-                  <div>
-                    <h3 className="font-bold mb-2">Total Taxes</h3>
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="bg-gray-100 border">
-                          <th className="border p-2 text-left">Tax%</th>
-                          <th className="border p-2 text-left">CGST</th>
-                          <th className="border p-2 text-left">SGST</th>
-                          <th className="border p-2 text-left">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="border">
-                          <td className="border p-2">{quotationData.cgstRate + quotationData.sgstRate}%</td>
-                          <td className="border p-2">₹{quotationData.cgstAmount.toFixed(2)}</td>
-                          <td className="border p-2">₹{quotationData.sgstAmount.toFixed(2)}</td>
-                          <td className="border p-2">
-                            ₹{(quotationData.cgstAmount + quotationData.sgstAmount).toFixed(2)}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="flex flex-col justify-between">
-                    <div>
-                      <p className="font-bold">Amount Chargeable (in words)</p>
-                      <p className="capitalize">
-                        Rupees {quotationData.total > 0 ? 'only' : 'zero only'}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold">Grand Total:</p>
-                      <p className="text-xl font-bold">₹{quotationData.total.toFixed(2)}</p>
-                    </div>
-                  </div>
-                </div>
+    {/* Terms and Conditions */}
+    <div className="mt-4 border-t pt-4">
+      <h3 className="font-bold mb-2">Terms & Conditions</h3>
+      <table className="w-full">
+        <tbody>
+          <tr>
+            <td className="py-1 font-medium">Validity</td>
+            <td className="py-1">{quotationData.validity}</td>
+          </tr>
+          <tr>
+            <td className="py-1 font-medium">Payment Terms</td>
+            <td className="py-1">{quotationData.paymentTerms}</td>
+          </tr>
+          <tr>
+            <td className="py-1 font-medium">Delivery</td>
+            <td className="py-1">{quotationData.delivery}</td>
+          </tr>
+          <tr>
+            <td className="py-1 font-medium">Freight</td>
+            <td className="py-1">{quotationData.freight}</td>
+          </tr>
+          <tr>
+            <td className="py-1 font-medium">Insurance</td>
+            <td className="py-1">{quotationData.insurance}</td>
+          </tr>
+          <tr>
+            <td className="py-1 font-medium">Taxes</td>
+            <td className="py-1">{quotationData.taxes}</td>
+          </tr>
+        </tbody>
+      </table>
 
-                {/* Terms and Conditions */}
-                <div className="mt-4">
-                  <h3 className="font-bold mb-2">Terms & Conditions</h3>
-                  <table className="w-full">
-                    <tbody>
-                      <tr>
-                        <td className="py-1">Validity-</td>
-                        <td className="py-1">{quotationData.validity}</td>
-                      </tr>
-                      <tr>
-                        <td className="py-1">Payment Terms-</td>
-                        <td className="py-1">{quotationData.paymentTerms}</td>
-                      </tr>
-                      <tr>
-                        <td className="py-1">Delivery-</td>
-                        <td className="py-1">{quotationData.delivery}</td>
-                      </tr>
-                      <tr>
-                        <td className="py-1">Freight-</td>
-                        <td className="py-1">{quotationData.freight}</td>
-                      </tr>
-                      <tr>
-                        <td className="py-1">Insurance-</td>
-                        <td className="py-1">{quotationData.insurance}</td>
-                      </tr>
-                      <tr>
-                        <td className="py-1">Taxes-</td>
-                        <td className="py-1">{quotationData.taxes}</td>
-                      </tr>
-                    </tbody>
-                  </table>
+      {quotationData.notes && quotationData.notes.length > 0 && (
+        <div className="mt-4">
+          <h4 className="font-bold mb-2">Notes</h4>
+          <ul className="list-disc pl-5">
+            {quotationData.notes.filter(note => note.trim()).map((note, index) => (
+              <li key={index} className="py-1">{note}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
 
-                  <h4 className="font-bold mt-4 mb-2">Note</h4>
-                  <ul className="list-disc pl-5">
-                    {quotationData.notes.map((note, index) => (
-                      <li key={index} className="py-1">
-                        {note}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+    {/* Bank Details and Footer */}
+    <div className="grid grid-cols-2 gap-4 border-t pt-4 mt-4">
+      <div>
+        <h3 className="font-bold mb-2">Bank Details</h3>
+        <p>Account No.: {quotationData.accountNo || "N/A"}</p>
+        <p>Bank Name: {quotationData.bankName || "N/A"}</p>
+        <p>Bank Address: {quotationData.bankAddress || "N/A"}</p>
+        <p>IFSC CODE: {quotationData.ifscCode || "N/A"}</p>
+        <p>Email: {quotationData.email || "N/A"}</p>
+        <p>Website: {quotationData.website || "N/A"}</p>
+        <p>Company PAN: {quotationData.pan || "N/A"}</p>
+      </div>
+      <div className="text-right">
+        <h3 className="font-bold mb-2">Declaration:</h3>
+        <p>
+          We declare that this Quotation shows the actual price of the goods described and that all
+          particulars are true and correct.
+        </p>
+        <p className="mt-4">Prepared By: {quotationData.preparedBy || "N/A"}</p>
+        <p className="mt-4 text-sm italic">
+          This Quotation is computer-generated and does not require a seal or signature.
+        </p>
+      </div>
+    </div>
+  </div>
 
-                {/* Bank Details and Footer */}
-                <div className="grid grid-cols-2 gap-4 border-t pt-4 mt-4">
-                  <div>
-                    <h3 className="font-bold mb-2">Bank Details</h3>
-                    <p>Account No.: {quotationData.accountNo}</p>
-                    <p>Bank Name: {quotationData.bankName}</p>
-                    <p>Bank Address: {quotationData.bankAddress}</p>
-                    <p>IFSC CODE: {quotationData.ifscCode}</p>
-                    <p>Email: {quotationData.email}</p>
-                    <p>Website: {quotationData.website}</p>
-                    <p>Company PAN: {quotationData.pan}</p>
-                  </div>
-                  <div className="text-right">
-                    <h3 className="font-bold mb-2">Declaration:</h3>
-                    <p>
-                      We declare that this Quotation shows the actual price of the goods described and that all
-                      particulars are true and correct.
-                    </p>
-                    <p className="mt-4">Prepared By- {quotationData.preparedBy}</p>
-                    <p className="mt-4 text-sm italic">
-                      This Quotation is computerized generated, hence doesn't require any seal & signature.
-                    </p>
-                  </div>
-                </div>
-              </div>
+  {/* Rest of the existing preview section remains the same */}
+  {quotationLink && (
+    <div className="p-4 border rounded-md bg-gray-50">
+      <p className="font-medium mb-2">Quotation Link:</p>
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={quotationLink}
+          readOnly
+          className="w-full p-2 border border-gray-300 rounded-md"
+        />
+        <button
+          className="border border-gray-300 hover:bg-gray-100 p-2 rounded-md"
+          onClick={() => {
+            navigator.clipboard.writeText(quotationLink)
+            alert("Quotation link copied to clipboard")
+          }}
+        >
+          <CopyIcon className="h-4 w-4" />
+        </button>
+        <button className="border border-gray-300 hover:bg-gray-100 p-2 rounded-md">
+          <ShareIcon className="h-4 w-4" />
+        </button>
+      </div>
+      <p className="text-sm text-gray-500 mt-2">
+        Share this link with the client. They can view and request updates to the quotation.
+      </p>
+    </div>
+  )}
 
-              {quotationLink && (
-                <div className="p-4 border rounded-md bg-gray-50">
-                  <p className="font-medium mb-2">Quotation Link:</p>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={quotationLink}
-                      readOnly
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
-                    <button
-                      className="border border-gray-300 hover:bg-gray-100 p-2 rounded-md"
-                      onClick={() => {
-                        navigator.clipboard.writeText(quotationLink)
-                        alert("Quotation link copied to clipboard")
-                      }}
-                    >
-                      <CopyIcon className="h-4 w-4" />
-                    </button>
-                    <button className="border border-gray-300 hover:bg-gray-100 p-2 rounded-md">
-                      <ShareIcon className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <p className="text-sm text-gray-500 mt-2">
-                    Share this link with the client. They can view and request updates to the quotation.
-                  </p>
-                </div>
-              )}
-
-              {pdfUrl && (
-                <div className="p-4 border rounded-md bg-gray-50">
-                  <p className="font-medium mb-2">PDF Document:</p>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={pdfUrl}
-                      readOnly
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
-                    <button
-                      className="border border-gray-300 hover:bg-gray-100 p-2 rounded-md"
-                      onClick={() => {
-                        navigator.clipboard.writeText(pdfUrl)
-                        alert("PDF URL copied to clipboard")
-                      }}
-                    >
-                      <CopyIcon className="h-4 w-4" />
-                    </button>
-                    <a
-                      href={pdfUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="border border-gray-300 hover:bg-gray-100 p-2 rounded-md"
-                    >
-                      <EyeIcon className="h-4 w-4" />
-                    </a>
-                  </div>
-                </div>
-              )}
+  {pdfUrl && (
+    <div className="p-4 border rounded-md bg-gray-50">
+      <p className="font-medium mb-2">PDF Document:</p>
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={pdfUrl}
+          readOnly
+          className="w-full p-2 border border-gray-300 rounded-md"
+        />
+        <button
+          className="border border-gray-300 hover:bg-gray-100 p-2 rounded-md"
+          onClick={() => {
+            navigator.clipboard.writeText(pdfUrl)
+            alert("PDF URL copied to clipboard")
+          }}
+        >
+          <CopyIcon className="h-4 w-4" />
+        </button>
+        <a
+          href={pdfUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="border border-gray-300 hover:bg-gray-100 p-2 rounded-md"
+        >
+          <EyeIcon className="h-4 w-4" />
+        </a>
+      </div>
+    </div>
+  )}
 
               <div className="flex justify-between">
                 <button className="border border-gray-300 hover:bg-gray-50 px-4 py-2 rounded-md flex items-center">

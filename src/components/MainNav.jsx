@@ -90,9 +90,9 @@ function MainNav({ logout }) {
           {/* User info display */}
           <div className="hidden md:flex items-center mr-4">
             <div className="flex items-center space-x-2">
-              {/* <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-slate-700">
                 {currentUser?.username || 'User'}
-              </span> */}
+              </span>
               {userType && (
                 <span className={`px-2 py-1 text-xs rounded-full ${
                   userType === 'admin' 

@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useContext } from "react"
 import { Link } from "react-router-dom"
 import { SearchIcon, ArrowRightIcon } from "../components/Icons"
+import { AuthContext } from "../App" // Import AuthContext
 
 const slideIn = "animate-in slide-in-from-right duration-300"
 const slideOut = "animate-out slide-out-to-right duration-300"
@@ -10,12 +11,13 @@ const fadeIn = "animate-in fade-in duration-300"
 const fadeOut = "animate-out fade-out duration-300"
 
 function FollowUp() {
+  const { currentUser, userType, isAdmin } = useContext(AuthContext) // Get user info and admin function
   const [searchTerm, setSearchTerm] = useState("")
   const [activeTab, setActiveTab] = useState("pending")
   const [pendingFollowUps, setPendingFollowUps] = useState([])
   const [historyFollowUps, setHistoryFollowUps] = useState([])
   const [isLoading, setIsLoading] = useState(true)
-  const [filterType, setFilterType] = useState("all") // New state for filter
+  const [filterType, setFilterType] = useState("all")
   const [showPopup, setShowPopup] = useState(false)
   const [selectedFollowUp, setSelectedFollowUp] = useState(null)
 
@@ -156,7 +158,7 @@ function FollowUp() {
 
         const historyData = JSON.parse(historyJsonData)
 
-        // Process Pending Follow-ups from FMS sheet - Modified to use columns B, G, C, D, J, Q, R
+        // Process Pending Follow-ups from FMS sheet
         if (pendingData && pendingData.table && pendingData.table.rows) {
           const pendingFollowUpData = []
 
@@ -166,20 +168,27 @@ function FollowUp() {
               // Check if column K (index 10) has data and column L (index 11) is null
               const hasColumnK = row.c[27] && row.c[27].v
               const isColumnLEmpty = !row.c[28] || row.c[28].v === null || row.c[28].v === ""
+              
+              // Get the assigned user 
+              const assignedUser = row.c[88] ? row.c[88].v : ""
+              
+              // For admin users, include all rows; for regular users, filter by their username
+              const shouldInclude = isAdmin() || (currentUser && assignedUser === currentUser.username)
 
-              // Only include rows where column K has data and column L is null/empty
-              if (hasColumnK && isColumnLEmpty) {
+              // Only include rows where column K has data, column L is null/empty, and user has access
+              if (hasColumnK && isColumnLEmpty && shouldInclude) {
                 const followUpItem = {
                   id: row.c[0] ? row.c[0].v : "",
-                  leadId: row.c[1] ? row.c[1].v : "", // Column B - Lead Number
-                  companyName: row.c[4] ? row.c[4].v : "", // Column G - Company Name
-                  personName: row.c[6] ? row.c[6].v : "", // Column C - Person Name (Lead Receiver)
-                  leadSource: row.c[3] ? row.c[3].v : "", // Column D - Lead Source
-                  location: row.c[7] ? row.c[7].v : "", // Column J - Location
-                  customerSay: row.c[31] ? row.c[31].v : "", // Column Q - What Customer Said
-                  enquiryStatus: row.c[32] ? row.c[32].v : "", // Column R - Enquiry Status
-                  createdAt: row.c[0] ? row.c[0].v : "", // Using date from column A
-                  priority: determinePriority(row.c[3] ? row.c[3].v : ""), // Determine priority based on source
+                  leadId: row.c[1] ? row.c[1].v : "",
+                  companyName: row.c[4] ? row.c[4].v : "",
+                  personName: row.c[6] ? row.c[6].v : "",
+                  leadSource: row.c[3] ? row.c[3].v : "",
+                  location: row.c[7] ? row.c[7].v : "",
+                  customerSay: row.c[31] ? row.c[31].v : "",
+                  enquiryStatus: row.c[32] ? row.c[32].v : "",
+                  createdAt: row.c[0] ? row.c[0].v : "",
+                  priority: determinePriority(row.c[3] ? row.c[3].v : ""),
+                  assignedTo: assignedUser // Add assigned user to the follow-up item
                 }
 
                 pendingFollowUpData.push(followUpItem)
@@ -197,17 +206,19 @@ function FollowUp() {
           // Start from index 1 to skip header row, process rows starting from index 2 in the sheet
           historyData.table.rows.slice(0).forEach((row) => {
             if (row.c) {
+              // NEW: Check if the username matches column (you'll need to determine which column stores the assigned user in Leads Tracker)
+              // For now, we'll show all history records
               const followUpItem = {
-                leadNo: row.c[1] ? row.c[1].v : "", // Column B - Lead No.
-                customerSay: row.c[2] ? row.c[2].v : "", // Column C - What did the customer say?
-                status: row.c[3] ? row.c[3].v : "", // Column D - Status
-                enquiryReceivedStatus: row.c[4] ? row.c[4].v : "", // Column E - Enquiry Received Status
+                leadNo: row.c[1] ? row.c[1].v : "",
+                customerSay: row.c[2] ? row.c[2].v : "",
+                status: row.c[3] ? row.c[3].v : "",
+                enquiryReceivedStatus: row.c[4] ? row.c[4].v : "",
                 enquiryReceivedDate: row.c[5] ? formatDateToDDMMYYYY(row.c[5] ? row.c[5].v : "") : "",
-                enquiryState: row.c[6] ? row.c[6].v : "", // Column G - Enquiry for State
-                projectName: row.c[7] ? row.c[7].v : "", // Column H - Project Name
-                salesType: row.c[8] ? row.c[8].v : "", // Column I - Sales Type
-                requiredProductDate: row.c[9] ? formatDateToDDMMYYYY(row.c[9] ? row.c[9].v : "") : "", // Column J - Required Product Date
-                projectApproxValue: row.c[10] ? row.c[10].v : "", // Column K - Project Approximate Value
+                enquiryState: row.c[6] ? row.c[6].v : "",
+                projectName: row.c[7] ? row.c[7].v : "",
+                salesType: row.c[8] ? row.c[8].v : "",
+                requiredProductDate: row.c[9] ? formatDateToDDMMYYYY(row.c[9] ? row.c[9].v : "") : "",
+                projectApproxValue: row.c[10] ? row.c[10].v : "",
 
                 // Item details
                 itemName1: row.c[11] ? row.c[11].v : "", // Column L - Item Name1
@@ -274,9 +285,9 @@ function FollowUp() {
       }
     }
 
-    fetchFollowUpData()
-  }, [])
 
+    fetchFollowUpData()
+  }, [currentUser, isAdmin])  // Add isAdmin to dependencies
 
 // Add this function or modify the existing formatDateToDDMMYYYY function
 const formatPopupDate = (dateValue) => {
@@ -332,6 +343,7 @@ const formatPopupDate = (dateValue) => {
             Follow-Up Tracker
           </h1>
           <p className="text-slate-600 mt-1">Track and manage all your follow-up calls</p>
+          {isAdmin() && <p className="text-green-600 font-semibold mt-1">Admin View: Showing all data</p>}
         </div>
 
         <div className="flex gap-2">
@@ -408,6 +420,12 @@ const formatPopupDate = (dateValue) => {
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
+                          Actions
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
                           Lead No.
                         </th>
                         <th
@@ -446,18 +464,38 @@ const formatPopupDate = (dateValue) => {
                         >
                           Enquiry Status
                         </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Actions
-                        </th>
+                        {isAdmin() && (
+                          <th
+                            scope="col"
+                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                          >
+                            Assigned To
+                          </th>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {filteredPendingFollowUps.length > 0 ? (
                         filteredPendingFollowUps.map((followUp) => (
                           <tr key={followUp.id} className="hover:bg-slate-50">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <div className="flex space-x-2">
+                                <Link to={`/follow-up/new?leadId=${followUp.leadId}&leadNo=${followUp.leadId}`}>
+                                  <button className="px-3 py-1 text-xs border border-amber-200 text-amber-600 hover:bg-amber-50 rounded-md">
+                                    Call Now <ArrowRightIcon className="ml-1 h-3 w-3 inline" />
+                                  </button>
+                                </Link>
+                                {/* <button
+                                  onClick={() => {
+                                    setSelectedFollowUp(followUp)
+                                    setShowPopup(true)
+                                  }}
+                                  className="px-3 py-1 text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-md"
+                                >
+                                  View
+                                </button> */}
+                              </div>
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                               {followUp.leadId}
                             </td>
@@ -485,29 +523,16 @@ const formatPopupDate = (dateValue) => {
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               {followUp.enquiryStatus}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                              <div className="flex space-x-2">
-                                <Link to={`/follow-up/new?leadId=${followUp.leadId}&leadNo=${followUp.leadId}`}>
-                                  <button className="px-3 py-1 text-xs border border-amber-200 text-amber-600 hover:bg-amber-50 rounded-md">
-                                    Call Now <ArrowRightIcon className="ml-1 h-3 w-3 inline" />
-                                  </button>
-                                </Link>
-                                {/* <button
-                                  onClick={() => {
-                                    setSelectedFollowUp(followUp)
-                                    setShowPopup(true)
-                                  }}
-                                  className="px-3 py-1 text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-md"
-                                >
-                                  View
-                                </button> */}
-                              </div>
-                            </td>
+                            {isAdmin() && (
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {followUp.assignedTo}
+                              </td>
+                            )}
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={8} className="px-6 py-4 text-center text-sm text-slate-500">
+                          <td colSpan={isAdmin() ? 9 : 8} className="px-6 py-4 text-center text-sm text-slate-500">
                             No pending follow-ups found
                           </td>
                         </tr>
@@ -809,3 +834,5 @@ const formatPopupDate = (dateValue) => {
 }
 
 export default FollowUp
+
+

@@ -16,12 +16,15 @@ import Notification from "./components/Notification"
 
 // Create auth context
 export const AuthContext = createContext(null)
+// Create data context to manage data access based on user type
+export const DataContext = createContext(null)
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [notification, setNotification] = useState(null)
   const [currentUser, setCurrentUser] = useState(null)
   const [userType, setUserType] = useState(null)
+  const [userData, setUserData] = useState(null)
 
   // Check if user is already logged in
   useEffect(() => {
@@ -33,8 +36,46 @@ function App() {
       setIsAuthenticated(true)
       setCurrentUser(JSON.parse(storedUser))
       setUserType(storedUserType)
+      // Fetch data based on user type
+      fetchUserData(JSON.parse(storedUser).username, storedUserType)
     }
   }, [])
+
+  // Function to fetch data based on user type
+  const fetchUserData = async (username, userType) => {
+    try {
+      // Example: Fetch data from Google Sheet
+      const dataUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=Data"
+      const response = await fetch(dataUrl)
+      const text = await response.text()
+      
+      // Extract JSON from response
+      const jsonStart = text.indexOf('{')
+      const jsonEnd = text.lastIndexOf('}') + 1
+      const jsonData = text.substring(jsonStart, jsonEnd)
+      const data = JSON.parse(jsonData)
+      
+      if (!data || !data.table || !data.table.rows) {
+        showNotification("Failed to fetch data", "error")
+        return
+      }
+      
+      // Filter data based on user type
+      if (userType === "admin") {
+        // Admin sees all data
+        setUserData(data.table.rows)
+      } else {
+        // Regular user only sees their own data
+        const filteredData = data.table.rows.filter(row => 
+          row.c && row.c[0] && row.c[0].v === username
+        )
+        setUserData(filteredData)
+      }
+    } catch (error) {
+      console.error("Data fetching error:", error)
+      showNotification("An error occurred while fetching data", "error")
+    }
+  }
 
   const login = async (username, password) => {
     try {
@@ -82,6 +123,9 @@ function App() {
         localStorage.setItem("currentUser", JSON.stringify(userInfo))
         localStorage.setItem("userType", foundUser.userType)
         
+        // Fetch data based on user type
+        await fetchUserData(foundUser.username, foundUser.userType)
+        
         showNotification(`Welcome, ${username}! (${foundUser.userType})`, "success")
         return true
       } else {
@@ -99,6 +143,7 @@ function App() {
     setIsAuthenticated(false)
     setCurrentUser(null)
     setUserType(null)
+    setUserData(null)
     localStorage.removeItem("isAuthenticated")
     localStorage.removeItem("currentUser")
     localStorage.removeItem("userType")
@@ -142,75 +187,77 @@ function App() {
       userType, 
       isAdmin: isAdmin 
     }}>
-      <Router>
-        <div className="min-h-screen flex flex-col bg-white text-gray-900">
-          {isAuthenticated && <MainNav logout={logout} userType={userType} username={currentUser?.username} />}
-          <main className="flex-1">
-            <Routes>
-              <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/" />} />
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/leads"
-                element={
-                  <ProtectedRoute>
-                    <Leads />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/follow-up"
-                element={
-                  <ProtectedRoute>
-                    <FollowUp />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/follow-up/new"
-                element={
-                  <ProtectedRoute>
-                    <NewFollowUp />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/call-tracker"
-                element={
-                  <ProtectedRoute>
-                    <CallTracker />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/call-tracker/new"
-                element={
-                  <ProtectedRoute>
-                    <NewCallTracker />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/quotation"
-                element={
-                  <ProtectedRoute>
-                    <Quotation />
-                  </ProtectedRoute>
-                }
-              />
-              <Route path="*" element={<Navigate to="/" />} />
-            </Routes>
-          </main>
-          {isAuthenticated && <Footer />}
-          {notification && <Notification message={notification.message} type={notification.type} />}
-        </div>
-      </Router>
+      <DataContext.Provider value={{ userData, fetchUserData }}>
+        <Router>
+          <div className="min-h-screen flex flex-col bg-white text-gray-900">
+            {isAuthenticated && <MainNav logout={logout} userType={userType} username={currentUser?.username} />}
+            <main className="flex-1">
+              <Routes>
+                <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/" />} />
+                <Route
+                  path="/"
+                  element={
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/leads"
+                  element={
+                    <ProtectedRoute>
+                      <Leads />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/follow-up"
+                  element={
+                    <ProtectedRoute>
+                      <FollowUp />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/follow-up/new"
+                  element={
+                    <ProtectedRoute>
+                      <NewFollowUp />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/call-tracker"
+                  element={
+                    <ProtectedRoute>
+                      <CallTracker />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/call-tracker/new"
+                  element={
+                    <ProtectedRoute>
+                      <NewCallTracker />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/quotation"
+                  element={
+                    <ProtectedRoute>
+                      <Quotation />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="*" element={<Navigate to="/" />} />
+              </Routes>
+            </main>
+            {isAuthenticated && <Footer />}
+            {notification && <Notification message={notification.message} type={notification.type} />}
+          </div>
+        </Router>
+      </DataContext.Provider>
     </AuthContext.Provider>
   )
 }

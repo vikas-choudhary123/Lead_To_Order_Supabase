@@ -466,18 +466,20 @@ const handleSubmit = async (e) => {
                 <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">
                   Company Name
                 </label>
-                <select
-                  id="companyName"
-                  value={formData.companyName}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                >
-                  <option value="">Select company</option>
-                  {companyOptions.map((company, index) => (
-                    <option key={index} value={company}>{company}</option>
-                  ))}
-                </select>
+                <input
+  list="companyOptions"
+  id="companyName"
+  value={formData.companyName}
+  onChange={handleChange}
+  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+  required
+/>
+<datalist id="companyOptions">
+  {companyOptions.map((company, index) => (
+    <option key={index} value={company} />
+  ))}
+</datalist>
+
               </div>
 
               <div className="space-y-2">
@@ -488,9 +490,9 @@ const handleSubmit = async (e) => {
                   id="phoneNumber"
                   value={formData.phoneNumber}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Phone number will auto-fill"
-                  readOnly={formData.companyName !== ""}
+                  // readOnly={formData.companyName !== ""}
                   required
                 />
               </div>
@@ -503,9 +505,9 @@ const handleSubmit = async (e) => {
                   id="salespersonName"
                   value={formData.salespersonName}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Salesperson name will auto-fill"
-                  readOnly={formData.companyName !== ""}
+                  // readOnly={formData.companyName !== ""}
                   required
                 />
               </div>
@@ -518,9 +520,9 @@ const handleSubmit = async (e) => {
                   id="location"
                   value={formData.location}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Location will auto-fill"
-                  readOnly={formData.companyName !== ""}
+                  // readOnly={formData.companyName !== ""}
                   required
                 />
               </div>
@@ -534,9 +536,9 @@ const handleSubmit = async (e) => {
                   type="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Email will auto-fill"
-                  readOnly={formData.companyName !== ""}
+                  // readOnly={formData.companyName !== ""}
                 />
               </div>
 
@@ -550,7 +552,7 @@ const handleSubmit = async (e) => {
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter state"
-                  required
+                  // required
                 />
               </div>
             </div>
@@ -567,7 +569,7 @@ const handleSubmit = async (e) => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter complete address"
                 rows="2"
-                required
+                // required
               />
             </div>
 
@@ -692,7 +694,7 @@ const handleSubmit = async (e) => {
                   value={formData.creditAccess}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
+                  // required
                 >
                   <option value="">Select option</option>
                   <option value="Yes">Yes</option>
@@ -709,8 +711,8 @@ const handleSubmit = async (e) => {
                   value={formData.creditDays}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required={formData.creditAccess === "Yes"}
-                  disabled={formData.creditAccess !== "Yes"}
+                  // required={formData.creditAccess === "Yes"}
+                  // disabled={formData.creditAccess !== "Yes"}
                 >
                   <option value="">Select credit days</option>
                   {creditDaysOptions.map((option, index) => (
@@ -728,8 +730,8 @@ const handleSubmit = async (e) => {
                   value={formData.creditLimit}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required={formData.creditAccess === "Yes"}
-                  disabled={formData.creditAccess !== "Yes"}
+                  // required={formData.creditAccess === "Yes"}
+                  // disabled={formData.creditAccess !== "Yes"}
                 >
                   <option value="">Select credit limit</option>
                   {creditLimitOptions.map((option, index) => (
