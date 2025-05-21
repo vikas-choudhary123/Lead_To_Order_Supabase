@@ -59,7 +59,7 @@ function NewFollowUp() {
           // Existing column processing...
           if (row.c && row.c[2] && row.c[2].v) states.push(row.c[2].v.toString())
           if (row.c && row.c[3] && row.c[3].v) types.push(row.c[3].v.toString())
-          if (row.c && row.c[35] && row.c[35].v) categories.push(row.c[35].v.toString())
+          if (row.c && row.c[76] && row.c[76].v) categories.push(row.c[76].v.toString())
           if (row.c && row.c[37] && row.c[37].v) nobs.push(row.c[37].v.toString())
 
           // Add column AM (index 38) processing

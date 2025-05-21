@@ -28,6 +28,19 @@ const [isLoadingQuotation, setIsLoadingQuotation] = useState(false);
 const [productCodes, setProductCodes] = useState([]);
 const [productNames, setProductNames] = useState([]);
 const [productData, setProductData] = useState({}); // To store code-name mappings
+const [selectedReferences, setSelectedReferences] = useState([]);
+
+const [specialDiscount, setSpecialDiscount] = useState(0);
+
+// Add this near your other state declarations
+const [hiddenFields, setHiddenFields] = useState({
+  validity: false,
+  paymentTerms: false,
+  delivery: false,
+  freight: false,
+  insurance: false,
+  taxes: false
+});
 
   
   // State for dropdown data
@@ -217,16 +230,18 @@ const [productData, setProductData] = useState({}); // To store code-name mappin
     const subtotalAfterDiscount = Math.max(0, subtotal - Number(prev.totalFlatDiscount))
     const cgstAmount = Number((subtotalAfterDiscount * (prev.cgstRate / 100)).toFixed(2))  // Added missing closing parenthesis
     const sgstAmount = Number((subtotalAfterDiscount * (prev.sgstRate / 100)).toFixed(2))  // Added missing closing parenthesis
-    const total = Number((subtotalAfterDiscount + cgstAmount + sgstAmount).toFixed(2))  // Added missing closing parenthesis
-  
-    return {
-      ...prev,
-      items: newItems,
-      subtotal,
-      cgstAmount,
-      sgstAmount,
-      total,
-    }
+    // In your handleItemChange and handleFlatDiscountChange functions, update the total calculation:
+const totalBeforeSpecialDiscount = subtotalAfterDiscount + cgstAmount + sgstAmount;
+const total = Math.max(0, totalBeforeSpecialDiscount - specialDiscount);
+
+return {
+  ...prev,
+  items: newItems,
+  subtotal,
+  cgstAmount,
+  sgstAmount,
+  total,
+}
   })
 }
 
@@ -250,6 +265,14 @@ const [productData, setProductData] = useState({}); // To store code-name mappin
       }
     })
   }
+
+  // Add these functions near your other handler functions
+const toggleFieldVisibility = (field) => {
+  setHiddenFields(prev => ({
+    ...prev,
+    [field]: !prev[field]
+  }));
+};
   // Handle note changes
   const handleNoteChange = (index, value) => {
     setQuotationData((prev) => {
@@ -345,6 +368,12 @@ const handleQuotationSelect = async (quotationNo) => {
 
     if (result.success) {
       const loadedData = result.quotationData;
+      
+      // Parse reference names from consignorName
+      const references = loadedData.consignorName ? 
+        loadedData.consignorName.split(",").map(r => r.trim()).filter(r => r) : 
+        [];
+      setSelectedReferences(references);
       
       // Parse the items string into proper items array
       let items = [];
@@ -1283,7 +1312,8 @@ const itemsString = quotationData.items.map(item => {
     item.rate || 0,
     item.discount || 0,
     item.flatDiscount || 0,
-    item.amount || 0
+    item.amount || 0,
+    specialDiscount.toString(), // Add special discount
   ].join("|");
 }).join(";");
     
@@ -1620,16 +1650,67 @@ const itemPromises = quotationData.items.map(async (item) => {
                   <div className="space-y-4">
                   <div className="space-y-2">
   <label className="block text-sm font-medium">Reference Name</label>
+  
+  {/* Selected references display */}
+  <div className="flex flex-wrap gap-2 mb-2">
+    {selectedReferences.map((ref) => (
+      <div key={ref} className="flex items-center bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-sm">
+        {ref}
+        <button
+          type="button"
+          onClick={() => {
+            const updated = selectedReferences.filter(r => r !== ref);
+            setSelectedReferences(updated);
+            handleInputChange("consignorName", updated.join(", "));
+            
+            // Update mobile numbers
+            if (updated.length > 0 && dropdownData.references) {
+              const mobileNumbers = updated
+                .map(r => dropdownData.references[r]?.mobile)
+                .filter(Boolean);
+              handleInputChange("consignorMobile", mobileNumbers.join(", "));
+            } else {
+              handleInputChange("consignorMobile", "");
+            }
+          }}
+          className="ml-1 text-blue-600 hover:text-blue-800"
+        >
+          ×
+        </button>
+      </div>
+    ))}
+  </div>
+  
+  {/* Dropdown select */}
   <select
-    value={quotationData.consignorName}
-    onChange={handleReferenceChange}  // Use the new handler here
+    value="" // Always empty to allow new selections
+    onChange={(e) => {
+      const selectedRef = e.target.value;
+      if (selectedRef && !selectedReferences.includes(selectedRef)) {
+        const updated = [...selectedReferences, selectedRef];
+        setSelectedReferences(updated);
+        handleInputChange("consignorName", updated.join(", "));
+        
+        // Update mobile numbers
+        if (dropdownData.references && dropdownData.references[selectedRef]?.mobile) {
+          const mobileNumbers = updated
+            .map(ref => dropdownData.references[ref]?.mobile)
+            .filter(Boolean);
+          handleInputChange("consignorMobile", mobileNumbers.join(", "));
+        }
+      }
+      e.target.value = ""; // Reset the select
+    }}
     className="w-full p-2 border border-gray-300 rounded-md"
   >
-    {referenceOptions.map((option) => (
-      <option key={option} value={option}>
-        {option}
-      </option>
-    ))}
+    <option value="">Select Reference</option>
+    {referenceOptions
+      .filter(option => option !== "Select Reference" && !selectedReferences.includes(option))
+      .map((option) => (
+        <option key={option} value={option}>
+          {option}
+        </option>
+      ))}
   </select>
 </div>
 
@@ -1997,152 +2078,130 @@ const itemPromises = quotationData.items.map(async (item) => {
     ))}
   </tbody>
   <tfoot>
-    <tr>
-      <td colSpan="9" className="px-4 py-2 text-right font-medium">
-        Subtotal:
-      </td>
-      <td className="border p-2">₹{typeof quotationData.subtotal === 'number' ? quotationData.subtotal.toFixed(2) : '0.00'}</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td colSpan="9" className="px-4 py-2 text-right font-medium">
-        Total Flat Discount:
-      </td>
-      <td className="px-4 py-2">
-        <input
-          type="number"
-          value={quotationData.totalFlatDiscount}
-          onChange={(e) => handleFlatDiscountChange(e.target.value)}
-          className="w-24 p-1 border border-gray-300 rounded-md"
-          min="0"
-        />
-      </td>
-      <td></td>
-    </tr>
-    <tr>
-      <td colSpan="9" className="px-4 py-2 text-right font-medium">
-        Taxable Amount:
-      </td>
-      <td className="px-4 py-2">₹{(quotationData.subtotal - quotationData.totalFlatDiscount).toFixed(2)}</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td colSpan="9" className="px-4 py-2 text-right font-medium">
-        CGST ({quotationData.cgstRate}%):
-      </td>
-      <td className="px-4 py-2">₹{quotationData.cgstAmount.toFixed(2)}</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td colSpan="9" className="px-4 py-2 text-right font-medium">
-        SGST ({quotationData.sgstRate}%):
-      </td>
-      <td className="px-4 py-2">₹{quotationData.sgstAmount.toFixed(2)}</td>
-      <td></td>
-    </tr>
-    <tr className="font-bold">
+  <tr>
+    <td colSpan="9" className="px-4 py-2 text-right font-medium">
+      Subtotal:
+    </td>
+    <td className="border p-2">₹{typeof quotationData.subtotal === 'number' ? quotationData.subtotal.toFixed(2) : '0.00'}</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td colSpan="9" className="px-4 py-2 text-right font-medium">
+      Total Flat Discount:
+    </td>
+    <td className="px-4 py-2">
+      <input
+        type="number"
+        value={quotationData.totalFlatDiscount}
+        onChange={(e) => handleFlatDiscountChange(e.target.value)}
+        className="w-24 p-1 border border-gray-300 rounded-md"
+        min="0"
+      />
+    </td>
+    <td></td>
+  </tr>
+  <tr>
+    <td colSpan="9" className="px-4 py-2 text-right font-medium">
+      Taxable Amount:
+    </td>
+    <td className="px-4 py-2">₹{(quotationData.subtotal - quotationData.totalFlatDiscount).toFixed(2)}</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td colSpan="9" className="px-4 py-2 text-right font-medium">
+      CGST ({quotationData.cgstRate}%):
+    </td>
+    <td className="px-4 py-2">₹{quotationData.cgstAmount.toFixed(2)}</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td colSpan="9" className="px-4 py-2 text-right font-medium">
+      SGST ({quotationData.sgstRate}%):
+    </td>
+    <td className="px-4 py-2">₹{quotationData.sgstAmount.toFixed(2)}</td>
+    <td></td>
+  </tr>
+  {/* <tr className="font-bold">
       <td colSpan="9" className="px-4 py-2 text-right">
         Total:
       </td>
       <td className="px-4 py-2">₹{quotationData.total.toFixed(2)}</td>
       <td></td>
-    </tr>
-  </tfoot>
+    </tr> */}
+
+  <tr>
+    <td colSpan="9" className="px-4 py-2 text-right font-medium">
+      Special Discount:
+    </td>
+    <td className="px-4 py-2">
+      <input
+        type="number"
+        value={specialDiscount}
+        onChange={(e) => {
+          const discount = Number(e.target.value) || 0;
+          setSpecialDiscount(discount);
+          // Update the total with special discount
+          const taxableAmount = quotationData.subtotal - quotationData.totalFlatDiscount;
+          const totalBeforeSpecialDiscount = taxableAmount + quotationData.cgstAmount + quotationData.sgstAmount;
+          const newTotal = Math.max(0, totalBeforeSpecialDiscount - discount);
+          setQuotationData(prev => ({
+            ...prev,
+            total: newTotal
+          }));
+        }}
+        className="w-24 p-1 border border-gray-300 rounded-md"
+        min="0"
+      />
+    </td>
+    <td></td>
+  </tr>
+  <tr className="font-bold">
+    <td colSpan="9" className="px-4 py-2 text-right">
+      Grand Total:
+    </td>
+    <td className="px-4 py-2">₹{quotationData.total.toFixed(2)}</td>
+    <td></td>
+  </tr>
+</tfoot>
 </table>
                   </div>
                 </div>
               </div>
 
               <div className="bg-white border rounded-lg p-4 shadow-sm">
-                <h3 className="text-lg font-medium mb-4">Terms & Conditions</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium">Validity</label>
-                    <input
-                      type="text"
-                      value={quotationData.validity}
-                      onChange={(e) => handleInputChange("validity", e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium">Payment Terms</label>
-                    <input
-                      type="text"
-                      value={quotationData.paymentTerms}
-                      onChange={(e) => handleInputChange("paymentTerms", e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium">Delivery</label>
-                    <input
-                      type="text"
-                      value={quotationData.delivery}
-                      onChange={(e) => handleInputChange("delivery", e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium">Freight</label>
-                    <input
-                      type="text"
-                      value={quotationData.freight}
-                      onChange={(e) => handleInputChange("freight", e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium">Insurance</label>
-                    <input
-                      type="text"
-                      value={quotationData.insurance}
-                      onChange={(e) => handleInputChange("insurance", e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium">Taxes</label>
-                    <input
-                      type="text"
-                      value={quotationData.taxes}
-                      onChange={(e) => handleInputChange("taxes", e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                </div>
-
-                <div className="bg-white border rounded-lg p-4 shadow-sm">
-  <h3 className="text-lg font-medium mb-4">Notes</h3>
-  <div className="space-y-4">
-    {quotationData.notes.map((note, index) => (
-      <div key={index} className="flex items-start gap-2">
-        <textarea
-          value={note}
-          onChange={(e) => handleNoteChange(index, e.target.value)}
-          className="w-full p-2 border border-gray-300 rounded-md"
-          rows={2}
-        />
-        <button
-          type="button"
-          onClick={() => removeNote(index)}
-          disabled={quotationData.notes.length <= 1}
-          className="text-red-500 hover:text-red-700 p-1 rounded-md"
-        >
-          <TrashIcon className="h-4 w-4" />
-        </button>
+  <h3 className="text-lg font-medium mb-4">Terms & Conditions</h3>
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {Object.entries({
+      validity: "Validity",
+      paymentTerms: "Payment Terms",
+      delivery: "Delivery",
+      freight: "Freight",
+      insurance: "Insurance",
+      taxes: "Taxes"
+    }).map(([field, label]) => (
+      <div key={field} className="space-y-2">
+        <div className="flex justify-between items-center">
+          <label className="block text-sm font-medium">{label}</label>
+          <button
+            type="button"
+            onClick={() => toggleFieldVisibility(field)}
+            className="text-xs text-blue-600 hover:text-blue-800"
+          >
+            {hiddenFields[field] ? "Show" : "Hide"}
+          </button>
+        </div>
+        {!hiddenFields[field] && (
+          <input
+            type="text"
+            value={quotationData[field]}
+            onChange={(e) => handleInputChange(field, e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded-md"
+          />
+        )}
       </div>
     ))}
-    <button
-      type="button"
-      className="px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50"
-      onClick={addNote}
-    >
-      <PlusIcon className="h-4 w-4 inline mr-1" /> Add Note
-    </button>
   </div>
 </div>
-
 
 <div className="bg-white border rounded-lg p-4 shadow-sm">
   <h3 className="text-lg font-medium mb-6 text-center">Bank Details</h3>
@@ -2231,7 +2290,7 @@ const itemPromises = quotationData.items.map(async (item) => {
     </div>
   </div>
 </div>
-</div>
+
 
               <div className="flex justify-between">
                 <button
@@ -2406,6 +2465,14 @@ const itemPromises = quotationData.items.map(async (item) => {
               <td className="border p-2">{quotationData.cgstRate + quotationData.sgstRate}%</td>
               <td className="border p-2">₹{Number(quotationData.cgstAmount + quotationData.sgstAmount).toFixed(2)}</td>
             </tr>
+            <tr className="border">
+  <td colSpan="9" className="border p-2 text-right">Special Discount</td>
+  <td className="border p-2">-₹{Number(specialDiscount).toFixed(2)}</td>
+</tr>
+<tr className="border font-bold">
+  <td colSpan="9" className="border p-2 text-right">Grand Total</td>
+  <td className="border p-2">₹{Number(quotationData.total).toFixed(2)}</td>
+</tr>
           </tbody>
         </table>
       </div>

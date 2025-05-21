@@ -182,6 +182,7 @@ function FollowUp() {
                   leadId: row.c[1] ? row.c[1].v : "",
                   companyName: row.c[4] ? row.c[4].v : "",
                   personName: row.c[6] ? row.c[6].v : "",
+                  phoneNumber: row.c[5] ? row.c[5].v : "", // Added phone number from column F (index 5)
                   leadSource: row.c[3] ? row.c[3].v : "",
                   location: row.c[7] ? row.c[7].v : "",
                   customerSay: row.c[31] ? row.c[31].v : "",
@@ -252,6 +253,7 @@ function FollowUp() {
             leadId: "LD-001",
             companyName: "ABC Corp",
             personName: "John Smith",
+            phoneNumber: "9876543210", // Added sample phone number
             leadSource: "Indiamart",
             location: "Mumbai",
             customerSay: "Interested in product details",
@@ -412,62 +414,68 @@ const formatPopupDate = (dateValue) => {
           ) : (
             <>
               {activeTab === "pending" && (
-                <div className="rounded-md border overflow-x-auto">
+                <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-slate-50">
                       <tr>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
                           Actions
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
                           Lead No.
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
                           Company Name
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
                           Person Name
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Phone No.
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
                           Lead Source
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
                           Location
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
                           What did customer say
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
                           Enquiry Status
                         </th>
                         {isAdmin() && (
                           <th
                             scope="col"
-                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                            className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                           >
                             Assigned To
                           </th>
@@ -478,7 +486,7 @@ const formatPopupDate = (dateValue) => {
                       {filteredPendingFollowUps.length > 0 ? (
                         filteredPendingFollowUps.map((followUp) => (
                           <tr key={followUp.id} className="hover:bg-slate-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <td className="px-4 py-4 text-sm font-medium">
                               <div className="flex space-x-2">
                                 <Link to={`/follow-up/new?leadId=${followUp.leadId}&leadNo=${followUp.leadId}`}>
                                   <button className="px-3 py-1 text-xs border border-amber-200 text-amber-600 hover:bg-amber-50 rounded-md">
@@ -496,14 +504,19 @@ const formatPopupDate = (dateValue) => {
                                 </button> */}
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <td className="px-4 py-4 text-sm font-medium text-gray-900">
                               {followUp.leadId}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[150px] break-words">
                               {followUp.companyName}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.personName}</td>
-                            <td className="px-6 py-4 whitespace-nowrap">
+                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">
+                              {followUp.personName}
+                            </td>
+                            <td className="px-4 py-4 text-sm text-gray-500">
+                              {followUp.phoneNumber}
+                            </td>
+                            <td className="px-4 py-4">
                               <span
                                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                                   followUp.priority === "High"
@@ -516,15 +529,17 @@ const formatPopupDate = (dateValue) => {
                                 {followUp.leadSource}
                               </span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.location}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">
+                              {followUp.location}
+                            </td>
+                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[200px] break-words">
                               {followUp.customerSay}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">
                               {followUp.enquiryStatus}
                             </td>
                             {isAdmin() && (
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              <td className="px-4 py-4 text-sm text-gray-500">
                                 {followUp.assignedTo}
                               </td>
                             )}
@@ -532,7 +547,7 @@ const formatPopupDate = (dateValue) => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={isAdmin() ? 9 : 8} className="px-6 py-4 text-center text-sm text-slate-500">
+                          <td colSpan={isAdmin() ? 10 : 9} className="px-4 py-4 text-center text-sm text-slate-500">
                             No pending follow-ups found
                           </td>
                         </tr>
@@ -543,93 +558,92 @@ const formatPopupDate = (dateValue) => {
               )}
 
               {activeTab === "history" && (
-                <div className="rounded-md border overflow-x-auto">
+                <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-slate-50">
+                    <thead className="bg-slate-50 sticky top-0">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Lead No.
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           What did the customer say?
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Status
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Enquiry Received Status
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Enquiry Received Date
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Enquiry for State
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Project Name
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Sales Type
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Required Product Date
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Project Approximate Value
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Item Name 1
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Quantity 1
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Item Name 2
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Quantity 2
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Item Name 3
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Quantity 3
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Quantity 3
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Item Name 4
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Quantity 4
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Item Name 5
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Quantity 5
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Next Action
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Next Call Date
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Next Call Time
                         </th>
-                        {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th> */}
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {filteredHistoryFollowUps.length > 0 ? (
                         filteredHistoryFollowUps.map((followUp, index) => (
                           <tr key={index} className="hover:bg-slate-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <td className="px-4 py-4 text-sm font-medium text-gray-900 max-w-[100px] break-words">
                               {followUp.leadNo}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[200px] break-words">
                               {followUp.customerSay}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
+                            <td className="px-4 py-4">
                               <span
                                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                                   followUp.status === "Completed"
@@ -642,56 +656,47 @@ const formatPopupDate = (dateValue) => {
                                 {followUp.status}
                               </span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">
                               {followUp.enquiryReceivedStatus}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td className="px-4 py-4 text-sm text-gray-500">
                               {followUp.enquiryReceivedDate}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[100px] break-words">
                               {followUp.enquiryState}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">
                               {followUp.projectName}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.salesType}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td className="px-4 py-4 text-sm text-gray-500">{followUp.salesType}</td>
+                            <td className="px-4 py-4 text-sm text-gray-500">
                               {followUp.requiredProductDate}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td className="px-4 py-4 text-sm text-gray-500">
                               {followUp.projectApproxValue}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.itemName1}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.quantity1}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.itemName2}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.quantity2}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.itemName3}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.quantity3}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.itemName4}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.quantity4}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.itemName5}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.quantity5}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{followUp.nextAction}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">{followUp.itemName1}</td>
+                            <td className="px-4 py-4 text-sm text-gray-500">{followUp.quantity1}</td>
+                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">{followUp.itemName2}</td>
+                            <td className="px-4 py-4 text-sm text-gray-500">{followUp.quantity2}</td>
+                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">{followUp.itemName3}</td>
+                            <td className="px-4 py-4 text-sm text-gray-500">{followUp.quantity3}</td>
+                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">{followUp.itemName4}</td>
+                            <td className="px-4 py-4 text-sm text-gray-500">{followUp.quantity4}</td>
+                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">{followUp.itemName5}</td>
+                            <td className="px-4 py-4 text-sm text-gray-500">{followUp.quantity5}</td>
+                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">{followUp.nextAction}</td>
+                            <td className="px-4 py-4 text-sm text-gray-500">
                               {followUp.nextCallDate}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td className="px-4 py-4 text-sm text-gray-500">
                               {followUp.nextCallTime}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                              <div className="flex space-x-2">
-                                {/* <Link to={`/follow-up/${followUp.leadNo}`}>
-                                  <button className="px-3 py-1 text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-md">
-                                    View
-                                  </button>
-                                </Link> */}
-                              </div>
                             </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={24} className="px-6 py-4 text-center text-sm text-slate-500">
+                          <td colSpan={24} className="px-4 py-4 text-center text-sm text-slate-500">
                             No history found
                           </td>
                         </tr>
@@ -743,6 +748,12 @@ const formatPopupDate = (dateValue) => {
                   <p className="text-base">{selectedFollowUp?.personName}</p>
                 </div>
 
+                {/* Phone Number */}
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-500">Phone Number</p>
+                  <p className="text-base">{selectedFollowUp?.phoneNumber}</p>
+                </div>
+
                 {/* Column D - Lead Source */}
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-gray-500">Lead Source</p>
@@ -775,9 +786,9 @@ const formatPopupDate = (dateValue) => {
 
                 {/* Column K - Created At (using id as placeholder) */}
                 <div className="space-y-2">
-  <p className="text-sm font-medium text-gray-500">Created Date</p>
-  <p className="text-base">{formatPopupDate(selectedFollowUp?.createdAt)}</p>
-</div>
+                  <p className="text-sm font-medium text-gray-500">Created Date</p>
+                  <p className="text-base">{formatPopupDate(selectedFollowUp?.createdAt)}</p>
+                </div>
 
                 {/* Column L - Priority (derived from lead source) */}
                 <div className="space-y-2">
@@ -834,5 +845,3 @@ const formatPopupDate = (dateValue) => {
 }
 
 export default FollowUp
-
-

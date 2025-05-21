@@ -175,6 +175,7 @@ function CallTracker() {
                   receiverName: row.c[2] ? row.c[2].v : "", // Column C - Lead Receiver Name
                   leadSource: row.c[4] ? row.c[4].v : "", // Column D - Lead Source
                   salespersonName: row.c[56] ? row.c[56].v : "", // Column E - Salesperson Name
+                  phoneNumber: row.c[5] ? row.c[5].v : "", // Added phone number from column F (index 5)
                   companyName: row.c[57] ? row.c[57].v : "", // Column G - Company Name
                   createdAt: row.c[0] ? formatDateToDDMMYYYY(row.c[0].v) : "", // Using date from column A
                   status: "Expected", // Default status for pending
@@ -295,6 +296,7 @@ function CallTracker() {
             receiverName: "John Doe",
             leadSource: "Website",
             salespersonName: "Jane Smith",
+            phoneNumber: "9876543210", // Added sample phone number
             companyName: "Sample Corp",
             status: "Expected",
             priority: "Medium",
@@ -452,6 +454,12 @@ function CallTracker() {
                         </th>
                         <th
                           scope="col"
+                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Phone No.
+                        </th>
+                        <th
+                          scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
                           Salesperson Name
@@ -480,7 +488,7 @@ function CallTracker() {
                                     Process <ArrowRightIcon className="ml-1 h-3 w-3 inline" />
                                   </button>
                                 </Link>
-                                <button
+                                {/* <button
                                   onClick={() => {
                                     setSelectedTracker(tracker)
                                     setShowPopup(true)
@@ -488,7 +496,7 @@ function CallTracker() {
                                   className="px-3 py-1 text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-md"
                                 >
                                   View
-                                </button>
+                                </button> */}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -509,6 +517,9 @@ function CallTracker() {
                               >
                                 {tracker.leadSource}
                               </span>
+                            </td>
+                            <td className="px-4 py-4 text-sm text-gray-500">
+                              {tracker.phoneNumber}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               {tracker.salespersonName}
