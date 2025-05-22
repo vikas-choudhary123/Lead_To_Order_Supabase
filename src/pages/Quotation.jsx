@@ -15,6 +15,10 @@ function Quotation() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [quotationLink, setQuotationLink] = useState("")
   const [pdfUrl, setPdfUrl] = useState("")
+
+  // At the top of your component, add:
+const params = new URLSearchParams(window.location.search);
+const isViewMode = params.has('view');
   
   // Dynamic dropdown options
   const [stateOptions, setStateOptions] = useState(["Select State"])
@@ -845,17 +849,42 @@ const handleQuotationSelect = async (quotationNo) => {
 
   // Generate shareable link
   const handleGenerateLink = () => {
-    setIsGenerating(true)
+    setIsGenerating(true);
+    
+    // Create a unique identifier for this quotation
+    const quotationId = `quotation_${Date.now()}`;
+    
+    // Store the current quotation data in localStorage with this ID
+    localStorage.setItem(quotationId, JSON.stringify(quotationData));
+    
+    // Generate the link that will open this quotation in view-only mode
+    const link = `${window.location.origin}${window.location.pathname}?view=${quotationId}`;
+    
+    setQuotationLink(link);
+    setIsGenerating(false);
+    alert("Quotation link has been successfully generated and is ready to share.");
+  };
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsGenerating(false)
-      setQuotationLink(`https://leadtoorder.example.com/quotations/${quotationData.quotationNo}`)
-
-      // Show success message
-      alert("Quotation link has been successfully generated and is ready to share.")
-    }, 1000)
-  }
+  useEffect(() => {
+    // Check if we're in view mode (URL has ?view= parameter)
+    const params = new URLSearchParams(window.location.search);
+    const viewId = params.get('view');
+    
+    if (viewId) {
+      // Load the quotation data from localStorage
+      const savedQuotation = localStorage.getItem(viewId);
+      
+      if (savedQuotation) {
+        try {
+          const parsedData = JSON.parse(savedQuotation);
+          setQuotationData(parsedData);
+          setActiveTab("preview"); // Force preview mode
+        } catch (error) {
+          console.error("Error loading quotation data:", error);
+        }
+      }
+    }
+  }, []);
   
   // Generate PDF
   // Generate PDF
