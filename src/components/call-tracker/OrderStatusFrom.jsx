@@ -1,8 +1,6 @@
-"use client"
-
 import { useState, useEffect } from "react"
 
-function OrderStatusForm({ formData, onFieldChange }) {
+function OrderStatusForm({ formData, onFieldChange, enquiryNo }) {
   const [orderStatus, setOrderStatus] = useState(formData.orderStatus || "")
   const [acceptanceViaOptions, setAcceptanceViaOptions] = useState([])
   const [paymentModeOptions, setPaymentModeOptions] = useState([])
@@ -13,6 +11,8 @@ function OrderStatusForm({ formData, onFieldChange }) {
   const [isLoadingDropdowns, setIsLoadingDropdowns] = useState(false)
   const [orderVideoError, setOrderVideoError] = useState("")
   const [transportModeOptions, setTransportModeOptions] = useState([])
+  const [quotationNumbers, setQuotationNumbers] = useState([])
+  const [isLoadingQuotations, setIsLoadingQuotations] = useState(false)
 
   // Fetch dropdown options from DROPDOWN sheet
   useEffect(() => {
@@ -112,6 +112,59 @@ function OrderStatusForm({ formData, onFieldChange }) {
     fetchDropdownOptions()
   }, [])
 
+  // Fetch quotation numbers for the given enquiry number
+  useEffect(() => {
+    const fetchQuotationNumbers = async () => {
+      if (!enquiryNo) return
+      
+      try {
+        setIsLoadingQuotations(true)
+        
+        // Fetch data from FMS sheet
+        const fmsUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=FMS"
+        const response = await fetch(fmsUrl)
+        const text = await response.text()
+        
+        // Extract the JSON part from the response
+        const jsonStart = text.indexOf('{')
+        const jsonEnd = text.lastIndexOf('}') + 1
+        const jsonData = text.substring(jsonStart, jsonEnd)
+        
+        const data = JSON.parse(jsonData)
+        
+        // Find matching quotation numbers where column B matches the enquiry number
+        if (data && data.table && data.table.rows) {
+          const matchingQuotations = []
+          
+          data.table.rows.forEach(row => {
+            // Column B is index 1 (enquiry number) and column H is index 7 (quotation number)
+            if (row.c && 
+                row.c[1] && 
+                row.c[1].v && 
+                row.c[1].v.toString() === enquiryNo.toString() &&
+                row.c[60] && 
+                row.c[60].v) {
+              matchingQuotations.push(row.c[60].v)
+            }
+          })
+          
+          setQuotationNumbers(matchingQuotations)
+          
+          // If we found matches and the form field is empty, auto-fill with the first match
+          if (matchingQuotations.length > 0 && !formData.orderStatusQuotationNumber) {
+            onFieldChange('orderStatusQuotationNumber', matchingQuotations[0])
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching quotation numbers:", error)
+      } finally {
+        setIsLoadingQuotations(false)
+      }
+    }
+    
+    fetchQuotationNumbers()
+  }, [enquiryNo, formData.orderStatusQuotationNumber, onFieldChange])
+
   const handleChange = (e) => {
     const { name, value } = e.target
     onFieldChange(name, value)
@@ -147,15 +200,41 @@ function OrderStatusForm({ formData, onFieldChange }) {
           <label htmlFor="orderStatusQuotationNumber" className="block text-sm font-medium text-gray-700">
             Quotation Number
           </label>
-          <input
-            id="orderStatusQuotationNumber"
-            name="orderStatusQuotationNumber"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-            placeholder="Enter quotation number"
-            value={formData.orderStatusQuotationNumber || ""}
-            onChange={handleChange}
-            required
-          />
+          {isLoadingQuotations ? (
+            <div className="flex items-center space-x-2">
+              <input
+                id="orderStatusQuotationNumber"
+                name="orderStatusQuotationNumber"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="Loading quotation numbers..."
+                value={formData.orderStatusQuotationNumber || ""}
+                onChange={handleChange}
+                disabled
+                required
+              />
+              <div className="text-sm text-gray-500">Loading...</div>
+            </div>
+          ) : (
+            <input
+              id="orderStatusQuotationNumber"
+              name="orderStatusQuotationNumber"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="Enter quotation number"
+              value={formData.orderStatusQuotationNumber || ""}
+              onChange={handleChange}
+              required
+            />
+          )}
+          {enquiryNo && quotationNumbers.length > 0 && !isLoadingQuotations && (
+            <div className="text-xs text-green-600 mt-1">
+              {quotationNumbers.length === 1 
+                ? "Found matching quotation" 
+                : `Found ${quotationNumbers.length} matching quotations`}
+            </div>
+          )}
+          {enquiryNo && quotationNumbers.length === 0 && !isLoadingQuotations && (
+            <div className="text-xs text-orange-500 mt-1">No matching quotations found for enquiry #{enquiryNo}</div>
+          )}
         </div>
       </div>
 

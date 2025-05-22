@@ -374,7 +374,7 @@ const handleSubmit = async () => {
     )
 
     // Add enquiry number in the last column
-    rowData.push(newCallTrackerData.enquiryNo) // Enquiry No.
+    // rowData.push(newCallTrackerData.enquiryNo) // Enquiry No.
 
     console.log("Row Data to be submitted:", rowData)
 
@@ -477,24 +477,24 @@ const handleSubmit = async () => {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">
-                Company Name
-              </label>
-              <select
-                id="companyName"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                value={newCallTrackerData.companyName}
-                onChange={(e) => handleCompanyChange(e.target.value)}
-                required
-              >
-                <option value="">Select company</option>
-                {companyOptions.map((company, index) => (
-                  <option key={index} value={company}>
-                    {company}
-                  </option>
-                ))}
-              </select>
-            </div>
+  <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">
+    Company Name
+  </label>
+  <input
+    list="companyOptions"
+    id="companyName"
+    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+    value={newCallTrackerData.companyName}
+    onChange={(e) => handleCompanyChange(e.target.value)}
+    required
+  />
+  <datalist id="companyOptions">
+    {companyOptions.map((company, index) => (
+      <option key={index} value={company} />
+    ))}
+  </datalist>
+</div>
+
 
             <div className="space-y-2">
               <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
