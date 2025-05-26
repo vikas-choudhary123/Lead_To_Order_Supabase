@@ -13,6 +13,8 @@ function OrderStatusForm({ formData, onFieldChange, enquiryNo }) {
   const [transportModeOptions, setTransportModeOptions] = useState([])
   const [quotationNumbers, setQuotationNumbers] = useState([])
   const [isLoadingQuotations, setIsLoadingQuotations] = useState(false)
+  const [creditDaysOptions, setCreditDaysOptions] = useState([])
+const [creditLimitOptions, setCreditLimitOptions] = useState([])
 
   // Fetch dropdown options from DROPDOWN sheet
   useEffect(() => {
@@ -47,12 +49,29 @@ function OrderStatusForm({ formData, onFieldChange, enquiryNo }) {
           const conveyedOptions = []
           // For Transport Mode options (column BN = index 65)
           const transportOptions = []
+
+          const creditDaysOptions = []
+// For Credit Limit options (column CE = index 82)
+const creditLimitOptions = []
+
+// 3. In the forEach loop inside fetchDropdownOptions, add these extractions:
+// Extract column CD values (index 81)
+
           
           // Skip the header row (index 0)
           data.table.rows.slice(0).forEach(row => {
             // Extract column H values (index 7)
             if (row.c && row.c[7] && row.c[7].v) {
               acceptanceOptions.push(row.c[7].v)
+            }
+
+            if (row.c && row.c[81] && row.c[81].v) {
+              creditDaysOptions.push(row.c[81].v)
+            }
+            
+            // Extract column CE values (index 82)
+            if (row.c && row.c[82] && row.c[82].v) {
+              creditLimitOptions.push(row.c[82].v)
             }
             
             // Extract column I values (index 8)
@@ -93,6 +112,9 @@ function OrderStatusForm({ formData, onFieldChange, enquiryNo }) {
           setPaymentTermsOptions(paymentTermsOptions)
           setConveyedOptions(conveyedOptions)
           setTransportModeOptions(transportOptions)
+          setCreditDaysOptions(creditDaysOptions)
+setCreditLimitOptions(creditLimitOptions)
+
         }
       } catch (error) {
         console.error("Error fetching dropdown options:", error)
@@ -104,6 +126,9 @@ function OrderStatusForm({ formData, onFieldChange, enquiryNo }) {
         setPaymentTermsOptions(["30", "45", "60", "90"])
         setConveyedOptions(["Yes", "No"])
         setTransportModeOptions(["Road", "Air", "Sea", "Rail"])
+        setCreditDaysOptions(["30", "45", "60", "90"])
+setCreditLimitOptions(["10000", "25000", "50000", "100000"])
+
       } finally {
         setIsLoadingDropdowns(false)
       }
@@ -362,6 +387,42 @@ function OrderStatusForm({ formData, onFieldChange, enquiryNo }) {
     <option value="">Select transport mode</option>
     {transportModeOptions.map((option, index) => (
       <option key={index} value={option.toLowerCase()}>{option}</option>
+    ))}
+  </select>
+</div>
+
+<div className="space-y-2">
+  <label htmlFor="creditDays" className="block text-sm font-medium text-gray-700">
+    Credit Days
+  </label>
+  <select
+    id="creditDays"
+    name="creditDays"
+    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+    value={formData.creditDays || ""}
+    onChange={handleChange}
+  >
+    <option value="">Select credit days</option>
+    {creditDaysOptions.map((option, index) => (
+      <option key={index} value={option}>{option}</option>
+    ))}
+  </select>
+</div>
+
+<div className="space-y-2">
+  <label htmlFor="creditLimit" className="block text-sm font-medium text-gray-700">
+    Credit Limit
+  </label>
+  <select
+    id="creditLimit"
+    name="creditLimit"
+    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+    value={formData.creditLimit || ""}
+    onChange={handleChange}
+  >
+    <option value="">Select credit limit</option>
+    {creditLimitOptions.map((option, index) => (
+      <option key={index} value={option}>{option}</option>
     ))}
   </select>
 </div>

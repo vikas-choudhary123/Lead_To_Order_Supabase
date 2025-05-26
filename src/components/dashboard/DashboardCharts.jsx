@@ -342,49 +342,64 @@ function DashboardCharts() {
       }
       
       // Process data for the Lead Sources chart (filtering by user)
-      if (fmsData && fmsData.table && fmsData.table.rows) {
-          // Count leads by source from FMS sheet column D (index 3)
-          const sourceCounter = {}
-          const colors = {
-              "Indiamart": "#06b6d4",
-              "Justdial": "#0ea5e9",
-              "Social Media": "#3b82f6",
-              "Website": "#6366f1",
-              "Referrals": "#8b5cf6",
-              // Add more colors for other sources if needed
-          }
+      // Process data for the Lead Sources chart (filtering by user)
+if (fmsData && fmsData.table && fmsData.table.rows) {
+  // Count leads by source from FMS sheet column D (index 3)
+  const sourceCounter = {}
+  
+  // Define a color palette that will cycle through different colors
+  const colorPalette = [
+      "#06b6d4", // cyan
+      "#0ea5e9", // sky
+      "#3b82f6", // blue
+      "#6366f1", // indigo
+      "#8b5cf6", // violet
+      "#a855f7", // purple
+      "#d946ef", // fuchsia
+      "#ec4899", // pink
+      "#f43f5e", // rose
+      "#ef4444", // red
+      "#f97316", // orange
+      "#f59e0b", // amber
+      "#eab308", // yellow
+      "#84cc16", // lime
+      "#22c55e", // green
+      "#10b981", // emerald
+      "#14b8a6", // teal
+  ]
+  
+  fmsData.table.rows.slice(2).forEach(row => {
+      if (row.c && row.c[3] && row.c[3].v) {
+          // Get the assigned user from column CH (index 88)
+          const assignedUser = row.c[88] ? row.c[88].v : ""
           
-          fmsData.table.rows.slice(2).forEach(row => {
-              if (row.c && row.c[3] && row.c[3].v) {
-                  // Get the assigned user from column CH (index 88)
-                  const assignedUser = row.c[88] ? row.c[88].v : ""
-                  
-                  // Check if this row should be included based on user permissions
-                  const shouldInclude = isAdmin() || (currentUser && assignedUser === currentUser.username)
-                  
-                  // Only count sources for rows that match the user filter
-                  if (shouldInclude) {
-                      const source = row.c[3].v
-                      sourceCounter[source] = (sourceCounter[source] || 0) + 1
-                  }
-              }
-          })
+          // Check if this row should be included based on user permissions
+          const shouldInclude = isAdmin() || (currentUser && assignedUser === currentUser.username)
           
-          // Convert to array format for the chart
-          const newSourceData = Object.entries(sourceCounter).map(([name, value]) => ({
-              name,
-              value,
-              color: colors[name] || "#9ca3af" // Use gray as default if color not defined
-          }))
-          
-          // Sort by value (descending)
-          newSourceData.sort((a, b) => b.value - a.value)
-          
-          // Update state if we have data
-          if (newSourceData.length > 0) {
-              setSourceData(newSourceData)
+          // Only count sources for rows that match the user filter
+          if (shouldInclude) {
+              const source = row.c[3].v
+              sourceCounter[source] = (sourceCounter[source] || 0) + 1
           }
       }
+  })
+  
+  // Convert to array format for the chart with dynamic color assignment
+  const sourceNames = Object.keys(sourceCounter)
+  const newSourceData = sourceNames.map((name, index) => ({
+      name,
+      value: sourceCounter[name],
+      color: colorPalette[index % colorPalette.length] // Cycle through colors
+  }))
+  
+  // Sort by value (descending)
+  newSourceData.sort((a, b) => b.value - a.value)
+  
+  // Update state if we have data
+  if (newSourceData.length > 0) {
+      setSourceData(newSourceData)
+  }
+}
       
     } catch (error) {
       console.error("Error fetching chart data:", error)

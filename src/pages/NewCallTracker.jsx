@@ -65,6 +65,8 @@ function NewCallTracker() {
     paymentMode: "",
     paymentTerms: "",
     tranportMode: "",
+    creditDays: "",
+    creditLimit: "",
     conveyedForRegistration: "",
     orderVideo: "",
     acceptanceFile: null,
@@ -395,6 +397,11 @@ const fetchLatestQuotationNumber = async (enquiryNo) => {
             acceptanceFileUrl || "",           // Column AB
             orderStatusData.orderRemark,       // Column AC
           )
+          rowData.push(...new Array(8).fill(""))
+  rowData.push(
+    orderStatusData.creditDays,        // Column AN - Credit Days
+    orderStatusData.creditLimit,       // Column AO - Credit Limit
+  )
           // Add empty values for remaining columns (AF-AI)
           rowData.push(...new Array(4).fill(""))
         } else if (orderStatusData.orderStatus === "no") {

@@ -217,28 +217,29 @@ const [hiddenFields, setHiddenFields] = useState({
       const newItems = prev.items.map((item) => {
         if (item.id === id) {
           const updatedItem = { ...item, [field]: value }
-    
+      
           // Ensure numeric calculations
           if (field === "qty" || field === "rate" || field === "discount" || field === "flatDiscount") {
             const baseAmount = Number(updatedItem.qty) * Number(updatedItem.rate)
             const discountedAmount = baseAmount * (1 - (Number(updatedItem.discount) / 100))
             updatedItem.amount = Math.max(0, discountedAmount - Number(updatedItem.flatDiscount))
           }
-    
+      
           return updatedItem
         }
         return item
       })
-    
+      
       // Calculate total flat discount from all items
       const totalFlatDiscount = newItems.reduce((sum, item) => sum + Number(item.flatDiscount), 0)
       const subtotal = Number(newItems.reduce((sum, item) => sum + item.amount, 0))
-      const subtotalAfterDiscount = Math.max(0, subtotal - totalFlatDiscount)
-      const cgstAmount = Number((subtotalAfterDiscount * (prev.cgstRate / 100)).toFixed(2))
-      const sgstAmount = Number((subtotalAfterDiscount * (prev.sgstRate / 100)).toFixed(2))
-      const totalBeforeSpecialDiscount = subtotalAfterDiscount + cgstAmount + sgstAmount
+      // Remove the subtraction of totalFlatDiscount from taxable amount
+      const taxableAmount = subtotal // Changed from (subtotal - totalFlatDiscount)
+      const cgstAmount = Number((taxableAmount * (prev.cgstRate / 100)).toFixed(2))
+      const sgstAmount = Number((taxableAmount * (prev.sgstRate / 100)).toFixed(2))
+      const totalBeforeSpecialDiscount = taxableAmount + cgstAmount + sgstAmount
       const total = Math.max(0, totalBeforeSpecialDiscount - specialDiscount)
-  
+    
       return {
         ...prev,
         items: newItems,
@@ -256,15 +257,16 @@ const [hiddenFields, setHiddenFields] = useState({
     setQuotationData((prev) => {
       const numValue = Number(value)
       const subtotal = prev.items.reduce((sum, item) => sum + item.amount, 0)
-      const subtotalAfterDiscount = Math.max(0, subtotal - numValue)
-      const cgstAmount = Number((subtotalAfterDiscount * (prev.cgstRate / 100)).toFixed(2))
-      const sgstAmount = Number((subtotalAfterDiscount * (prev.sgstRate / 100)).toFixed(2))
-      const total = Number((subtotalAfterDiscount + cgstAmount + sgstAmount).toFixed(2))
-    
+      // Remove the subtraction of numValue from taxable amount
+      const taxableAmount = subtotal // Changed from (subtotal - numValue)
+      const cgstAmount = Number((taxableAmount * (prev.cgstRate / 100)).toFixed(2))
+      const sgstAmount = Number((taxableAmount * (prev.sgstRate / 100)).toFixed(2))
+      const total = Number((taxableAmount + cgstAmount + sgstAmount).toFixed(2))
+      
       return {
         ...prev,
         totalFlatDiscount: numValue,
-        subtotal: subtotal, // Use the calculated subtotal from prev.items
+        subtotal: subtotal,
         cgstAmount,
         sgstAmount,
         total,
@@ -2049,10 +2051,10 @@ const itemPromises = quotationData.items.map(async (item) => {
             className="w-20 p-1 border border-gray-300 rounded-md"
           >
             <option value="0">0%</option>
-            <option value="5">5%</option>
-            <option value="12">12%</option>
+            {/* <option value="5">5%</option> */}
+            {/* <option value="12">12%</option> */}
             <option value="18">18%</option>
-            <option value="28">28%</option>
+            {/* <option value="28">28%</option> */}
           </select>
         </td>
         <td className="px-4 py-2">
@@ -2166,10 +2168,10 @@ const itemPromises = quotationData.items.map(async (item) => {
     <td></td>
   </tr>
   <tr>
-    <td colSpan="9" className="px-4 py-2 text-right font-medium">
+  <td colSpan="9" className="px-4 py-2 text-right font-medium">
       Taxable Amount:
     </td>
-    <td className="px-4 py-2">₹{(quotationData.subtotal - quotationData.totalFlatDiscount).toFixed(2)}</td>
+    <td className="px-4 py-2">₹{quotationData.subtotal.toFixed(2)}</td> {/* Removed subtraction of totalFlatDiscount */}
     <td></td>
   </tr>
   <tr>
@@ -2564,7 +2566,16 @@ const itemPromises = quotationData.items.map(async (item) => {
     </div>
 
     {/* Terms and Conditions */}
-    <div className="mt-4 border-t pt-4">
+{/* Terms and Conditions */}
+<div className="mt-4 border-t pt-4">
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+    {/* Image container */}
+    <div className="flex items-center justify-center p-6 rounded-lg border border-gray-200">
+      <img src={imageform} alt="ManiQuip Logo" className="max-h-100 w-auto object-contain" />
+    </div>
+    
+    {/* Terms and conditions content */}
+    <div>
       <h3 className="font-bold mb-2">Terms & Conditions</h3>
       <table className="w-full">
         <tbody>
@@ -2606,6 +2617,8 @@ const itemPromises = quotationData.items.map(async (item) => {
         </div>
       )}
     </div>
+  </div>
+</div>
 
     {/* Bank Details and Footer */}
     <div className="grid grid-cols-2 gap-4 border-t pt-4 mt-4">
