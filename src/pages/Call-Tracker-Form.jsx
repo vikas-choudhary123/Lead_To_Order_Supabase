@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 
 const CallTrackerForm = ({ onClose = () => window.history.back() }) => {
   const [leadSources, setLeadSources] = useState([])
+  const [scNameOptions, setScNameOptions] = useState([]) // Added SC Name options
   const [enquiryStates, setEnquiryStates] = useState([])
   const [nobOptions, setNobOptions] = useState([])
   const [salesTypes, setSalesTypes] = useState([])
@@ -19,6 +20,7 @@ const [assignToProjectOptions, setAssignToProjectOptions] = useState([])
   const [newCallTrackerData, setNewCallTrackerData] = useState({
     enquiryNo: "",
     leadSource: "",
+    scName: "", // Added SC Name field
     companyName: "",
     phoneNumber: "",
     salesPersonName: "",
@@ -131,6 +133,7 @@ const [assignToProjectOptions, setAssignToProjectOptions] = useState([])
       
       if (data && data.table && data.table.rows) {
         const sources = []        // Column B (Lead Sources)
+        const scNames = []        // Column AK (SC Name Options) - index 36
         const states = []         // Column C (Enquiry States)
         const salesTypeOptions = [] // Column D (Sales Types)
         const productItems = []   // Column AJ (index 35) - Product Categories
@@ -145,6 +148,11 @@ const [assignToProjectOptions, setAssignToProjectOptions] = useState([])
             // Column B (Lead Sources)
             if (row.c[1] && row.c[1].v) {
               sources.push(row.c[1].v.toString())
+            }
+            
+            // Column AK (SC Name Options) - index 36
+            if (row.c[36] && row.c[36].v) {
+              scNames.push(row.c[36].v.toString())
             }
             
             // Column C (Enquiry States)
@@ -186,6 +194,7 @@ const [assignToProjectOptions, setAssignToProjectOptions] = useState([])
         
         // Update state with fetched values (using unique values to prevent duplicates)
         setLeadSources([...new Set(sources.filter(Boolean))])
+        setScNameOptions([...new Set(scNames.filter(Boolean))]) // Added SC Name options
         setEnquiryStates([...new Set(states.filter(Boolean))])
         setSalesTypes([...new Set(salesTypeOptions.filter(Boolean))])
         setProductCategories([...new Set(productItems.filter(Boolean))])
@@ -198,6 +207,7 @@ const [assignToProjectOptions, setAssignToProjectOptions] = useState([])
       console.error("Error fetching dropdown values:", error)
       // Fallback to empty arrays if there's an error
       setLeadSources(["Website", "Justdial", "Sulekha", "Indiamart", "Referral", "Other"])
+      setScNameOptions(["SC 1", "SC 2", "SC 3"]) // Added fallback for SC Name
       setEnquiryStates(["Maharashtra", "Gujarat", "Karnataka", "Tamil Nadu", "Delhi"])
       setNobOptions(["NOB 1", "NOB 2", "NOB 3"])
       setSalesTypes(["NBD", "CRR", "NBD_CRR"])
@@ -319,7 +329,7 @@ const [assignToProjectOptions, setAssignToProjectOptions] = useState([])
   }
 
   // Function to handle form submission
-  // Function to handle form submission
+// Function to handle form submission
 const handleSubmit = async () => {
   setIsSubmitting(true)
   try {
@@ -373,8 +383,18 @@ const handleSubmit = async () => {
       expectedFormData.nextCallTime || "" // Next Call Time
     )
 
-    // Add enquiry number in the last column
-    // rowData.push(newCallTrackerData.enquiryNo) // Enquiry No.
+    // Add empty columns up to column BX (index 75) to place SC Name in the correct position
+    // Calculate how many empty columns we need to add to reach column BX
+    const currentLength = rowData.length
+    const targetIndex = 75 // Column BX is index 75 (0-based)
+    
+    // Add empty columns if needed
+    while (rowData.length < targetIndex) {
+      rowData.push("")
+    }
+    
+    // Add SC Name at column BX (index 75)
+    rowData.push(newCallTrackerData.scName || "") // BX: SC Name
 
     console.log("Row Data to be submitted:", rowData)
 
@@ -471,6 +491,27 @@ const handleSubmit = async () => {
                 {leadSources.map((source, index) => (
                   <option key={index} value={source}>
                     {source}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Added SC Name field after Lead Source */}
+            <div className="space-y-2">
+              <label htmlFor="scName" className="block text-sm font-medium text-gray-700">
+                SC Name
+              </label>
+              <select
+                id="scName"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                value={newCallTrackerData.scName}
+                onChange={(e) => setNewCallTrackerData({ ...newCallTrackerData, scName: e.target.value })}
+                required
+              >
+                <option value="">Select SC Name</option>
+                {scNameOptions.map((scName, index) => (
+                  <option key={index} value={scName}>
+                    {scName}
                   </option>
                 ))}
               </select>
@@ -621,6 +662,7 @@ const handleSubmit = async () => {
     ))}
   </select>
 </div>
+
 
           <div className="space-y-2">
             <label htmlFor="gstNumber" className="block text-sm font-medium text-gray-700">

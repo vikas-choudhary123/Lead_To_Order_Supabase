@@ -54,6 +54,7 @@ function NewCallTracker() {
   const [orderExpectedData, setOrderExpectedData] = useState({
     nextCallDate: "",
     nextCallTime: "",
+    followupStatus: "",
   })
 
   // State for OrderStatusForm data
@@ -363,10 +364,14 @@ const fetchLatestQuotationNumber = async (enquiryNo) => {
         // Add order expected data for columns U-V
         rowData.push(
           orderExpectedData.nextCallDate,  // Column U
-          orderExpectedData.nextCallTime   // Column V
+          orderExpectedData.nextCallTime,   // Column V
+          // orderExpectedData.followupStatus
         )
+        rowData.push(...new Array(12).fill(""))
+  // Add followup status in column AM
+  rowData.push(orderExpectedData.followupStatus)  // Column AM
         // Add empty values for columns W-AI (order status columns)
-        rowData.push(...new Array(13).fill(""))
+        rowData.push(...new Array(17).fill(""))
       } else if (currentStage === "order-status") {
         // Add empty values for columns F-G
         rowData.push("", "")

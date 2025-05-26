@@ -33,6 +33,7 @@ const [productCodes, setProductCodes] = useState([]);
 const [productNames, setProductNames] = useState([]);
 const [productData, setProductData] = useState({}); // To store code-name mappings
 const [selectedReferences, setSelectedReferences] = useState([]);
+const [preparedByOptions, setPreparedByOptions] = useState([])
 
 const [specialDiscount, setSpecialDiscount] = useState(0);
 
@@ -212,42 +213,43 @@ const [hiddenFields, setHiddenFields] = useState({
 
   // Handle item changes with discount calculation
   const handleItemChange = (id, field, value) => {
-  setQuotationData((prev) => {
-    const newItems = prev.items.map((item) => {
-      if (item.id === id) {
-        const updatedItem = { ...item, [field]: value }
-  
-        // Ensure numeric calculations
-        if (field === "qty" || field === "rate" || field === "discount" || field === "flatDiscount") {
-          const baseAmount = Number(updatedItem.qty) * Number(updatedItem.rate)
-          const discountedAmount = baseAmount * (1 - (Number(updatedItem.discount) / 100))  // Added missing closing parenthesis
-          updatedItem.amount = Math.max(0, discountedAmount - Number(updatedItem.flatDiscount))
+    setQuotationData((prev) => {
+      const newItems = prev.items.map((item) => {
+        if (item.id === id) {
+          const updatedItem = { ...item, [field]: value }
+    
+          // Ensure numeric calculations
+          if (field === "qty" || field === "rate" || field === "discount" || field === "flatDiscount") {
+            const baseAmount = Number(updatedItem.qty) * Number(updatedItem.rate)
+            const discountedAmount = baseAmount * (1 - (Number(updatedItem.discount) / 100))
+            updatedItem.amount = Math.max(0, discountedAmount - Number(updatedItem.flatDiscount))
+          }
+    
+          return updatedItem
         }
+        return item
+      })
+    
+      // Calculate total flat discount from all items
+      const totalFlatDiscount = newItems.reduce((sum, item) => sum + Number(item.flatDiscount), 0)
+      const subtotal = Number(newItems.reduce((sum, item) => sum + item.amount, 0))
+      const subtotalAfterDiscount = Math.max(0, subtotal - totalFlatDiscount)
+      const cgstAmount = Number((subtotalAfterDiscount * (prev.cgstRate / 100)).toFixed(2))
+      const sgstAmount = Number((subtotalAfterDiscount * (prev.sgstRate / 100)).toFixed(2))
+      const totalBeforeSpecialDiscount = subtotalAfterDiscount + cgstAmount + sgstAmount
+      const total = Math.max(0, totalBeforeSpecialDiscount - specialDiscount)
   
-        return updatedItem
+      return {
+        ...prev,
+        items: newItems,
+        totalFlatDiscount,
+        subtotal,
+        cgstAmount,
+        sgstAmount,
+        total,
       }
-      return item
     })
-  
-    // Ensure all calculations result in numbers
-    const subtotal = Number(newItems.reduce((sum, item) => sum + item.amount, 0))
-    const subtotalAfterDiscount = Math.max(0, subtotal - Number(prev.totalFlatDiscount))
-    const cgstAmount = Number((subtotalAfterDiscount * (prev.cgstRate / 100)).toFixed(2))  // Added missing closing parenthesis
-    const sgstAmount = Number((subtotalAfterDiscount * (prev.sgstRate / 100)).toFixed(2))  // Added missing closing parenthesis
-    // In your handleItemChange and handleFlatDiscountChange functions, update the total calculation:
-const totalBeforeSpecialDiscount = subtotalAfterDiscount + cgstAmount + sgstAmount;
-const total = Math.max(0, totalBeforeSpecialDiscount - specialDiscount);
-
-return {
-  ...prev,
-  items: newItems,
-  subtotal,
-  cgstAmount,
-  sgstAmount,
-  total,
-}
-  })
-}
+  }
 
   // Handle total flat discount change
   const handleFlatDiscountChange = (value) => {
@@ -542,6 +544,19 @@ const handleQuotationSelect = async (quotationNo) => {
           // For state options (Column AA - index 26)
           const stateOptionsData = ["Select State"]
           const stateDetailsMap = {}
+
+          const preparedByOptionsData = [""]
+
+
+dropdownData.table.rows.slice(0).forEach((row) => {
+  if (row.c) {
+    // Add this to fetch Column BX (index 75)
+    const preparedByName = row.c[79] ? row.c[79].v : ""
+    if (preparedByName && !preparedByOptionsData.includes(preparedByName)) {
+      preparedByOptionsData.push(preparedByName)
+    }
+  }
+})
           
           // For company options (Column M - index 12)
           const companyOptionsData = ["Select Company"]
@@ -606,6 +621,7 @@ const handleQuotationSelect = async (quotationNo) => {
           setStateOptions(stateOptionsData)
           setCompanyOptions(companyOptionsData)
           setReferenceOptions(referenceOptionsData)
+          setPreparedByOptions(preparedByOptionsData)
           
           // Update dropdown data
           setDropdownData({
@@ -687,6 +703,24 @@ const handleQuotationSelect = async (quotationNo) => {
     
     fetchDropdownData()
   }, [])
+
+
+  // Add this function near the top of your component with other helper functions
+const getCurrentFinancialYear = () => {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const nextYear = currentYear + 1;
+  
+  // Financial year runs from April to March
+  const financialYearStart = now.getMonth() >= 3 ? currentYear : currentYear - 1;
+  const financialYearEnd = financialYearStart + 1;
+  
+  // Get last two digits of each year
+  const startShort = String(financialYearStart).slice(-2);
+  const endShort = String(financialYearEnd).slice(-2);
+  
+  return `${startShort}-${endShort}`;
+};
 
   // Handle reference name change and auto-fill mobile number
   const handleReferenceChange = (e) => {
@@ -944,7 +978,8 @@ const generatePDFFromData = () => {
 
   // Prepare consignor and consignee details
   const consignorDetails = [
-    `Name: ${quotationData.consignorName}`,
+    // `Name: ${quotationData.consignorName}`,
+    `Name: ${selectedReferences[0] || 'N/A'}`,
     `Address: ${quotationData.consignorAddress}`,
     `GSTIN: ${quotationData.consignorGSTIN || 'N/A'}`,
     `State Code: ${quotationData.consignorStateCode || 'N/A'}`
@@ -1223,21 +1258,22 @@ const handleSaveQuotation = async () => {
     const base64Data = generatePDFFromData()
     
     // Handle revision numbering
-    let finalQuotationNo = quotationData.quotationNo;
-    if (isRevising && selectedQuotation) {
-      // Check if this is the first revision (no -## suffix)
-      if (!finalQuotationNo.match(/-\d{2}$/)) {
-        finalQuotationNo = `${finalQuotationNo}-01`;
-      } else {
-        // Increment the revision number
-        const parts = finalQuotationNo.split('-');
-        const lastPart = parts[parts.length - 1];
-        const revisionNumber = parseInt(lastPart, 10);
-        const newRevision = (revisionNumber + 1).toString().padStart(2, '0');
-        parts[parts.length - 1] = newRevision;
-        finalQuotationNo = parts.join('-');
-      }
-    }
+    // Update the revision numbering logic in handleSaveQuotation
+let finalQuotationNo = quotationData.quotationNo;
+if (isRevising && selectedQuotation) {
+  // Check if this is the first revision (no -## suffix)
+  if (!finalQuotationNo.match(/-\d{2}$/)) {
+    finalQuotationNo = `${finalQuotationNo}-01`;
+  } else {
+    // Increment the revision number
+    const parts = finalQuotationNo.split('-');
+    const lastPart = parts[parts.length - 1];
+    const revisionNumber = parseInt(lastPart, 10);
+    const newRevision = (revisionNumber + 1).toString().padStart(2, '0');
+    parts[parts.length - 1] = newRevision;
+    finalQuotationNo = parts.join('-');
+  }
+}
     
     const fileName = `Quotation_${finalQuotationNo}.pdf`
     
@@ -1649,16 +1685,23 @@ const itemPromises = quotationData.items.map(async (item) => {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="block text-sm font-medium">Prepared By</label>
-                      <input
-                        type="text"
-                        value={quotationData.preparedBy}
-                        onChange={(e) => handleInputChange("preparedBy", e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded-md"
-                        placeholder="Enter name of person preparing this quotation"
-                        required
-                      />
-                    </div>
+  <label className="block text-sm font-medium">Prepared By</label>
+  <input
+    type="text"
+    list="preparedByList"
+    value={quotationData.preparedBy}
+    onChange={(e) => handleInputChange("preparedBy", e.target.value)}
+    className="w-full p-2 border border-gray-300 rounded-md"
+    placeholder="Enter or select the name of the person preparing this quotation"
+    required
+  />
+  <datalist id="preparedByList">
+    {preparedByOptions.map((name, idx) => (
+      <option key={idx} value={name} />
+    ))}
+  </datalist>
+</div>
+
                     <div className="space-y-2">
                       <label className="block text-sm font-medium">State</label>
                       <select
@@ -2115,18 +2158,11 @@ const itemPromises = quotationData.items.map(async (item) => {
     <td></td>
   </tr>
   <tr>
-    <td colSpan="9" className="px-4 py-2 text-right font-medium">
+  <td colSpan="9" className="px-4 py-2 text-right font-medium">
       Total Flat Discount:
     </td>
-    <td className="px-4 py-2">
-      <input
-        type="number"
-        value={quotationData.totalFlatDiscount}
-        onChange={(e) => handleFlatDiscountChange(e.target.value)}
-        className="w-24 p-1 border border-gray-300 rounded-md"
-        min="0"
-      />
-    </td>
+    <td className="p-2">₹{typeof quotationData.totalFlatDiscount === 'number' ? quotationData.totalFlatDiscount.toFixed(2) : '0.00'}</td>
+    <td></td>
     <td></td>
   </tr>
   <tr>
@@ -2206,7 +2242,8 @@ const itemPromises = quotationData.items.map(async (item) => {
       delivery: "Delivery",
       freight: "Freight",
       insurance: "Insurance",
-      taxes: "Taxes"
+      taxes: "Taxes",
+      note: "Notes"
     }).map(([field, label]) => (
       <div key={field} className="space-y-2">
         <div className="flex justify-between items-center">
@@ -2365,7 +2402,8 @@ const itemPromises = quotationData.items.map(async (item) => {
               <div id="quotation-preview" className="bg-white border p-6 rounded-lg">
     <div className="flex justify-between items-start border-b pb-4">
       <div className="w-1/3">
-        <p className="font-bold">{quotationData.consignorName || "Consignor Name"}</p>
+        {/* <p className="font-bold">{quotationData.consignorName || "Consignor Name"}</p> */}
+        <p className="font-bold">{selectedReferences[0] || "Consignor Name"}</p>
         <p className="text-sm">{quotationData.consignorAddress || "Consignor Address"}</p>
         <p className="text-sm">Mobile: {quotationData.consignorMobile || "N/A"}</p>
         <p className="text-sm">Phone: {quotationData.consignorPhone || "N/A"}</p>
@@ -2386,7 +2424,8 @@ const itemPromises = quotationData.items.map(async (item) => {
     <div className="grid grid-cols-2 gap-4 border-b pb-4">
       <div>
         <h3 className="font-bold mb-2">Consignor Details</h3>
-        <p>{quotationData.consignorName || "N/A"}</p>
+        {/* <p>{quotationData.consignorName || "N/A"}</p> */}
+        <p>{selectedReferences[0] || "N/A"}</p> {/* Show only first reference */}
         <p>{quotationData.consignorAddress || "N/A"}</p>
         <p>GSTIN: {quotationData.consignorGSTIN || "N/A"}</p>
         <p>State Code: {quotationData.consignorStateCode || "N/A"}</p>

@@ -50,6 +50,57 @@ function MakeQuotationForm({ enquiryNo, formData, onFieldChange }) {
     
     fetchSharedByOptions()
   }, [])
+
+  // Add this new useEffect after the existing sharedByOptions useEffect
+useEffect(() => {
+  const generateSendQuotationNo = async () => {
+    if (!enquiryNo) return;
+    
+    try {
+      // Fetch data from ENQUIRY TRACKER sheet
+      const trackerUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=ENQUIRY TRACKER"
+      const response = await fetch(trackerUrl)
+      const text = await response.text()
+      
+      // Extract the JSON part from the response
+      const jsonStart = text.indexOf('{')
+      const jsonEnd = text.lastIndexOf('}') + 1
+      const jsonData = text.substring(jsonStart, jsonEnd)
+      
+      const data = JSON.parse(jsonData)
+      
+      let count = 0;
+      
+      // Count occurrences in column B (index 1)
+      if (data && data.table && data.table.rows) {
+        data.table.rows.forEach(row => {
+          if (row.c && row.c[1] && row.c[1].v === enquiryNo) {
+            count++;
+          }
+        })
+      }
+      
+      // Generate new quotation number (count + 1)
+      const newQuotationNo = `${count + 1}`;
+      onFieldChange('sendQuotationNo', newQuotationNo);
+      
+    } catch (error) {
+      console.error("Error generating quotation number:", error)
+      // Fallback: just use enquiry number with -1
+      onFieldChange('sendQuotationNo', `${enquiryNo}-1`);
+    }
+  }
+  
+  generateSendQuotationNo()
+}, [enquiryNo]) // Dependency on enquiryNo
+
+// Also modify the Send Quotation No. input field to be readonly:
+// Change this line in the JSX:
+// className="w-full p-2 border border-gray-300 rounded-md"
+// To:
+// className="w-full p-2 border border-gray-300 rounded-md bg-gray-100"
+// And add:
+// readOnly
   
   const handleChange = (e) => {
     const { name, value } = e.target
