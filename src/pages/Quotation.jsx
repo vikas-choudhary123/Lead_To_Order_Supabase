@@ -385,42 +385,15 @@ const handleQuotationSelect = async (quotationNo) => {
       
       // Parse the items string into proper items array
       let items = [];
+      let specialDiscountFromItems = loadedData.specialDiscount || 0; // Get special discount from response
+      
       if (loadedData.items && Array.isArray(loadedData.items) && loadedData.items.length > 0) {
         items = loadedData.items.map((item, index) => ({
           id: index + 1,
           ...item
         }));
-      } else if (loadedData.items && typeof loadedData.items === 'string') {
-        items = loadedData.items.split(';').filter(itemStr => itemStr.trim()).map((itemStr, index) => {
-          const itemParts = itemStr.split('|');
-          return {
-            id: index + 1,
-            code: itemParts[0] || "",
-            name: itemParts[1] || "",
-            description: itemParts[2] || "", // Add description field
-            gst: Number(itemParts[3]) || 18,
-            qty: Number(itemParts[4]) || 1,
-            units: itemParts[5] || "Nos",
-            rate: Number(itemParts[6]) || 0,
-            discount: Number(itemParts[7]) || 0,
-            flatDiscount: Number(itemParts[8]) || 0,
-            amount: Number(itemParts[9]) || 0
-          };
-        });
-      } else {
-        items = [{
-          id: 1,
-          code: "",
-          name: "",
-          gst: 18,
-          qty: 1,
-          units: "Nos",
-          rate: 0,
-          discount: 0,
-          flatDiscount: 0,
-          amount: 0
-        }];
-      }
+      } 
+      // ... rest of your item parsing logic ...
 
       // Calculate totals
       const subtotal = items.reduce((sum, item) => sum + Number(item.amount), 0);
@@ -430,7 +403,7 @@ const handleQuotationSelect = async (quotationNo) => {
       const taxableAmount = Math.max(0, subtotal - totalFlatDiscount);
       const cgstAmount = Number((taxableAmount * (cgstRate / 100)).toFixed(2));
       const sgstAmount = Number((taxableAmount * (sgstRate / 100)).toFixed(2));
-      const total = Number((taxableAmount + cgstAmount + sgstAmount).toFixed(2));
+      const total = Number((taxableAmount + cgstAmount + sgstAmount - specialDiscountFromItems).toFixed(2));
 
       // Set the quotationData state with all fields
       setQuotationData({
@@ -443,7 +416,6 @@ const handleQuotationSelect = async (quotationNo) => {
         cgstAmount,
         sgstAmount,
         total,
-        // Make sure to include all fields, especially shipTo and state
         accountNo: loadedData.accountNo || "",
         bankName: loadedData.bankName || "",
         bankAddress: loadedData.bankAddress || "",
@@ -460,7 +432,7 @@ const handleQuotationSelect = async (quotationNo) => {
         consignorStateCode: loadedData.consignorStateCode || "",
         consigneeName: loadedData.consigneeName || "",
         consigneeAddress: loadedData.consigneeAddress || "",
-        shipTo: loadedData.shipTo || "", // Use shipTo if exists, otherwise consigneeAddress
+        shipTo: loadedData.shipTo || "",
         consigneeState: loadedData.consigneeState || "",
         consigneeContactName: loadedData.consigneeContactName || "",
         consigneeContactNo: loadedData.consigneeContactNo || "",
@@ -471,6 +443,9 @@ const handleQuotationSelect = async (quotationNo) => {
         notes: Array.isArray(loadedData.notes) ? loadedData.notes : 
               (loadedData.notes ? [loadedData.notes] : [""])
       });
+      
+      // Set the special discount from the response
+      setSpecialDiscount(specialDiscountFromItems);
     }
   } catch (error) {
     console.error("Error fetching quotation data:", error);
@@ -1361,15 +1336,16 @@ if (isRevising && selectedQuotation) {
     ]
     
     // Terms and Conditions
-    const termsDetails = [
-      quotationData.validity,
-      quotationData.paymentTerms,
-      quotationData.delivery,
-      quotationData.freight,
-      quotationData.insurance,
-      quotationData.taxes,
-      quotationData.notes.join("|") // Join notes with a separator
-    ]
+   // In handleSaveQuotation, update the termsDetails array to include notes:
+const termsDetails = [
+  quotationData.validity,
+  quotationData.paymentTerms,
+  quotationData.delivery,
+  quotationData.freight,
+  quotationData.insurance,
+  quotationData.taxes,
+  quotationData.notes.filter(note => note.trim()).join("|") // Only include non-empty notes
+]
     
     // Bank Details
     const bankDetails = [
@@ -2261,7 +2237,7 @@ const itemPromises = quotationData.items.map(async (item) => {
       freight: "Freight",
       insurance: "Insurance",
       taxes: "Taxes",
-      note: "Notes"
+      // note: "Notes"
     }).map(([field, label]) => (
       <div key={field} className="space-y-2">
         <div className="flex justify-between items-center">
@@ -2284,6 +2260,38 @@ const itemPromises = quotationData.items.map(async (item) => {
         )}
       </div>
     ))}
+    <div className="bg-white rounded-lg p-4 shadow-sm">
+  <h3 className="text-lg font-medium mb-4">Notes</h3>
+  <div className="space-y-4">
+    {quotationData.notes.map((note, index) => (
+      <div key={index} className="flex items-center gap-2">
+        <input
+          type="text"
+          value={note}
+          onChange={(e) => handleNoteChange(index, e.target.value)}
+          className="flex-1 p-2 border border-gray-300 rounded-md"
+          placeholder="Enter note"
+        />
+        {quotationData.notes.length > 1 && (
+          <button
+            type="button"
+            onClick={() => removeNote(index)}
+            className="text-red-500 hover:text-red-700 p-2"
+          >
+            <TrashIcon className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+    ))}
+    <button
+      type="button"
+      onClick={addNote}
+      className="px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+    >
+      <PlusIcon className="h-4 w-4 mr-1" /> Add Note
+    </button>
+  </div>
+</div>
   </div>
 </div>
 
@@ -2622,16 +2630,16 @@ const itemPromises = quotationData.items.map(async (item) => {
         </tbody>
       </table>
 
-      {quotationData.notes && quotationData.notes.length > 0 && (
-        <div className="mt-4">
-          <h4 className="font-bold mb-2">Notes</h4>
-          <ul className="list-disc pl-5">
-            {quotationData.notes.filter(note => note.trim()).map((note, index) => (
-              <li key={index} className="py-1">{note}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {quotationData.notes && quotationData.notes.filter(note => note.trim()).length > 0 && (
+    <div className="mt-4">
+      <h4 className="font-bold mb-2">Notes</h4>
+      <ul className="list-disc pl-5">
+        {quotationData.notes.filter(note => note.trim()).map((note, index) => (
+          <li key={index} className="py-1">{note}</li>
+        ))}
+      </ul>
+    </div>
+  )}
     </div>
   </div>
 </div>

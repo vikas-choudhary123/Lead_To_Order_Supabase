@@ -173,10 +173,10 @@ function CallTracker() {
                   id: index + 1,
                   leadId: row.c[1] ? row.c[1].v : "", // Column B - Lead Number
                   receiverName: row.c[2] ? row.c[2].v : "", // Column C - Lead Receiver Name
-                  leadSource: row.c[4] ? row.c[4].v : "", // Column D - Lead Source
-                  salespersonName: row.c[56] ? row.c[56].v : "", // Column E - Salesperson Name
+                  leadSource: row.c[3] ? row.c[3].v : "", // Column D - Lead Source
+                  salespersonName: row.c[6] ? row.c[6].v : "", // Column E - Salesperson Name
                   phoneNumber: row.c[5] ? row.c[5].v : "", // Added phone number from column F (index 5)
-                  companyName: row.c[57] ? row.c[57].v : "", // Column G - Company Name
+                  companyName: row.c[4] ? row.c[4].v : "", // Column G - Company Name
                   createdAt: row.c[0] ? formatDateToDDMMYYYY(row.c[0].v) : "", // Using date from column A
                   status: "Expected", // Default status for pending
                   priority: determinePriority(row.c[3] ? row.c[3].v : ""), // Determine priority based on source
