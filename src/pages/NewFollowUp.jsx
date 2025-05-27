@@ -126,7 +126,7 @@ function NewFollowUp() {
       // Handle different scenarios
       if (enquiryStatus === "expected") {
         // Explicitly add columns F-K as empty (6 empty columns)
-        rowData.push("", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "","","","","")
+        rowData.push("", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "")
 
         // Then add columns V, W, X
         rowData.push(
@@ -217,7 +217,7 @@ function NewFollowUp() {
 
   const addItem = () => {
     // Define maximum number of items allowed
-    const MAX_ITEMS = 10
+    const MAX_ITEMS = 5
 
     // Only add a new item if we haven't reached the maximum
     if (items.length < MAX_ITEMS) {
@@ -537,9 +537,9 @@ function NewFollowUp() {
                       type="button"
                       onClick={addItem}
                       className="px-3 py-1 text-xs border border-amber-200 text-amber-600 hover:bg-amber-50 rounded-md"
-                      disabled={items.length >= 10}
+                      disabled={items.length >= 5}
                     >
-                      + Add Item ({items.length}/10)
+                      + Add Item ({items.length}/5)
                     </button>
                   </div>
 
