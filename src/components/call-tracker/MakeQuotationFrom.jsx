@@ -72,13 +72,15 @@ useEffect(() => {
       let count = 0;
       
       // Count occurrences in column B (index 1)
-      if (data && data.table && data.table.rows) {
-        data.table.rows.forEach(row => {
-          if (row.c && row.c[1] && row.c[1].v === enquiryNo) {
-            count++;
-          }
-        })
-      }
+    // Count occurrences in column B (index 1) where column E (index 4) is "make quotation"
+if (data && data.table && data.table.rows) {
+  data.table.rows.forEach(row => {
+    if (row.c && row.c[1] && row.c[1].v === enquiryNo && 
+        row.c[4] && row.c[4].v === "make-quotation") {
+      count++;
+    }
+  })
+}
       
       // Generate new quotation number (count + 1)
       const newQuotationNo = `${count + 1}`;

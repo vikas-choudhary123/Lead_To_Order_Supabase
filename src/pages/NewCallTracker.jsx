@@ -369,7 +369,7 @@ const fetchLatestQuotationNumber = async (enquiryNo) => {
           orderExpectedData.nextCallTime,   // Column V
           // orderExpectedData.followupStatus
         )
-        rowData.push(...new Array(12).fill(""))
+        rowData.push(...new Array(16).fill(""))
   // Add followup status in column AM
   rowData.push(orderExpectedData.followupStatus)  // Column AM
         // Add empty values for columns W-AI (order status columns)
