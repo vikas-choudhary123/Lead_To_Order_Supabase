@@ -18,6 +18,7 @@ function FollowUp() {
   const [historyFollowUps, setHistoryFollowUps] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [filterType, setFilterType] = useState("all")
+  const [dateFilter, setDateFilter] = useState("all") // New state for date filter
   const [showPopup, setShowPopup] = useState(false)
   const [selectedFollowUp, setSelectedFollowUp] = useState(null)
 
@@ -126,6 +127,57 @@ function FollowUp() {
     }
   }
 
+  // Helper function to parse date from column CL and compare with today
+  const getDateFromColumnCL = (dateValue) => {
+    if (!dateValue) return null
+
+    try {
+      // Check if it's a Date object-like string (e.g. "Date(2025,4,27)")
+      if (typeof dateValue === "string" && dateValue.startsWith("Date(")) {
+        const dateString = dateValue.substring(5, dateValue.length - 1)
+        const [year, month, day] = dateString.split(",").map((part) => Number.parseInt(part.trim()))
+        // JavaScript months are 0-indexed
+        return new Date(year, month, day)
+      }
+
+      // Try to parse as regular date
+      const parsedDate = new Date(dateValue)
+      if (!isNaN(parsedDate.getTime())) {
+        return parsedDate
+      }
+
+      return null
+    } catch (error) {
+      console.error("Error parsing date from column CL:", error)
+      return null
+    }
+  }
+
+  // Helper function to check date filter condition
+  // Helper function to check date filter condition
+  const checkDateFilter = (followUp, filterType) => {
+    if (filterType === "all") return true
+
+    // Get the text value from column CL (nextCallDate field)
+    const columnCLValue = followUp.nextCallDate
+    if (!columnCLValue) return false
+
+    // Convert the column CL value to lowercase for comparison
+    const columnCLText = String(columnCLValue).toLowerCase()
+
+    // Match the filter type with the text in column CL
+    switch (filterType) {
+      case "today":
+        return columnCLText.includes("today")
+      case "overdue":
+        return columnCLText.includes("overdue")
+      case "upcoming":
+        return columnCLText.includes("upcoming")
+      default:
+        return true
+    }
+  }
+
   // Function to fetch data from FMS and Leads Tracker sheets
   useEffect(() => {
     const fetchFollowUpData = async () => {
@@ -188,6 +240,7 @@ function FollowUp() {
                   customerSay: row.c[31] ? row.c[31].v : "",
                   enquiryStatus: row.c[32] ? row.c[32].v : "",
                   createdAt: row.c[0] ? row.c[0].v : "",
+                  nextCallDate: row.c[89] ? row.c[89].v : "", // Column CL (index 89) for date filtering
                   priority: determinePriority(row.c[3] ? row.c[3].v : ""),
                   assignedTo: assignedUser // Add assigned user to the follow-up item
                 }
@@ -259,6 +312,7 @@ function FollowUp() {
             customerSay: "Interested in product details",
             enquiryStatus: "New",
             createdAt: "2023-05-15",
+            nextCallDate: "Date(2025,4,27)", // Sample date for testing
             priority: "High",
           },
         ])
@@ -322,13 +376,20 @@ const formatPopupDate = (dateValue) => {
       followUp.leadId.toLowerCase().includes(searchTerm.toLowerCase())
 
     // Apply filter type for Column R
-    if (filterType === "first") {
-      return matchesSearch && (followUp.enquiryStatus === "" || followUp.enquiryStatus === null)
-    } else if (filterType === "multi") {
-      return matchesSearch && followUp.enquiryStatus === "expected"
-    } else {
-      return matchesSearch
-    }
+    const matchesFilterType = (() => {
+      if (filterType === "first") {
+        return followUp.enquiryStatus === "" || followUp.enquiryStatus === null
+      } else if (filterType === "multi") {
+        return followUp.enquiryStatus === "expected"
+      } else {
+        return true
+      }
+    })()
+
+    // Apply date filter based on column CL
+    const matchesDateFilter = checkDateFilter(followUp, dateFilter)
+
+    return matchesSearch && matchesFilterType && matchesDateFilter
   })
 
   const filteredHistoryFollowUps = historyFollowUps.filter(
@@ -349,6 +410,20 @@ const formatPopupDate = (dateValue) => {
         </div>
 
         <div className="flex gap-2">
+          {/* Date Filter Dropdown */}
+          <div>
+            <select
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+            >
+              <option value="all">All</option>
+              <option value="today">Today</option>
+              <option value="overdue">Overdue</option>
+              <option value="upcoming">Upcoming</option>
+            </select>
+          </div>
+
           {/* Filter Dropdown */}
           <div>
             <select

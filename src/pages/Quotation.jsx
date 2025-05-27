@@ -581,12 +581,22 @@ dropdownData.table.rows.slice(0).forEach((row) => {
                   bankDetails = row.c[27].v
                 }
                 
+                // Get PAN from column Z (index 25)
+                // const pan = row.c[25] ? row.c[25].v : ""
+                // Get PAN from column Z (index 25)
+const pan = row.c[25] ? row.c[25].v : ""
+                
+                // Get MSME number from column AH (index 33)
+                const msmeNumber = row.c[33] ? row.c[33].v : ""
+                
                 // Store associated data
                 stateDetailsMap[stateName] = {
                   bankDetails: bankDetails, // Column AB - Bank Details
                   consignerAddress: row.c[28] ? row.c[28].v : "", // Column AC - Consigner Address
                   stateCode: row.c[30] ? row.c[30].v : "", // Column AE - State Code
-                  gstin: row.c[31] ? row.c[31].v : "" // Column AF - GSTIN
+                  gstin: row.c[31] ? row.c[31].v : "", // Column AF - GSTIN
+                  pan: pan, // Column Z - PAN
+                  msmeNumber: msmeNumber // Column AH - MSME Number
                 }
               }
               
@@ -787,7 +797,6 @@ const getCurrentFinancialYear = () => {
         const ifscMatch = bankDetailsText.match(/IFSC CODE: ([^\n]+)/)
         const emailMatch = bankDetailsText.match(/Email: ([^\n]+)/)
         const websiteMatch = bankDetailsText.match(/Website: ([^\n]+)/)
-        const panMatch = bankDetailsText.match(/PAN: ([^\n]+)/) // Add PAN extraction
         
         // Update bank details fields
         if (accountNoMatch) handleInputChange("accountNo", accountNoMatch[1])
@@ -796,22 +805,28 @@ const getCurrentFinancialYear = () => {
         if (ifscMatch) handleInputChange("ifscCode", ifscMatch[1])
         if (emailMatch) handleInputChange("email", emailMatch[1])
         if (websiteMatch) handleInputChange("website", websiteMatch[1])
-        if (panMatch) handleInputChange("pan", panMatch[1]) // Add PAN handling
       }
       
-      // Update consigner address from column AC
+      // Update other state details
       if (stateDetails.consignerAddress) {
         handleInputChange("consignorAddress", stateDetails.consignerAddress)
       }
       
-      // Update state code from column AE
       if (stateDetails.stateCode) {
         handleInputChange("consignorStateCode", stateDetails.stateCode)
       }
       
-      // Update GSTIN from column AF
       if (stateDetails.gstin) {
         handleInputChange("consignorGSTIN", stateDetails.gstin)
+      }
+  
+      if (stateDetails.msmeNumber) {
+        handleInputChange("msmeNumber", stateDetails.msmeNumber)
+      }
+  
+      // Add this line to set the PAN from state details
+      if (stateDetails.pan) {
+        handleInputChange("pan", stateDetails.pan)
       }
     } else {
       // Clear fields when no state is selected or data is not available
@@ -825,6 +840,7 @@ const getCurrentFinancialYear = () => {
       handleInputChange("consignorAddress", "")
       handleInputChange("consignorStateCode", "")
       handleInputChange("consignorGSTIN", "")
+      handleInputChange("msmeNumber", "") // Clear MSME field
     }
   }
 
