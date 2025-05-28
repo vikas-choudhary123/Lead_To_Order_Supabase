@@ -4,7 +4,6 @@ import { useState, useEffect, useContext } from "react"
 import { Link } from "react-router-dom"
 import { PlusIcon, SearchIcon, ArrowRightIcon, BuildingIcon } from "../components/Icons"
 import { AuthContext } from "../App" // Import AuthContext just like in the FollowUp component
-import CallTrackerForm from "./Call-Tracker-Form"
 
 // Animation classes
 const slideIn = "animate-in slide-in-from-right duration-300"
@@ -23,6 +22,15 @@ function CallTracker() {
   const [showPopup, setShowPopup] = useState(false)
   const [selectedTracker, setSelectedTracker] = useState(null)
   const [directEnquiryPendingTrackers, setDirectEnquiryPendingTrackers] = useState([])
+  const [callingDaysFilter, setCallingDaysFilter] = useState([])
+  const [enquiryNoFilter, setEnquiryNoFilter] = useState([])
+  const [currentStageFilter, setCurrentStageFilter] = useState([])
+  const [availableEnquiryNos, setAvailableEnquiryNos] = useState([])
+  
+  // Dropdown visibility states
+  const [showCallingDaysDropdown, setShowCallingDaysDropdown] = useState(false)
+  const [showEnquiryNoDropdown, setShowEnquiryNoDropdown] = useState(false)
+  const [showCurrentStageDropdown, setShowCurrentStageDropdown] = useState(false)
 
   // Helper function to determine priority based on status
   const determinePriority = (status) => {
@@ -109,6 +117,76 @@ function CallTracker() {
     }
   }
 
+  // Helper function to check if a date is today
+  const isToday = (dateStr) => {
+    if (!dateStr) return false
+    try {
+      const date = new Date(dateStr.split("/").reverse().join("-")) // Convert DD/MM/YYYY to YYYY-MM-DD
+      const today = new Date()
+      return date.toDateString() === today.toDateString()
+    } catch {
+      return false
+    }
+  }
+
+  // Helper function to check if a date is overdue
+  const isOverdue = (dateStr) => {
+    if (!dateStr) return false
+    try {
+      const date = new Date(dateStr.split("/").reverse().join("-"))
+      const today = new Date()
+      return date < today
+    } catch {
+      return false
+    }
+  }
+
+  // Helper function to check if a date is upcoming
+  const isUpcoming = (dateStr) => {
+    if (!dateStr) return false
+    try {
+      const date = new Date(dateStr.split("/").reverse().join("-"))
+      const today = new Date()
+      return date > today
+    } catch {
+      return false
+    }
+  }
+
+  // Helper function to check calling days filter
+  const matchesCallingDaysFilter = (dateStr, activeTab) => {
+    if (callingDaysFilter.length === 0) return true
+
+    return callingDaysFilter.some((filter) => {
+      switch (filter) {
+        case "today":
+          return isToday(dateStr)
+        case "overdue":
+          return isOverdue(dateStr)
+        case "upcoming":
+          return isUpcoming(dateStr)
+        default:
+          return false
+      }
+    })
+  }
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.dropdown-container')) {
+        setShowCallingDaysDropdown(false)
+        setShowEnquiryNoDropdown(false)
+        setShowCurrentStageDropdown(false)
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
+
   // Function to fetch data from FMS and Enquiry Tracker sheets
   useEffect(() => {
     const fetchCallTrackerData = async () => {
@@ -155,8 +233,9 @@ function CallTracker() {
         const directEnquiryData = JSON.parse(directEnquiryJsonData)
 
         // Process Pending Call Trackers from FMS sheet
+        let pendingCallTrackerData = []
         if (pendingData && pendingData.table && pendingData.table.rows) {
-          const pendingCallTrackerData = []
+          pendingCallTrackerData = []
 
           // Skip the header row (index 0)
           pendingData.table.rows.slice(2).forEach((row, index) => {
@@ -164,10 +243,10 @@ function CallTracker() {
             if (row.c && row.c[52] && row.c[52].v && (!row.c[53] || !row.c[53].v)) {
               // Get the assigned user from column CC (index 88) like in the FollowUp component
               const assignedUser = row.c[88] ? row.c[88].v : ""
-              
+
               // For admin users, include all rows; for regular users, filter by their username
               const shouldInclude = isAdmin() || (currentUser && assignedUser === currentUser.username)
-              
+
               if (shouldInclude) {
                 const callTrackerItem = {
                   id: index + 1,
@@ -182,7 +261,9 @@ function CallTracker() {
                   priority: determinePriority(row.c[3] ? row.c[3].v : ""), // Determine priority based on source
                   stage: "Pending", // Default stage
                   dueDate: "", // You might want to add logic to calculate due date
-                  assignedTo: assignedUser // Add assigned user to the tracker item
+                  assignedTo: assignedUser, // Add assigned user to the tracker item
+                  currentStage: row.c[57] ? row.c[57].v : "", // Column BF - Current Stage
+                  callingDate: row.c[90] ? formatDateToDDMMYYYY(row.c[90].v) : "", // Column CM - Calling Date
                 }
 
                 pendingCallTrackerData.push(callTrackerItem)
@@ -194,8 +275,9 @@ function CallTracker() {
         }
 
         // Process History Call Trackers from Enquiry Tracker sheet
+        let historyCallTrackerData = []
         if (historyData && historyData.table && historyData.table.rows) {
-          const historyCallTrackerData = []
+          historyCallTrackerData = []
 
           // Start from index 1 to skip header row
           historyData.table.rows.slice(0).forEach((row, index) => {
@@ -240,6 +322,7 @@ function CallTracker() {
                 holdingDate: formatDateToDDMMYYYY(row.c[35] ? row.c[35].v : ""), // Column AH - Holding Date
                 holdRemark: row.c[36] ? row.c[36].v : "", // Column AI - Hold Remark
                 priority: determinePriority(row.c[2] ? row.c[2].v : ""), // Determine priority based on status
+                callingDate: formatDateToDDMMYYYY(row.c[41] ? row.c[41].v : ""), // Column AP - Calling Date
               }
 
               historyCallTrackerData.push(callTrackerItem)
@@ -250,19 +333,20 @@ function CallTracker() {
         }
 
         // Process Direct Enquiry Pending from ENQUIRY TO ORDER sheet
+        let directEnquiryPendingData = []
         if (directEnquiryData && directEnquiryData.table && directEnquiryData.table.rows) {
-          const directEnquiryPendingData = []
-        
+          directEnquiryPendingData = []
+
           // Skip the header row (index 0)
           directEnquiryData.table.rows.slice(1).forEach((row, index) => {
             // Only show rows where column AH (index 37) is not null and column AI (index 38) is null
             if (row.c && row.c[37] && row.c[37].v && (!row.c[38] || !row.c[38].v)) {
-              // Get the assigned user from column BX (index 75) 
+              // Get the assigned user from column BX (index 75)
               const assignedUser = row.c[75] ? row.c[75].v : ""
-              
+
               // For admin users, include all rows; for regular users, filter by their username
               const shouldInclude = isAdmin() || (currentUser && assignedUser === currentUser.username)
-              
+
               if (shouldInclude) {
                 const directEnquiryItem = {
                   id: index + 1,
@@ -276,16 +360,38 @@ function CallTracker() {
                   priority: determinePriority(row.c[3] ? row.c[3].v : ""), // Determine priority based on source
                   stage: "Pending", // Default stage
                   dueDate: "", // You might want to add logic to calculate due date
-                  assignedTo: assignedUser // Add assigned user to the tracker item
+                  assignedTo: assignedUser, // Add assigned user to the tracker item
+                  currentStage: row.c[42] ? row.c[42].v : "", // Column AQ - Current Stage
+                  callingDate: row.c[76] ? formatDateToDDMMYYYY(row.c[76].v) : "", // Column BY - Calling Date
                 }
-        
+
                 directEnquiryPendingData.push(directEnquiryItem)
               }
             }
           })
-        
+
           setDirectEnquiryPendingTrackers(directEnquiryPendingData)
         }
+
+        // Extract unique enquiry numbers for filter dropdown
+        const allEnquiryNos = new Set()
+
+        // Add enquiry numbers from pending data
+        pendingCallTrackerData.forEach((item) => {
+          if (item.leadId) allEnquiryNos.add(item.leadId)
+        })
+
+        // Add enquiry numbers from direct enquiry data
+        directEnquiryPendingData.forEach((item) => {
+          if (item.leadId) allEnquiryNos.add(item.leadId)
+        })
+
+        // Add enquiry numbers from history data
+        historyCallTrackerData.forEach((item) => {
+          if (item.enquiryNo) allEnquiryNos.add(item.enquiryNo)
+        })
+
+        setAvailableEnquiryNos(Array.from(allEnquiryNos).sort())
       } catch (error) {
         console.error("Error fetching call tracker data:", error)
         // Fallback to mock data if fetch fails
@@ -302,6 +408,8 @@ function CallTracker() {
             priority: "Medium",
             stage: "Pending",
             dueDate: "2023-05-20",
+            currentStage: "make-quotation",
+            callingDate: "15/05/2023",
           },
         ])
 
@@ -317,33 +425,126 @@ function CallTracker() {
             nextCallDate: "15/05/2023",
             nextCallTime: "5:30 PM",
             holdingDate: "20/05/2023",
+            callingDate: "12/05/2023",
           },
         ])
+
+        setDirectEnquiryPendingTrackers([
+          {
+            id: "3",
+            leadId: "En-003",
+            receiverName: "Alice Brown",
+            leadSource: "Referral",
+            salespersonName: "Bob Johnson",
+            companyName: "Test Corp",
+            createdAt: "05/05/2023",
+            status: "Expected",
+            priority: "High",
+            stage: "Pending",
+            currentStage: "quotation-validation",
+            callingDate: "18/05/2023",
+          },
+        ])
+
+        setAvailableEnquiryNos(["En-001", "En-002", "En-003"])
       } finally {
         setIsLoading(false)
       }
     }
 
-
     fetchCallTrackerData()
   }, [currentUser, isAdmin]) // Add isAdmin to dependencies like in FollowUp
 
-  // Filter function for search in both sections
-  const filteredPendingCallTrackers = pendingCallTrackers.filter(
-    (tracker) =>
-      tracker.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tracker.leadId.toLowerCase().includes(searchTerm.toLowerCase()),
+  // Enhanced filter function for search and dropdown filters
+  const filterTrackers = (tracker, searchTerm, activeTab) => {
+    // Search term filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase()
+      const matchesSearch = Object.values(tracker).some(
+        (value) => value && value.toString().toLowerCase().includes(term),
+      )
+      if (!matchesSearch) return false
+    }
+
+    // Enquiry number filter
+    if (enquiryNoFilter.length > 0) {
+      const enquiryNo = activeTab === "history" ? tracker.enquiryNo : tracker.leadId
+      if (!enquiryNoFilter.includes(enquiryNo)) return false
+    }
+
+    // Current stage filter
+    if (currentStageFilter.length > 0) {
+      const currentStage = tracker.currentStage || ""
+      if (!currentStageFilter.includes(currentStage)) return false
+    }
+
+    // Calling days filter
+    if (callingDaysFilter.length > 0) {
+      const callingDate = tracker.callingDate || ""
+      if (!matchesCallingDaysFilter(callingDate, activeTab)) return false
+    }
+
+    return true
+  }
+
+  const filteredPendingCallTrackers = pendingCallTrackers.filter((tracker) =>
+    filterTrackers(tracker, searchTerm, "pending"),
   )
 
   const filteredHistoryCallTrackers = historyCallTrackers.filter((tracker) =>
-    tracker.enquiryNo.toLowerCase().includes(searchTerm.toLowerCase()),
+    filterTrackers(tracker, searchTerm, "history"),
   )
 
-  const filteredDirectEnquiryPendingTrackers = directEnquiryPendingTrackers.filter(
-    (tracker) =>
-      tracker.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tracker.leadId.toLowerCase().includes(searchTerm.toLowerCase()),
+  const filteredDirectEnquiryPendingTrackers = directEnquiryPendingTrackers.filter((tracker) =>
+    filterTrackers(tracker, searchTerm, "directEnquiry"),
   )
+
+  // Toggle dropdown visibility
+  const toggleCallingDaysDropdown = (e) => {
+    e.stopPropagation()
+    setShowCallingDaysDropdown(!showCallingDaysDropdown)
+    setShowEnquiryNoDropdown(false)
+    setShowCurrentStageDropdown(false)
+  }
+
+  const toggleEnquiryNoDropdown = (e) => {
+    e.stopPropagation()
+    setShowEnquiryNoDropdown(!showEnquiryNoDropdown)
+    setShowCallingDaysDropdown(false)
+    setShowCurrentStageDropdown(false)
+  }
+
+  const toggleCurrentStageDropdown = (e) => {
+    e.stopPropagation()
+    setShowCurrentStageDropdown(!showCurrentStageDropdown)
+    setShowCallingDaysDropdown(false)
+    setShowEnquiryNoDropdown(false)
+  }
+
+  // Handle checkbox changes
+  const handleCallingDaysChange = (value) => {
+    if (callingDaysFilter.includes(value)) {
+      setCallingDaysFilter(callingDaysFilter.filter(item => item !== value))
+    } else {
+      setCallingDaysFilter([...callingDaysFilter, value])
+    }
+  }
+
+  const handleEnquiryNoChange = (value) => {
+    if (enquiryNoFilter.includes(value)) {
+      setEnquiryNoFilter(enquiryNoFilter.filter(item => item !== value))
+    } else {
+      setEnquiryNoFilter([...enquiryNoFilter, value])
+    }
+  }
+
+  const handleCurrentStageChange = (value) => {
+    if (currentStageFilter.includes(value)) {
+      setCurrentStageFilter(currentStageFilter.filter(item => item !== value))
+    } else {
+      setCurrentStageFilter([...currentStageFilter, value])
+    }
+  }
 
   return (
     <div className="container mx-auto py-10 px-4">
@@ -356,7 +557,7 @@ function CallTracker() {
           {isAdmin() && <p className="text-green-600 font-semibold mt-1">Admin View: Showing all data</p>}
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <div className="relative">
             <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
             <input
@@ -367,6 +568,214 @@ function CallTracker() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+
+          {/* Calling Days Filter */}
+          <div className="relative dropdown-container">
+            <button
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white flex items-center"
+              onClick={toggleCallingDaysDropdown}
+            >
+              <span>Calling Days {callingDaysFilter.length > 0 && `(${callingDaysFilter.length})`}</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className={`h-4 w-4 ml-2 transition-transform ${showCallingDaysDropdown ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {showCallingDaysDropdown && (
+              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-10 min-w-full">
+                <div className="p-2">
+                  <label className="flex items-center p-2 hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mr-2"
+                      checked={callingDaysFilter.includes("today")}
+                      onChange={() => handleCallingDaysChange("today")}
+                    />
+                    <span>Today</span>
+                  </label>
+                  <label className="flex items-center p-2 hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mr-2"
+                      checked={callingDaysFilter.includes("overdue")}
+                      onChange={() => handleCallingDaysChange("overdue")}
+                    />
+                    <span>Overdue</span>
+                  </label>
+                  <label className="flex items-center p-2 hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mr-2"
+                      checked={callingDaysFilter.includes("upcoming")}
+                      onChange={() => handleCallingDaysChange("upcoming")}
+                    />
+                    <span>Upcoming</span>
+                  </label>
+                </div>
+              </div>
+            )}
+            {callingDaysFilter.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {callingDaysFilter.map((filter) => (
+                  <span key={filter} className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">
+                    {filter}
+                    <button
+                      onClick={() => setCallingDaysFilter(callingDaysFilter.filter((item) => item !== filter))}
+                      className="ml-1 text-purple-600 hover:text-purple-800"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Enquiry No Filter */}
+          <div className="relative dropdown-container">
+            <button
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white flex items-center"
+              onClick={toggleEnquiryNoDropdown}
+            >
+              <span>Enquiry No. {enquiryNoFilter.length > 0 && `(${enquiryNoFilter.length})`}</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className={`h-4 w-4 ml-2 transition-transform ${showEnquiryNoDropdown ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {showEnquiryNoDropdown && (
+              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-10 min-w-full max-h-60 overflow-y-auto">
+                <div className="p-2">
+                  {availableEnquiryNos.map((enquiryNo) => (
+                    <label key={enquiryNo} className="flex items-center p-2 hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="mr-2"
+                        checked={enquiryNoFilter.includes(enquiryNo)}
+                        onChange={() => handleEnquiryNoChange(enquiryNo)}
+                      />
+                      <span>{enquiryNo}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            {enquiryNoFilter.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {enquiryNoFilter.map((filter) => (
+                  <span key={filter} className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">
+                    {filter}
+                    <button
+                      onClick={() => setEnquiryNoFilter(enquiryNoFilter.filter((item) => item !== filter))}
+                      className="ml-1 text-purple-600 hover:text-purple-800"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Current Stage Filter */}
+          <div className="relative dropdown-container">
+            <button
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white flex items-center"
+              onClick={toggleCurrentStageDropdown}
+            >
+              <span>Current Stage {currentStageFilter.length > 0 && `(${currentStageFilter.length})`}</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className={`h-4 w-4 ml-2 transition-transform ${showCurrentStageDropdown ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {showCurrentStageDropdown && (
+              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-10 min-w-full">
+                <div className="p-2">
+                  <label className="flex items-center p-2 hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mr-2"
+                      checked={currentStageFilter.includes("make-quotation")}
+                      onChange={() => handleCurrentStageChange("make-quotation")}
+                    />
+                    <span>Make Quotation</span>
+                  </label>
+                  <label className="flex items-center p-2 hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mr-2"
+                      checked={currentStageFilter.includes("quotation-validation")}
+                      onChange={() => handleCurrentStageChange("quotation-validation")}
+                    />
+                    <span>Quotation Validation</span>
+                  </label>
+                  <label className="flex items-center p-2 hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mr-2"
+                      checked={currentStageFilter.includes("order-status")}
+                      onChange={() => handleCurrentStageChange("order-status")}
+                    />
+                    <span>Order Status</span>
+                  </label>
+                  <label className="flex items-center p-2 hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mr-2"
+                      checked={currentStageFilter.includes("order-expected")}
+                      onChange={() => handleCurrentStageChange("order-expected")}
+                    />
+                    <span>Order Expected</span>
+                  </label>
+                </div>
+              </div>
+            )}
+            {currentStageFilter.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {currentStageFilter.map((filter) => (
+                  <span key={filter} className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">
+                    {filter.replace("-", " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                    <button
+                      onClick={() => setCurrentStageFilter(currentStageFilter.filter((item) => item !== filter))}
+                      className="ml-1 text-purple-600 hover:text-purple-800"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Clear Filters Button */}
+          {(callingDaysFilter.length > 0 || enquiryNoFilter.length > 0 || currentStageFilter.length > 0) && (
+            <button
+              className="px-3 py-2 text-sm border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              onClick={() => {
+                setCallingDaysFilter([])
+                setEnquiryNoFilter([])
+                setCurrentStageFilter([])
+              }}
+            >
+              Clear Filters
+            </button>
+          )}
 
           <button
             className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
@@ -467,6 +876,12 @@ function CallTracker() {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Company Name
                         </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Current Stage
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Calling Date
+                        </th>
                         {isAdmin() && (
                           <th
                             scope="col"
@@ -518,9 +933,7 @@ function CallTracker() {
                                 {tracker.leadSource}
                               </span>
                             </td>
-                            <td className="px-4 py-4 text-sm text-gray-500">
-                              {tracker.phoneNumber}
-                            </td>
+                            <td className="px-4 py-4 text-sm text-gray-500">{tracker.phoneNumber}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               {tracker.salespersonName}
                             </td>
@@ -529,6 +942,12 @@ function CallTracker() {
                                 <BuildingIcon className="h-4 w-4 mr-2 text-slate-400" />
                                 {tracker.companyName}
                               </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {tracker.currentStage}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {tracker.callingDate}
                             </td>
                             {isAdmin() && (
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -539,7 +958,7 @@ function CallTracker() {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={isAdmin() ? 7 : 6} className="px-6 py-4 text-center text-sm text-slate-500">
+                          <td colSpan={isAdmin() ? 10 : 9} className="px-6 py-4 text-center text-sm text-slate-500">
                             No pending call trackers found
                           </td>
                         </tr>
@@ -582,13 +1001,13 @@ function CallTracker() {
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
-                          What Did Customer Say
+                          Current Stage
                         </th>
                         <th
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
-                          Current Stage
+                          Calling Date
                         </th>
                       </tr>
                     </thead>
@@ -634,13 +1053,10 @@ function CallTracker() {
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {tracker.salespersonName}
+                              {tracker.currentStage}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              <div className="flex items-center">
-                                <BuildingIcon className="h-4 w-4 mr-2 text-slate-400" />
-                                {tracker.companyName}
-                              </div>
+                              {tracker.callingDate}
                             </td>
                           </tr>
                         ))

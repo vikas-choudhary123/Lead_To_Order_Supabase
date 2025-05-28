@@ -974,6 +974,7 @@ const generatePDFFromData = () => {
     // `Name: ${quotationData.consignorName}`,
     `Name: ${selectedReferences[0] || 'N/A'}`,
     `Address: ${quotationData.consignorAddress}`,
+    `Mobile: ${quotationData.consignorMobile.split(",")[0] || 'N/A'}`,
     `GSTIN: ${quotationData.consignorGSTIN || 'N/A'}`,
     `State Code: ${quotationData.consignorStateCode || 'N/A'}`
   ];
@@ -1578,9 +1579,9 @@ const itemPromises = quotationData.items.map(async (item) => {
   return (
     <div className="container mx-auto py-6 px-4">
    <div className="flex justify-between items-center mb-6">
-  <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent flex items-center">
     <img src={image1} alt="Logo" className="h-20 w-25 mr-3" />
-    Make Quotation
+  <h1 className="text-5xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent flex items-center">
+    DIVINE EMPIRE INDIA PVT. LTD.
   </h1>
   <button
     className={`px-4 py-2 rounded-md ${isRevising ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'} text-white`}
@@ -2431,7 +2432,8 @@ const itemPromises = quotationData.items.map(async (item) => {
         {/* <p className="font-bold">{quotationData.consignorName || "Consignor Name"}</p> */}
         <p className="font-bold">{selectedReferences[0] || "Consignor Name"}</p>
         <p className="text-sm">{quotationData.consignorAddress || "Consignor Address"}</p>
-        <p className="text-sm">Mobile: {quotationData.consignorMobile || "N/A"}</p>
+        {/* <p className="text-sm">Mobile: {quotationData.consignorMobile || "N/A"}</p> */}
+        <p className="text-sm">Mobile: {quotationData.consignorMobile.split(",")[0] || "N/A"}</p>
         <p className="text-sm">Phone: {quotationData.consignorPhone || "N/A"}</p>
         <p className="text-sm">GSTIN: {quotationData.consignorGSTIN || "N/A"}</p>
         <p className="text-sm">State Code: {quotationData.consignorStateCode || "N/A"}</p>

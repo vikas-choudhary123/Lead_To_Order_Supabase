@@ -261,7 +261,6 @@ function FollowUp() {
           historyData.table.rows.slice(0).forEach((row) => {
             if (row.c) {
               // NEW: Check if the username matches column (you'll need to determine which column stores the assigned user in Leads Tracker)
-              // For now, we'll show all history records
               const followUpItem = {
                 leadNo: row.c[1] ? row.c[1].v : "",
                 customerSay: row.c[2] ? row.c[2].v : "",
@@ -273,7 +272,7 @@ function FollowUp() {
                 salesType: row.c[8] ? row.c[8].v : "",
                 requiredProductDate: row.c[9] ? formatDateToDDMMYYYY(row.c[9] ? row.c[9].v : "") : "",
                 projectApproxValue: row.c[10] ? row.c[10].v : "",
-
+              
                 // Item details
                 itemName1: row.c[11] ? row.c[11].v : "", // Column L - Item Name1
                 quantity1: row.c[12] ? row.c[12].v : "", // Column M - Quantity1
@@ -285,10 +284,13 @@ function FollowUp() {
                 quantity4: row.c[18] ? row.c[18].v : "", // Column S - Quantity4
                 itemName5: row.c[19] ? row.c[19].v : "", // Column T - Item Name5
                 quantity5: row.c[20] ? row.c[20].v : "", // Column U - Quantity5
-
+              
                 nextAction: row.c[21] ? row.c[21].v : "", // Column V - Next Action
                 nextCallDate: row.c[22] ? formatDateToDDMMYYYY(row.c[22] ? row.c[22].v : "") : "", // Column W - Next Call Date
                 nextCallTime: row.c[23] ? formatNextCallTime(row.c[23].v) : "", // Column X - Next Call Time
+                
+                // ADD THIS NEW LINE for column Z (index 25):
+                historyDateFilter: row.c[25] ? row.c[25].v : "", // Column Z - Date filter for history
               }
 
               historyFollowUpData.push(followUpItem)
@@ -392,11 +394,48 @@ const formatPopupDate = (dateValue) => {
     return matchesSearch && matchesFilterType && matchesDateFilter
   })
 
-  const filteredHistoryFollowUps = historyFollowUps.filter(
-    (followUp) =>
+  const filteredHistoryFollowUps = historyFollowUps.filter((followUp) => {
+    const matchesSearch =
       followUp.leadNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      followUp.projectName.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+      followUp.projectName.toLowerCase().includes(searchTerm.toLowerCase())
+  
+    // Apply filter type for history - check column E (enquiryReceivedStatus)
+    const matchesFilterType = (() => {
+      if (filterType === "first") {
+        return followUp.enquiryReceivedStatus === "" || followUp.enquiryReceivedStatus === null || followUp.enquiryReceivedStatus === "New"
+      } else if (filterType === "multi") {
+        return followUp.enquiryReceivedStatus === "Expected" || followUp.enquiryReceivedStatus === "expected"
+      } else {
+        return true
+      }
+    })()
+  
+    // ADD THIS NEW SECTION: Apply date filter based on column Z
+    const matchesDateFilter = (() => {
+      if (dateFilter === "all") return true
+  
+      // Get the text value from column Z (historyDateFilter field)
+      const columnZValue = followUp.historyDateFilter
+      if (!columnZValue) return false
+  
+      // Convert the column Z value to lowercase for comparison
+      const columnZText = String(columnZValue).toLowerCase()
+  
+      // Match the filter type with the text in column Z
+      switch (dateFilter) {
+        case "today":
+          return columnZText.includes("today")
+        case "overdue":
+          return columnZText.includes("overdue")
+        case "upcoming":
+          return columnZText.includes("upcoming")
+        default:
+          return true
+      }
+    })()
+  
+    return matchesSearch && matchesFilterType && matchesDateFilter
+  })
 
   return (
     <div className="container mx-auto py-10 px-4">
@@ -411,18 +450,20 @@ const formatPopupDate = (dateValue) => {
 
         <div className="flex gap-2">
           {/* Date Filter Dropdown */}
-          <div>
-            <select
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
-            >
-              <option value="all">All</option>
-              <option value="today">Today</option>
-              <option value="overdue">Overdue</option>
-              <option value="upcoming">Upcoming</option>
-            </select>
-          </div>
+          {/* {activeTab === "pending" && ( */}
+    <div>
+      <select
+        value={dateFilter}
+        onChange={(e) => setDateFilter(e.target.value)}
+        className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+      >
+        <option value="all">All</option>
+        <option value="today">Today</option>
+        <option value="overdue">Overdue</option>
+        <option value="upcoming">Upcoming</option>
+      </select>
+    </div>
+  {/* )} */}
 
           {/* Filter Dropdown */}
           <div>
