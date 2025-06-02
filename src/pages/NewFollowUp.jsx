@@ -283,8 +283,8 @@ function NewFollowUp() {
                     id="hot"
                     name="leadStatus"
                     value="hot"
-                    checked={leadStatus === "hot"}
-                    onChange={() => setLeadStatus("hot")}
+                    checked={leadStatus === "Relevant"}
+                    onChange={() => setLeadStatus("Relevant")}
                     className="h-4 w-4 text-red-600 focus:ring-red-500"
                   />
                   <label htmlFor="hot" className="text-sm text-gray-700">
@@ -297,8 +297,8 @@ function NewFollowUp() {
                     id="warm"
                     name="leadStatus"
                     value="warm"
-                    checked={leadStatus === "warm"}
-                    onChange={() => setLeadStatus("warm")}
+                    checked={leadStatus === "Not Relevant"}
+                    onChange={() => setLeadStatus("Not Relevant")}
                     className="h-4 w-4 text-amber-600 focus:ring-amber-500"
                   />
                   <label htmlFor="warm" className="text-sm text-gray-700">
