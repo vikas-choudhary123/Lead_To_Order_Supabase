@@ -448,7 +448,7 @@ setCreditLimitOptions(["10000", "25000", "50000", "100000"])
 
           <div className="space-y-2">
   <label htmlFor="orderVideo" className="block text-sm font-medium text-gray-700">
-    Order Video (If Order Received)
+    Offer No.
   </label>
   <select
     id="orderVideo"

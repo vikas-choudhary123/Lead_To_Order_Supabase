@@ -523,13 +523,13 @@ const handleSubmit = async (e) => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Phone number will auto-fill"
                   // readOnly={formData.companyName !== ""}
-                  required
+                  // required
                 />
               </div>
 
               <div className="space-y-2">
                 <label htmlFor="salespersonName" className="block text-sm font-medium text-gray-700">
-                  Salesperson Name
+                  Person Name
                 </label>
                 <input
                   id="salespersonName"
@@ -538,7 +538,7 @@ const handleSubmit = async (e) => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Salesperson name will auto-fill"
                   // readOnly={formData.companyName !== ""}
-                  required
+                  // required
                 />
               </div>
 
@@ -553,7 +553,7 @@ const handleSubmit = async (e) => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Location will auto-fill"
                   // readOnly={formData.companyName !== ""}
-                  required
+                  // required
                 />
               </div>
 
@@ -643,7 +643,7 @@ const handleSubmit = async (e) => {
                         onChange={(e) => handleContactPersonChange(index, 'name', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="Contact name"
-                        required
+                        // required
                       />
                     </div>
                     <div className="space-y-2">
@@ -667,7 +667,7 @@ const handleSubmit = async (e) => {
                         onChange={(e) => handleContactPersonChange(index, 'number', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="Contact number"
-                        required
+                        // required
                       />
                     </div>
                   </div>
@@ -686,7 +686,7 @@ const handleSubmit = async (e) => {
     value={formData.nob}
     onChange={handleChange}
     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-    required
+    // required
   >
     <option value="">Select nature of business</option>
     {nobOptions.map((option, index) => (
@@ -705,7 +705,7 @@ const handleSubmit = async (e) => {
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="GST number"
-                  required
+                  // required
                 />
               </div>
 

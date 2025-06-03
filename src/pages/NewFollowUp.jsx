@@ -546,24 +546,25 @@ function NewFollowUp() {
                   {items.map((item, index) => (
                     <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                       <div className="md:col-span-5 space-y-2">
-                        <label htmlFor={`itemName-${item.id}`} className="block text-sm font-medium text-gray-700">
-                          Item Name 1
-                        </label>
-                        <select
-                          id={`itemName-${item.id}`}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
-                          value={item.name}
-                          onChange={(e) => updateItem(item.id, "name", e.target.value)}
-                          required
-                        >
-                          <option value="">Select item name</option>
-                          {productCategories.map((category, index) => (
-                            <option key={index} value={category}>
-                              {category}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+  <label htmlFor={`itemName-${item.id}`} className="block text-sm font-medium text-gray-700">
+    Item Name 1
+  </label>
+  <input
+    list={`item-options-${item.id}`}
+    id={`itemName-${item.id}`}
+    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+    value={item.name}
+    onChange={(e) => updateItem(item.id, "name", e.target.value)}
+    required
+    placeholder="Select or type item name"
+  />
+  <datalist id={`item-options-${item.id}`}>
+    {productCategories.map((category, index) => (
+      <option key={index} value={category} />
+    ))}
+  </datalist>
+</div>
+
 
                       <div className="md:col-span-5 space-y-2">
                         <label htmlFor={`quantity-${item.id}`} className="block text-sm font-medium text-gray-700">

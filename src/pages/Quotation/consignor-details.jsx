@@ -28,9 +28,12 @@ const ConsignorDetails = ({
 
                     if (updated.length > 0 && dropdownData.references) {
                       const mobileNumbers = updated.map((r) => dropdownData.references[r]?.mobile).filter(Boolean)
+                      const phoneNumbers = updated.map((r) => dropdownData.references[r]?.phone).filter(Boolean)
                       handleInputChange("consignorMobile", mobileNumbers.join(", "))
+                      handleInputChange("consignorPhone", phoneNumbers.join(", "))
                     } else {
                       handleInputChange("consignorMobile", "")
+                      handleInputChange("consignorPhone", "")
                     }
                   }}
                   className="ml-1 text-blue-600 hover:text-blue-800"
@@ -50,9 +53,11 @@ const ConsignorDetails = ({
                 setSelectedReferences(updated)
                 handleInputChange("consignorName", updated.join(", "))
 
-                if (dropdownData.references && dropdownData.references[selectedRef]?.mobile) {
+                if (dropdownData.references && dropdownData.references[selectedRef]) {
                   const mobileNumbers = updated.map((ref) => dropdownData.references[ref]?.mobile).filter(Boolean)
+                  const phoneNumbers = updated.map((ref) => dropdownData.references[ref]?.phone).filter(Boolean)
                   handleInputChange("consignorMobile", mobileNumbers.join(", "))
+                  handleInputChange("consignorPhone", phoneNumbers.join(", "))
                 }
               }
               e.target.value = ""

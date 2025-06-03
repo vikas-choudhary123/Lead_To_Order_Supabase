@@ -115,9 +115,10 @@ const QuotationForm = ({
               const referenceName = row.c[21] ? row.c[21].v : ""
               if (referenceName && !referenceOptionsData.includes(referenceName)) {
                 referenceOptionsData.push(referenceName)
-
+          
                 referenceDetailsMap[referenceName] = {
                   mobile: row.c[22] ? row.c[22].v : "",
+                  phone: row.c[83] ? row.c[83].v : "" // Add phone number from column CF
                 }
               }
             }

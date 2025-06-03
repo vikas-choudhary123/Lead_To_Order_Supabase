@@ -277,61 +277,71 @@ function CallTracker() {
 
         // Process History Call Trackers from Enquiry Tracker sheet
         let historyCallTrackerData = []
-        if (historyData && historyData.table && historyData.table.rows) {
-          historyCallTrackerData = []
+      // Process History Call Trackers from Enquiry Tracker sheet
+if (historyData && historyData.table && historyData.table.rows) {
+  const historyCallTrackerData = []
 
-          // Start from index 1 to skip header row
-          historyData.table.rows.slice(0).forEach((row, index) => {
-            if (row.c) {
-              const callTrackerItem = {
-                id: index + 1,
-                timestamp: formatDateToDDMMYYYY(row.c[0] ? row.c[0].v : ""), // Column A - Timestamp
-                enquiryNo: row.c[1] ? row.c[1].v : "", // Column B - Enquiry No
-                enquiryStatus: row.c[2] ? row.c[2].v : "", // Column C - Enquiry Status
-                customerFeedback: row.c[3] ? row.c[3].v : "", // Column D - What Did Customer Say
-                currentStage: row.c[4] ? row.c[4].v : "", // Column E - Current Stage
-                sendQuotationNo: row.c[5] ? row.c[5].v : "", // Column F - Send Quotation No
-                quotationSharedBy: row.c[6] ? row.c[6].v : "", // Column G - Quotation Shared By
-                quotationNumber: row.c[7] ? row.c[7].v : "", // Column H - Quotation Number
-                valueWithoutTax: row.c[8] ? row.c[8].v : "", // Column I - Value Without Tax
-                valueWithTax: row.c[9] ? row.c[9].v : "", // Column J - Value With Tax
-                quotationUpload: row.c[10] ? row.c[10].v : "", // Column K - Quotation Upload
-                quotationRemarks: row.c[11] ? row.c[11].v : "", // Column L - Quotation Remarks
-                validatorName: row.c[12] ? row.c[12].v : "", // Column M - Validator Name
-                sendStatus: row.c[13] ? row.c[13].v : "", // Column N - Send Status
-                validationRemark: row.c[14] ? row.c[14].v : "", // Column O - Validation Remark
-                faqVideo: row.c[15] ? row.c[15].v : "", // Column P - FAQ Video
-                productVideo: row.c[16] ? row.c[16].v : "", // Column Q - Product Video
-                offerVideo: row.c[17] ? row.c[17].v : "", // Column R - Offer Video
-                productCatalog: row.c[18] ? row.c[18].v : "", // Column S - Product Catalog
-                productImage: row.c[19] ? row.c[19].v : "", // Column T - Product Image
-                nextCallDate: formatDateToDDMMYYYY(row.c[20] ? row.c[20].v : ""), // Column U - Next Call Date
-                nextCallTime: formatTimeTo12Hour(row.c[21] ? row.c[21].v : ""), // Column V - Next Call Time
-                orderStatus: row.c[22] ? row.c[22].v : "", // Column W - Is Order Received? Status
-                acceptanceVia: row.c[23] ? row.c[23].v : "", // Column X - Acceptance Via
-                paymentMode: row.c[24] ? row.c[24].v : "", // Column Y - Payment Mode
-                paymentTerms: row.c[25] ? row.c[25].v : "", // Column Z - Payment Terms
-                transportMode: row.c[26] ? row.c[26].v : "", // Column Z - Payment Terms
-                registrationFrom: row.c[27] ? row.c[27].v : "", // Column Z - Payment Terms
-                orderVideo: row.c[28] ? row.c[28].v : "", // Column AA - Order Video
-                acceptanceFile: row.c[29] ? row.c[29].v : "", // Column AB - Acceptance File
-                orderRemark: row.c[30] ? row.c[30].v : "", // Column AC - Remark
-                apologyVideo: row.c[31] ? row.c[31].v : "", // Column AD - Apology Video
-                reasonStatus: row.c[32] ? row.c[32].v : "", // Column AE - Reason Status
-                reasonRemark: row.c[33] ? row.c[33].v : "", // Column AF - Reason Remark
-                holdReason: row.c[34] ? row.c[34].v : "", // Column AG - Hold Reason
-                holdingDate: formatDateToDDMMYYYY(row.c[35] ? row.c[35].v : ""), // Column AH - Holding Date
-                holdRemark: row.c[36] ? row.c[36].v : "", // Column AI - Hold Remark
-                priority: determinePriority(row.c[2] ? row.c[2].v : ""), // Determine priority based on status
-                callingDate: formatDateToDDMMYYYY(row.c[41] ? row.c[41].v : ""), // Column AP - Calling Date
-              }
+  // Start from index 1 to skip header row
+  historyData.table.rows.slice(0).forEach((row, index) => {
+    if (row.c) {
+      // Get the assigned user from column AL (index 37)
+      const assignedUser = row.c[37] ? row.c[37].v : ""
+      
+      // For admin users, include all rows; for regular users, filter by their username
+      const shouldInclude = isAdmin() || (currentUser && assignedUser === currentUser.username)
 
-              historyCallTrackerData.push(callTrackerItem)
-            }
-          })
-
-          setHistoryCallTrackers(historyCallTrackerData)
+      if (shouldInclude) {
+        const callTrackerItem = {
+          id: index + 1,
+          timestamp: formatDateToDDMMYYYY(row.c[0] ? row.c[0].v : ""), // Column A - Timestamp
+          enquiryNo: row.c[1] ? row.c[1].v : "", // Column B - Enquiry No
+          enquiryStatus: row.c[2] ? row.c[2].v : "", // Column C - Enquiry Status
+          customerFeedback: row.c[3] ? row.c[3].v : "", // Column D - What Did Customer Say
+          currentStage: row.c[4] ? row.c[4].v : "", // Column E - Current Stage
+          sendQuotationNo: row.c[5] ? row.c[5].v : "", // Column F - Send Quotation No
+          quotationSharedBy: row.c[6] ? row.c[6].v : "", // Column G - Quotation Shared By
+          quotationNumber: row.c[7] ? row.c[7].v : "", // Column H - Quotation Number
+          valueWithoutTax: row.c[8] ? row.c[8].v : "", // Column I - Value Without Tax
+          valueWithTax: row.c[9] ? row.c[9].v : "", // Column J - Value With Tax
+          quotationUpload: row.c[10] ? row.c[10].v : "", // Column K - Quotation Upload
+          quotationRemarks: row.c[11] ? row.c[11].v : "", // Column L - Quotation Remarks
+          validatorName: row.c[12] ? row.c[12].v : "", // Column M - Validator Name
+          sendStatus: row.c[13] ? row.c[13].v : "", // Column N - Send Status
+          validationRemark: row.c[14] ? row.c[14].v : "", // Column O - Validation Remark
+          faqVideo: row.c[15] ? row.c[15].v : "", // Column P - FAQ Video
+          productVideo: row.c[16] ? row.c[16].v : "", // Column Q - Product Video
+          offerVideo: row.c[17] ? row.c[17].v : "", // Column R - Offer Video
+          productCatalog: row.c[18] ? row.c[18].v : "", // Column S - Product Catalog
+          productImage: row.c[19] ? row.c[19].v : "", // Column T - Product Image
+          nextCallDate: formatDateToDDMMYYYY(row.c[20] ? row.c[20].v : ""), // Column U - Next Call Date
+          nextCallTime: formatTimeTo12Hour(row.c[21] ? row.c[21].v : ""), // Column V - Next Call Time
+          orderStatus: row.c[22] ? row.c[22].v : "", // Column W - Is Order Received? Status
+          acceptanceVia: row.c[23] ? row.c[23].v : "", // Column X - Acceptance Via
+          paymentMode: row.c[24] ? row.c[24].v : "", // Column Y - Payment Mode
+          paymentTerms: row.c[25] ? row.c[25].v : "", // Column Z - Payment Terms
+          transportMode: row.c[26] ? row.c[26].v : "", // Column AA - Transport Mode
+          registrationFrom: row.c[27] ? row.c[27].v : "", // Column AB - Registration From
+          orderVideo: row.c[28] ? row.c[28].v : "", // Column AC - Order Video
+          acceptanceFile: row.c[29] ? row.c[29].v : "", // Column AD - Acceptance File
+          orderRemark: row.c[30] ? row.c[30].v : "", // Column AE - Remark
+          apologyVideo: row.c[31] ? row.c[31].v : "", // Column AF - Apology Video
+          reasonStatus: row.c[32] ? row.c[32].v : "", // Column AG - Reason Status
+          reasonRemark: row.c[33] ? row.c[33].v : "", // Column AH - Reason Remark
+          holdReason: row.c[34] ? row.c[34].v : "", // Column AI - Hold Reason
+          holdingDate: formatDateToDDMMYYYY(row.c[35] ? row.c[35].v : ""), // Column AJ - Holding Date
+          holdRemark: row.c[36] ? row.c[36].v : "", // Column AK - Hold Remark
+          priority: determinePriority(row.c[2] ? row.c[2].v : ""), // Determine priority based on status
+          callingDate: formatDateToDDMMYYYY(row.c[41] ? row.c[41].v : ""), // Column AP - Calling Date
+          assignedTo: assignedUser, // Add assigned user to the history item
         }
+
+        historyCallTrackerData.push(callTrackerItem)
+      }
+    }
+  })
+
+  setHistoryCallTrackers(historyCallTrackerData)
+}
 
         // Process Direct Enquiry Pending from ENQUIRY TO ORDER sheet
         let directEnquiryPendingData = []
@@ -1144,12 +1154,17 @@ function CallTracker() {
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.valueWithoutTax}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.valueWithTax}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {tracker.quotationUpload && (
-                  <a href={tracker.quotationUpload} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                    View File
-                  </a>
-                )}
-              </td>
+  {tracker.quotationUpload && (
+    <a 
+      href={tracker.quotationUpload} 
+      target="_blank" 
+      rel="noopener noreferrer"
+      className="text-blue-600 hover:underline"
+    >
+      View File
+    </a>
+  )}
+</td>
               <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.quotationRemarks}>{tracker.quotationRemarks}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.validatorName}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.sendStatus}</td>
@@ -1171,8 +1186,17 @@ function CallTracker() {
                 {tracker.orderVideo}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {tracker.acceptanceFile}
-              </td>
+  {tracker.acceptanceFile && (
+    <a 
+      href={tracker.acceptanceFile} 
+      target="_blank" 
+      rel="noopener noreferrer"
+      className="text-blue-600 hover:underline"
+    >
+      View File
+    </a>
+  )}
+</td>
               <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.orderRemark}>{tracker.orderRemark}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {tracker.apologyVideo && (
@@ -1190,9 +1214,9 @@ function CallTracker() {
           ))
         ) : (
           <tr>
-            <td colSpan={36} className="px-6 py-4 text-center text-sm text-slate-500">
-              No history found
-            </td>
+            <td colSpan={isAdmin() ? 37 : 36} className="px-6 py-4 text-center text-sm text-slate-500">
+  No history found
+</td>
           </tr>
         )}
       </tbody>

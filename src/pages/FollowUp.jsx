@@ -21,6 +21,9 @@ function FollowUp() {
   const [dateFilter, setDateFilter] = useState("all") // New state for date filter
   const [showPopup, setShowPopup] = useState(false)
   const [selectedFollowUp, setSelectedFollowUp] = useState(null)
+  const [companyFilter, setCompanyFilter] = useState("all")
+  const [personFilter, setPersonFilter] = useState("all")
+  const [phoneFilter, setPhoneFilter] = useState("all")
 
   // Helper function to determine priority based on lead source
   const determinePriority = (source) => {
@@ -220,10 +223,10 @@ function FollowUp() {
               // Check if column K (index 10) has data and column L (index 11) is null
               const hasColumnK = row.c[27] && row.c[27].v
               const isColumnLEmpty = !row.c[28] || row.c[28].v === null || row.c[28].v === ""
-              
-              // Get the assigned user 
+
+              // Get the assigned user
               const assignedUser = row.c[88] ? row.c[88].v : ""
-              
+
               // For admin users, include all rows; for regular users, filter by their username
               const shouldInclude = isAdmin() || (currentUser && assignedUser === currentUser.username)
 
@@ -242,7 +245,7 @@ function FollowUp() {
                   createdAt: row.c[0] ? row.c[0].v : "",
                   nextCallDate: row.c[89] ? row.c[89].v : "", // Column CL (index 89) for date filtering
                   priority: determinePriority(row.c[3] ? row.c[3].v : ""),
-                  assignedTo: assignedUser // Add assigned user to the follow-up item
+                  assignedTo: assignedUser, // Add assigned user to the follow-up item
                 }
 
                 pendingFollowUpData.push(followUpItem)
@@ -254,46 +257,49 @@ function FollowUp() {
         }
 
         // Process History Follow-ups from Leads Tracker sheet
+        // Process History Follow-ups from Leads Tracker sheet
         if (historyData && historyData.table && historyData.table.rows) {
           const historyFollowUpData = []
 
-          // Start from index 1 to skip header row, process rows starting from index 2 in the sheet
           historyData.table.rows.slice(0).forEach((row) => {
             if (row.c) {
-              // NEW: Check if the username matches column (you'll need to determine which column stores the assigned user in Leads Tracker)
-              const followUpItem = {
-                leadNo: row.c[1] ? row.c[1].v : "",
-                customerSay: row.c[2] ? row.c[2].v : "",
-                status: row.c[3] ? row.c[3].v : "",
-                enquiryReceivedStatus: row.c[4] ? row.c[4].v : "",
-                enquiryReceivedDate: row.c[5] ? formatDateToDDMMYYYY(row.c[5] ? row.c[5].v : "") : "",
-                enquiryState: row.c[6] ? row.c[6].v : "",
-                projectName: row.c[7] ? row.c[7].v : "",
-                salesType: row.c[8] ? row.c[8].v : "",
-                requiredProductDate: row.c[9] ? formatDateToDDMMYYYY(row.c[9] ? row.c[9].v : "") : "",
-                projectApproxValue: row.c[10] ? row.c[10].v : "",
-              
-                // Item details
-                itemName1: row.c[11] ? row.c[11].v : "", // Column L - Item Name1
-                quantity1: row.c[12] ? row.c[12].v : "", // Column M - Quantity1
-                itemName2: row.c[13] ? row.c[13].v : "", // Column N - Item Name2
-                quantity2: row.c[14] ? row.c[14].v : "", // Column O - Quantity2
-                itemName3: row.c[15] ? row.c[15].v : "", // Column P - Item Name3
-                quantity3: row.c[16] ? row.c[16].v : "", // Column Q - Quantity3
-                itemName4: row.c[17] ? row.c[17].v : "", // Column R - Item Name4
-                quantity4: row.c[18] ? row.c[18].v : "", // Column S - Quantity4
-                itemName5: row.c[19] ? row.c[19].v : "", // Column T - Item Name5
-                quantity5: row.c[20] ? row.c[20].v : "", // Column U - Quantity5
-              
-                nextAction: row.c[21] ? row.c[21].v : "", // Column V - Next Action
-                nextCallDate: row.c[22] ? formatDateToDDMMYYYY(row.c[22] ? row.c[22].v : "") : "", // Column W - Next Call Date
-                nextCallTime: row.c[23] ? formatNextCallTime(row.c[23].v) : "", // Column X - Next Call Time
-                
-                // ADD THIS NEW LINE for column Z (index 25):
-                historyDateFilter: row.c[25] ? row.c[25].v : "", // Column Z - Date filter for history
-              }
+              // Get the assigned user from column Y (index 24)
+              const assignedUser = row.c[24] ? row.c[24].v : ""
 
-              historyFollowUpData.push(followUpItem)
+              // For admin users, include all rows; for regular users, filter by their username
+              const shouldInclude = isAdmin() || (currentUser && assignedUser === currentUser.username)
+
+              if (shouldInclude) {
+                const followUpItem = {
+                  leadNo: row.c[1] ? row.c[1].v : "",
+                  customerSay: row.c[2] ? row.c[2].v : "",
+                  status: row.c[3] ? row.c[3].v : "",
+                  enquiryReceivedStatus: row.c[4] ? row.c[4].v : "",
+                  enquiryReceivedDate: row.c[5] ? formatDateToDDMMYYYY(row.c[5] ? row.c[5].v : "") : "",
+                  enquiryState: row.c[6] ? row.c[6].v : "",
+                  projectName: row.c[7] ? row.c[7].v : "",
+                  salesType: row.c[8] ? row.c[8].v : "",
+                  requiredProductDate: row.c[9] ? formatDateToDDMMYYYY(row.c[9] ? row.c[9].v : "") : "",
+                  projectApproxValue: row.c[10] ? row.c[10].v : "",
+                  itemName1: row.c[11] ? row.c[11].v : "",
+                  quantity1: row.c[12] ? row.c[12].v : "",
+                  itemName2: row.c[13] ? row.c[13].v : "",
+                  quantity2: row.c[14] ? row.c[14].v : "",
+                  itemName3: row.c[15] ? row.c[15].v : "",
+                  quantity3: row.c[16] ? row.c[16].v : "",
+                  itemName4: row.c[17] ? row.c[17].v : "",
+                  quantity4: row.c[18] ? row.c[18].v : "",
+                  itemName5: row.c[19] ? row.c[19].v : "",
+                  quantity5: row.c[20] ? row.c[20].v : "",
+                  nextAction: row.c[21] ? row.c[21].v : "",
+                  nextCallDate: row.c[22] ? formatDateToDDMMYYYY(row.c[22] ? row.c[22].v : "") : "",
+                  nextCallTime: row.c[23] ? formatNextCallTime(row.c[23].v) : "",
+                  historyDateFilter: row.c[25] ? row.c[25].v : "",
+                  assignedTo: assignedUser, // Add assigned user to the history item
+                }
+
+                historyFollowUpData.push(followUpItem)
+              }
             }
           })
 
@@ -343,39 +349,47 @@ function FollowUp() {
       }
     }
 
-
     fetchFollowUpData()
-  }, [currentUser, isAdmin])  // Add isAdmin to dependencies
+  }, [currentUser, isAdmin]) // Add isAdmin to dependencies
 
-// Add this function or modify the existing formatDateToDDMMYYYY function
-const formatPopupDate = (dateValue) => {
-  if (!dateValue) return "";
+  // Add this function or modify the existing formatDateToDDMMYYYY function
+  const formatPopupDate = (dateValue) => {
+    if (!dateValue) return ""
 
-  try {
-    // Check if it's a Date object-like string (e.g. "Date(2025,4,3)")
-    if (typeof dateValue === "string" && dateValue.startsWith("Date(")) {
-      // Extract the parts from Date(YYYY,MM,DD) format
-      const dateString = dateValue.substring(5, dateValue.length - 1);
-      const [year, month, day] = dateString.split(",").map((part) => Number.parseInt(part.trim()));
-      
-      // JavaScript months are 0-indexed, but we need to display them as 1-indexed
-      // Also ensure day and month are padded with leading zeros if needed
-      return `${day.toString().padStart(2, "0")}/${(month + 1).toString().padStart(2, "0")}/${year}`;
+    try {
+      // Check if it's a Date object-like string (e.g. "Date(2025,4,3)")
+      if (typeof dateValue === "string" && dateValue.startsWith("Date(")) {
+        // Extract the parts from Date(YYYY,MM,DD) format
+        const dateString = dateValue.substring(5, dateValue.length - 1)
+        const [year, month, day] = dateString.split(",").map((part) => Number.parseInt(part.trim()))
+
+        // JavaScript months are 0-indexed, but we need to display them as 1-indexed
+        // Also ensure day and month are padded with leading zeros if needed
+        return `${day.toString().padStart(2, "0")}/${(month + 1).toString().padStart(2, "0")}/${year}`
+      }
+
+      // If it's already in the correct format, return as is
+      return dateValue
+    } catch (error) {
+      console.error("Error formatting popup date:", error)
+      return dateValue // Return the original value if formatting fails
     }
-    
-    // If it's already in the correct format, return as is
-    return dateValue;
-  } catch (error) {
-    console.error("Error formatting popup date:", error);
-    return dateValue; // Return the original value if formatting fails
   }
-};
 
   // Filter function for search in both sections
   const filteredPendingFollowUps = pendingFollowUps.filter((followUp) => {
+    const searchLower = searchTerm.toLowerCase()
     const matchesSearch =
-      followUp.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      followUp.leadId.toLowerCase().includes(searchTerm.toLowerCase())
+      searchTerm === "" ||
+      (followUp.companyName && followUp.companyName.toLowerCase().includes(searchLower)) ||
+      (followUp.leadId && followUp.leadId.toLowerCase().includes(searchLower)) ||
+      (followUp.personName && followUp.personName.toLowerCase().includes(searchLower)) ||
+      (followUp.phoneNumber && followUp.phoneNumber.toString().toLowerCase().includes(searchLower)) ||
+      (followUp.leadSource && followUp.leadSource.toLowerCase().includes(searchLower)) ||
+      (followUp.location && followUp.location.toLowerCase().includes(searchLower)) ||
+      (followUp.customerSay && followUp.customerSay.toLowerCase().includes(searchLower)) ||
+      (followUp.enquiryStatus && followUp.enquiryStatus.toLowerCase().includes(searchLower)) ||
+      (followUp.assignedTo && followUp.assignedTo.toLowerCase().includes(searchLower))
 
     // Apply filter type for Column R
     const matchesFilterType = (() => {
@@ -391,36 +405,84 @@ const formatPopupDate = (dateValue) => {
     // Apply date filter based on column CL
     const matchesDateFilter = checkDateFilter(followUp, dateFilter)
 
-    return matchesSearch && matchesFilterType && matchesDateFilter
+    // Apply company filter
+    const matchesCompanyFilter = companyFilter === "all" || followUp.companyName === companyFilter
+
+    // Apply person filter
+    const matchesPersonFilter = personFilter === "all" || followUp.personName === personFilter
+
+    // Apply phone filter
+    const phoneToCompare = followUp.phoneNumber ? followUp.phoneNumber.toString().trim() : ""
+    const matchesPhoneFilter = phoneFilter === "all" || phoneToCompare === phoneFilter.toString().trim()
+
+    return (
+      matchesSearch &&
+      matchesFilterType &&
+      matchesDateFilter &&
+      matchesCompanyFilter &&
+      matchesPersonFilter &&
+      matchesPhoneFilter
+    )
   })
 
+  useEffect(() => {
+    // Reset specific filters when switching tabs
+    if (activeTab !== "pending") {
+      setCompanyFilter("all")
+      setPersonFilter("all")
+      setPhoneFilter("all")
+    }
+  }, [activeTab])
+
   const filteredHistoryFollowUps = historyFollowUps.filter((followUp) => {
+    const searchLower = searchTerm.toLowerCase()
     const matchesSearch =
-      followUp.leadNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      followUp.projectName.toLowerCase().includes(searchTerm.toLowerCase())
-  
+      searchTerm === "" ||
+      (followUp.leadNo && followUp.leadNo.toString().toLowerCase().includes(searchLower)) ||
+      (followUp.customerSay && followUp.customerSay.toLowerCase().includes(searchLower)) ||
+      (followUp.status && followUp.status.toLowerCase().includes(searchLower)) ||
+      (followUp.enquiryReceivedStatus && followUp.enquiryReceivedStatus.toLowerCase().includes(searchLower)) ||
+      (followUp.enquiryReceivedDate && followUp.enquiryReceivedDate.toLowerCase().includes(searchLower)) ||
+      (followUp.enquiryState && followUp.enquiryState.toLowerCase().includes(searchLower)) ||
+      (followUp.projectName && followUp.projectName.toLowerCase().includes(searchLower)) ||
+      (followUp.salesType && followUp.salesType.toLowerCase().includes(searchLower)) ||
+      (followUp.requiredProductDate && followUp.requiredProductDate.toLowerCase().includes(searchLower)) ||
+      (followUp.projectApproxValue && followUp.projectApproxValue.toString().toLowerCase().includes(searchLower)) ||
+      (followUp.itemName1 && followUp.itemName1.toLowerCase().includes(searchLower)) ||
+      (followUp.itemName2 && followUp.itemName2.toLowerCase().includes(searchLower)) ||
+      (followUp.itemName3 && followUp.itemName3.toLowerCase().includes(searchLower)) ||
+      (followUp.itemName4 && followUp.itemName4.toLowerCase().includes(searchLower)) ||
+      (followUp.itemName5 && followUp.itemName5.toLowerCase().includes(searchLower)) ||
+      (followUp.nextAction && followUp.nextAction.toLowerCase().includes(searchLower)) ||
+      (followUp.nextCallDate && followUp.nextCallDate.toLowerCase().includes(searchLower)) ||
+      (followUp.nextCallTime && followUp.nextCallTime.toLowerCase().includes(searchLower))
+
     // Apply filter type for history - check column E (enquiryReceivedStatus)
     const matchesFilterType = (() => {
       if (filterType === "first") {
-        return followUp.enquiryReceivedStatus === "" || followUp.enquiryReceivedStatus === null || followUp.enquiryReceivedStatus === "New"
+        return (
+          followUp.enquiryReceivedStatus === "" ||
+          followUp.enquiryReceivedStatus === null ||
+          followUp.enquiryReceivedStatus === "New"
+        )
       } else if (filterType === "multi") {
         return followUp.enquiryReceivedStatus === "Expected" || followUp.enquiryReceivedStatus === "expected"
       } else {
         return true
       }
     })()
-  
-    // ADD THIS NEW SECTION: Apply date filter based on column Z
+
+    // Apply date filter based on column Z
     const matchesDateFilter = (() => {
       if (dateFilter === "all") return true
-  
+
       // Get the text value from column Z (historyDateFilter field)
       const columnZValue = followUp.historyDateFilter
       if (!columnZValue) return false
-  
+
       // Convert the column Z value to lowercase for comparison
       const columnZText = String(columnZValue).toLowerCase()
-  
+
       // Match the filter type with the text in column Z
       switch (dateFilter) {
         case "today":
@@ -433,529 +495,739 @@ const formatPopupDate = (dateValue) => {
           return true
       }
     })()
-  
+
     return matchesSearch && matchesFilterType && matchesDateFilter
   })
 
+
+  // Add this function inside your FollowUp component
+const calculateDateFilterCounts = () => {
+  const counts = {
+    today: 0,
+    overdue: 0,
+    upcoming: 0
+  };
+
+  // Calculate counts for pending follow-ups
+  pendingFollowUps.forEach(followUp => {
+    const columnCLValue = followUp.nextCallDate;
+    if (!columnCLValue) return;
+
+    const columnCLText = String(columnCLValue).toLowerCase();
+    
+    if (columnCLText.includes("today")) counts.today++;
+    if (columnCLText.includes("overdue")) counts.overdue++;
+    if (columnCLText.includes("upcoming")) counts.upcoming++;
+  });
+
+  // Calculate counts for history follow-ups if needed
+  if (activeTab === "history") {
+    historyFollowUps.forEach(followUp => {
+      const columnZValue = followUp.historyDateFilter;
+      if (!columnZValue) return;
+
+      const columnZText = String(columnZValue).toLowerCase();
+      
+      if (columnZText.includes("today")) counts.today++;
+      if (columnZText.includes("overdue")) counts.overdue++;
+      if (columnZText.includes("upcoming")) counts.upcoming++;
+    });
+  }
+
+  return counts;
+};
+
+// Get the counts
+const dateFilterCounts = calculateDateFilterCounts();
+
   return (
-    <div className="container mx-auto py-10 px-4">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-orange-600 bg-clip-text text-transparent">
-            Follow-Up Tracker
-          </h1>
-          <p className="text-slate-600 mt-1">Track and manage all your follow-up calls</p>
-          {isAdmin() && <p className="text-green-600 font-semibold mt-1">Admin View: Showing all data</p>}
-        </div>
-
-        <div className="flex gap-2">
-          {/* Date Filter Dropdown */}
-          {/* {activeTab === "pending" && ( */}
-    <div>
-      <select
-        value={dateFilter}
-        onChange={(e) => setDateFilter(e.target.value)}
-        className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
-      >
-        <option value="all">All</option>
-        <option value="today">Today</option>
-        <option value="overdue">Overdue</option>
-        <option value="upcoming">Upcoming</option>
-      </select>
-    </div>
-  {/* )} */}
-
-          {/* Filter Dropdown */}
-          <div>
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
-            >
-              <option value="all">All</option>
-              <option value="first">First Followup</option>
-              <option value="multi">Expected</option>
-            </select>
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto py-4 sm:py-6 lg:py-10 px-4 sm:px-6 lg:px-8">
+        {/* Header Section - Fully Responsive */}
+        <div className="flex flex-col space-y-4 lg:space-y-0 lg:flex-row lg:justify-between lg:items-start mb-6 lg:mb-8">
+          {/* Title Section */}
+          <div className="flex-shrink-0">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-amber-500 to-orange-600 bg-clip-text text-transparent">
+              Follow-Up Tracker
+            </h1>
+            <p className="text-slate-600 mt-1 text-sm sm:text-base">Track and manage all your follow-up calls</p>
+            {isAdmin() && <p className="text-green-600 font-semibold mt-1 text-sm">Admin View: Showing all data</p>}
           </div>
 
-          <div className="relative">
-            <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
-            <input
-              type="search"
-              placeholder="Search follow-ups..."
-              className="pl-8 w-[200px] md:w-[300px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-
-          {/* <Link to="/follow-up/new">
-            <button className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500">
-              <PlusIcon className="inline-block mr-2 h-4 w-4" /> New Follow-Up
-            </button>
-          </Link> */}
-        </div>
-      </div>
-
-      <div className="bg-white rounded-lg shadow-md">
-        <div className="p-6 border-b">
-          <h2 className="text-xl font-bold">All Follow-Ups</h2>
-        </div>
-        <div className="p-6">
-          <div className="mb-4">
-            <div className="inline-flex rounded-md shadow-sm">
-              <button
-                onClick={() => setActiveTab("pending")}
-                className={`px-4 py-2 text-sm font-medium rounded-l-md ${
-                  activeTab === "pending" ? "bg-amber-100 text-amber-800" : "bg-white text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                Pending
-              </button>
-              <button
-                onClick={() => setActiveTab("history")}
-                className={`px-4 py-2 text-sm font-medium rounded-r-md ${
-                  activeTab === "history" ? "bg-amber-100 text-amber-800" : "bg-white text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                History
-              </button>
-            </div>
-          </div>
-
-          {isLoading ? (
-            <div className="p-8 text-center">
-              <p className="text-slate-500">Loading follow-up data...</p>
-            </div>
-          ) : (
-            <>
+          {/* Filters Section - Responsive Grid */}
+          <div className="flex flex-col space-y-3 lg:space-y-0 lg:flex-row lg:space-x-3 lg:items-center">
+            {/* Mobile: Stack filters vertically, Desktop: Horizontal */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-row gap-2 lg:gap-3">
+              {/* Company Name Filter - Only show for pending tab */}
               {activeTab === "pending" && (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-slate-50">
-                      <tr>
-                        <th
-                          scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Actions
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Lead No.
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Company Name
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Person Name
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Phone No.
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Lead Source
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Location
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          What did customer say
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Enquiry Status
-                        </th>
-                        {isAdmin() && (
-                          <th
-                            scope="col"
-                            className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                          >
-                            Assigned To
-                          </th>
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredPendingFollowUps.length > 0 ? (
-                        filteredPendingFollowUps.map((followUp) => (
-                          <tr key={followUp.id} className="hover:bg-slate-50">
-                            <td className="px-4 py-4 text-sm font-medium">
-                              <div className="flex space-x-2">
-                                <Link to={`/follow-up/new?leadId=${followUp.leadId}&leadNo=${followUp.leadId}`}>
-                                  <button className="px-3 py-1 text-xs border border-amber-200 text-amber-600 hover:bg-amber-50 rounded-md">
-                                    Call Now <ArrowRightIcon className="ml-1 h-3 w-3 inline" />
-                                  </button>
-                                </Link>
-                                {/* <button
-                                  onClick={() => {
-                                    setSelectedFollowUp(followUp)
-                                    setShowPopup(true)
-                                  }}
-                                  className="px-3 py-1 text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-md"
-                                >
-                                  View
-                                </button> */}
-                              </div>
-                            </td>
-                            <td className="px-4 py-4 text-sm font-medium text-gray-900">
-                              {followUp.leadId}
-                            </td>
-                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[150px] break-words">
-                              {followUp.companyName}
-                            </td>
-                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">
-                              {followUp.personName}
-                            </td>
-                            <td className="px-4 py-4 text-sm text-gray-500">
-                              {followUp.phoneNumber}
-                            </td>
-                            <td className="px-4 py-4">
-                              <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                  followUp.priority === "High"
-                                    ? "bg-red-100 text-red-800"
-                                    : followUp.priority === "Medium"
-                                      ? "bg-amber-100 text-amber-800"
-                                      : "bg-slate-100 text-slate-800"
-                                }`}
-                              >
-                                {followUp.leadSource}
-                              </span>
-                            </td>
-                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">
-                              {followUp.location}
-                            </td>
-                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[200px] break-words">
-                              {followUp.customerSay}
-                            </td>
-                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">
-                              {followUp.enquiryStatus}
-                            </td>
-                            {isAdmin() && (
-                              <td className="px-4 py-4 text-sm text-gray-500">
-                                {followUp.assignedTo}
-                              </td>
-                            )}
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={isAdmin() ? 10 : 9} className="px-4 py-4 text-center text-sm text-slate-500">
-                            No pending follow-ups found
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+  <div className="min-w-0">
+    <input
+      list="company-options"
+      value={companyFilter === "all" ? "" : companyFilter}
+      onChange={(e) => setCompanyFilter(e.target.value || "all")}
+      placeholder="Select or type company"
+      className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+    />
+    <datalist id="company-options">
+      <option value="all">All Companies</option>
+      {Array.from(new Set(pendingFollowUps.map((item) => item.companyName)))
+        .filter(Boolean)
+        .map((company) => (
+          <option key={company} value={company} />
+        ))}
+    </datalist>
+  </div>
+)}
 
-              {activeTab === "history" && (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-slate-50 sticky top-0">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Lead No.
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          What did the customer say?
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Enquiry Received Status
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Enquiry Received Date
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Enquiry for State
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Project Name
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Sales Type
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Required Product Date
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Project Approximate Value
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Item Name 1
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Quantity 1
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Item Name 2
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Quantity 2
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Item Name 3
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Quantity 3
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Item Name 4
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Quantity 4
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Item Name 5
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Quantity 5
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Next Action
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Next Call Date
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Next Call Time
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredHistoryFollowUps.length > 0 ? (
-                        filteredHistoryFollowUps.map((followUp, index) => (
-                          <tr key={index} className="hover:bg-slate-50">
-                            <td className="px-4 py-4 text-sm font-medium text-gray-900 max-w-[100px] break-words">
-                              {followUp.leadNo}
-                            </td>
-                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[200px] break-words">
-                              {followUp.customerSay}
-                            </td>
-                            <td className="px-4 py-4">
-                              <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                  followUp.status === "Completed"
-                                    ? "bg-green-100 text-green-800"
-                                    : followUp.status === "Pending"
-                                      ? "bg-amber-100 text-amber-800"
-                                      : "bg-red-100 text-red-800"
-                                }`}
-                              >
-                                {followUp.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">
-                              {followUp.enquiryReceivedStatus}
-                            </td>
-                            <td className="px-4 py-4 text-sm text-gray-500">
-                              {followUp.enquiryReceivedDate}
-                            </td>
-                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[100px] break-words">
-                              {followUp.enquiryState}
-                            </td>
-                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">
-                              {followUp.projectName}
-                            </td>
-                            <td className="px-4 py-4 text-sm text-gray-500">{followUp.salesType}</td>
-                            <td className="px-4 py-4 text-sm text-gray-500">
-                              {followUp.requiredProductDate}
-                            </td>
-                            <td className="px-4 py-4 text-sm text-gray-500">
-                              {followUp.projectApproxValue}
-                            </td>
-                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">{followUp.itemName1}</td>
-                            <td className="px-4 py-4 text-sm text-gray-500">{followUp.quantity1}</td>
-                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">{followUp.itemName2}</td>
-                            <td className="px-4 py-4 text-sm text-gray-500">{followUp.quantity2}</td>
-                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">{followUp.itemName3}</td>
-                            <td className="px-4 py-4 text-sm text-gray-500">{followUp.quantity3}</td>
-                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">{followUp.itemName4}</td>
-                            <td className="px-4 py-4 text-sm text-gray-500">{followUp.quantity4}</td>
-                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">{followUp.itemName5}</td>
-                            <td className="px-4 py-4 text-sm text-gray-500">{followUp.quantity5}</td>
-                            <td className="px-4 py-4 text-sm text-gray-500 max-w-[120px] break-words">{followUp.nextAction}</td>
-                            <td className="px-4 py-4 text-sm text-gray-500">
-                              {followUp.nextCallDate}
-                            </td>
-                            <td className="px-4 py-4 text-sm text-gray-500">
-                              {followUp.nextCallTime}
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={24} className="px-4 py-4 text-center text-sm text-slate-500">
-                            No history found
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-      {/* Popup Modal */}
-      {showPopup && (
-        <div className={`fixed inset-0 z-50 flex items-center justify-center ${fadeIn}`}>
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowPopup(false)}></div>
-          <div
-            className={`relative bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-auto ${slideIn}`}
-          >
-            <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-gray-900">Follow-up Details: {selectedFollowUp?.leadId}</h3>
-              <button
-                onClick={() => setShowPopup(false)}
-                className="text-gray-500 hover:text-gray-700 focus:outline-none"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+
+
+              {/* Person Name Filter - Only show for pending tab */}
+              {activeTab === "pending" && (
+  <div className="min-w-0">
+    <input
+      list="person-options"
+      value={personFilter === "all" ? "" : personFilter}
+      onChange={(e) => setPersonFilter(e.target.value || "all")}
+      placeholder="Select or type person"
+      className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+    />
+    <datalist id="person-options">
+      <option value="all">All Persons</option>
+      {Array.from(new Set(pendingFollowUps.map((item) => item.personName)))
+        .filter(Boolean)
+        .map((person) => (
+          <option key={person} value={person} />
+        ))}
+    </datalist>
+  </div>
+)}
+
+
+              {/* Phone Number Filter - Only show for pending tab */}
+              {activeTab === "pending" && (
+  <div className="min-w-0">
+    <input
+      list="phone-options"
+      value={phoneFilter === "all" ? "" : phoneFilter}
+      onChange={(e) => setPhoneFilter(e.target.value || "all")}
+      placeholder="Select or type number"
+      className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+    />
+    <datalist id="phone-options">
+      <option value="all">All Numbers</option>
+      {Array.from(
+        new Set(
+          pendingFollowUps
+            .map((item) => (item.phoneNumber ? item.phoneNumber.toString().trim() : ""))
+            .filter(Boolean),
+        ),
+      ).map((phone) => (
+        <option key={phone} value={phone} />
+      ))}
+    </datalist>
+  </div>
+)}
+
+              {/* Date Filter */}
+              {/* Date Filter */}
+<div className="min-w-0">
+  <select
+    value={dateFilter}
+    onChange={(e) => setDateFilter(e.target.value)}
+    className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+  >
+    <option value="all">All</option>
+    <option value="today">Today ({dateFilterCounts.today})</option>
+    <option value="overdue">Overdue ({dateFilterCounts.overdue})</option>
+    <option value="upcoming">Upcoming ({dateFilterCounts.upcoming})</option>
+  </select>
+</div>
+
+              {/* Filter Dropdown */}
+              <div className="min-w-0">
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Column B - Lead ID */}
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-500">Lead Number</p>
-                  <p className="text-base font-semibold">{selectedFollowUp?.leadId}</p>
-                </div>
-
-                {/* Column C - Person Name */}
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-500">Person Name</p>
-                  <p className="text-base">{selectedFollowUp?.personName}</p>
-                </div>
-
-                {/* Phone Number */}
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-500">Phone Number</p>
-                  <p className="text-base">{selectedFollowUp?.phoneNumber}</p>
-                </div>
-
-                {/* Column D - Lead Source */}
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-500">Lead Source</p>
-                  <p className="text-base">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        selectedFollowUp?.priority === "High"
-                          ? "bg-red-100 text-red-800"
-                          : selectedFollowUp?.priority === "Medium"
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-slate-100 text-slate-800"
-                      }`}
-                    >
-                      {selectedFollowUp?.leadSource}
-                    </span>
-                  </p>
-                </div>
-
-                {/* Column G - Company Name */}
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-500">Company Name</p>
-                  <p className="text-base">{selectedFollowUp?.companyName}</p>
-                </div>
-
-                {/* Column J - Location */}
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-500">Location</p>
-                  <p className="text-base">{selectedFollowUp?.location}</p>
-                </div>
-
-                {/* Column K - Created At (using id as placeholder) */}
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-500">Created Date</p>
-                  <p className="text-base">{formatPopupDate(selectedFollowUp?.createdAt)}</p>
-                </div>
-
-                {/* Column L - Priority (derived from lead source) */}
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-500">Priority</p>
-                  <p className="text-base">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        selectedFollowUp?.priority === "High"
-                          ? "bg-red-100 text-red-800"
-                          : selectedFollowUp?.priority === "Medium"
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-slate-100 text-slate-800"
-                      }`}
-                    >
-                      {selectedFollowUp?.priority}
-                    </span>
-                  </p>
-                </div>
-              </div>
-
-              {/* Customer Say - Full width */}
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-500">What Customer Said</p>
-                <div className="p-4 bg-gray-50 rounded-md">
-                  <p className="text-base">{selectedFollowUp?.customerSay}</p>
-                </div>
-              </div>
-
-              {/* Enquiry Status - Full width */}
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-500">Enquiry Status</p>
-                <p className="text-base">{selectedFollowUp?.enquiryStatus}</p>
+                  <option value="all">All</option>
+                  <option value="first">First Followup</option>
+                  <option value="multi">Expected</option>
+                </select>
               </div>
             </div>
 
-            <div className="border-t p-4 flex justify-end space-x-3">
-              <button
-                onClick={() => setShowPopup(false)}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
-              >
-                Close
-              </button>
-              <Link to={`/follow-up/new?leadId=${selectedFollowUp?.leadId}&leadNo=${selectedFollowUp?.leadId}`}>
-                <button className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500">
-                  Call Now <ArrowRightIcon className="ml-1 h-4 w-4 inline" />
-                </button>
-              </Link>
+            {/* Search Input - Full width on mobile */}
+            <div className="relative w-full lg:w-auto lg:min-w-[250px]">
+              <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
+              <input
+                type="search"
+                placeholder="Search follow-ups..."
+                className="pl-8 w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
           </div>
         </div>
-      )}
+
+        {/* Main Content Card */}
+        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+          {/* Card Header */}
+          <div className="p-4 sm:p-6 border-b border-gray-200">
+            <h2 className="text-lg sm:text-xl font-bold text-gray-900">All Follow-Ups</h2>
+          </div>
+
+          {/* Card Content */}
+          <div className="p-4 sm:p-6">
+            {/* Tab Navigation - Responsive */}
+            <div className="mb-4 sm:mb-6">
+              <div className="inline-flex w-full sm:w-auto rounded-md shadow-sm">
+                <button
+                  onClick={() => setActiveTab("pending")}
+                  className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-l-md transition-colors ${
+                    activeTab === "pending"
+                      ? "bg-amber-100 text-amber-800 border-amber-200"
+                      : "bg-white text-slate-700 hover:bg-slate-50 border-gray-300"
+                  } border`}
+                >
+                  Pending
+                </button>
+                <button
+                  onClick={() => setActiveTab("history")}
+                  className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-r-md transition-colors ${
+                    activeTab === "history"
+                      ? "bg-amber-100 text-amber-800 border-amber-200"
+                      : "bg-white text-slate-700 hover:bg-slate-50 border-gray-300"
+                  } border border-l-0`}
+                >
+                  History
+                </button>
+              </div>
+            </div>
+
+            {/* Loading State */}
+            {isLoading ? (
+              <div className="p-8 text-center">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-amber-600"></div>
+                <p className="text-slate-500 mt-4">Loading follow-up data...</p>
+              </div>
+            ) : (
+              <>
+                {/* Pending Tab Content */}
+                {activeTab === "pending" && (
+                  <div className="overflow-x-auto -mx-4 sm:mx-0">
+                    <div className="inline-block min-w-full align-middle">
+                      <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-slate-50">
+                            <tr>
+                              <th
+                                scope="col"
+                                className="sticky left-0 z-10 bg-slate-50 px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200"
+                              >
+                                Actions
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap"
+                              >
+                                Lead No.
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap"
+                              >
+                                Company Name
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap"
+                              >
+                                Person Name
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap"
+                              >
+                                Phone No.
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap"
+                              >
+                                Lead Source
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap"
+                              >
+                                Location
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap"
+                              >
+                                Customer Say
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap"
+                              >
+                                Enquiry Status
+                              </th>
+                              {isAdmin() && (
+                                <th
+                                  scope="col"
+                                  className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap"
+                                >
+                                  Assigned To
+                                </th>
+                              )}
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {filteredPendingFollowUps.length > 0 ? (
+                              filteredPendingFollowUps.map((followUp, index) => (
+                                <tr key={`${followUp.leadId}-${index}`} className="hover:bg-slate-50 transition-colors">
+                                  <td className="sticky left-0 z-10 bg-white px-3 sm:px-4 py-3 sm:py-4 text-sm font-medium border-r border-gray-200">
+                                    <div className="flex flex-col sm:flex-row space-y-1 sm:space-y-0 sm:space-x-2">
+                                      <Link to={`/follow-up/new?leadId=${followUp.leadId}&leadNo=${followUp.leadId}`}>
+                                        <button className="w-full sm:w-auto px-2 sm:px-3 py-1 text-xs border border-amber-200 text-amber-600 hover:bg-amber-50 rounded-md transition-colors whitespace-nowrap">
+                                          Call Now <ArrowRightIcon className="ml-1 h-3 w-3 inline" />
+                                        </button>
+                                      </Link>
+                                    </div>
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
+                                    {followUp.leadId}
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                    <div
+                                      className="max-w-[120px] sm:max-w-[150px] truncate"
+                                      title={followUp.companyName}
+                                    >
+                                      {followUp.companyName}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                    <div
+                                      className="max-w-[100px] sm:max-w-[120px] truncate"
+                                      title={followUp.personName}
+                                    >
+                                      {followUp.personName}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                    {followUp.phoneNumber}
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4">
+                                    <span
+                                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                        followUp.priority === "High"
+                                          ? "bg-red-100 text-red-800"
+                                          : followUp.priority === "Medium"
+                                            ? "bg-amber-100 text-amber-800"
+                                            : "bg-slate-100 text-slate-800"
+                                      }`}
+                                    >
+                                      {followUp.leadSource}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                    <div className="max-w-[100px] sm:max-w-[120px] truncate" title={followUp.location}>
+                                      {followUp.location}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                    <div
+                                      className="max-w-[150px] sm:max-w-[200px] truncate"
+                                      title={followUp.customerSay}
+                                    >
+                                      {followUp.customerSay}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                    <div
+                                      className="max-w-[100px] sm:max-w-[120px] truncate"
+                                      title={followUp.enquiryStatus}
+                                    >
+                                      {followUp.enquiryStatus}
+                                    </div>
+                                  </td>
+                                  {isAdmin() && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                      {followUp.assignedTo}
+                                    </td>
+                                  )}
+                                </tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td
+                                  colSpan={isAdmin() ? 10 : 9}
+                                  className="px-4 py-8 text-center text-sm text-slate-500"
+                                >
+                                  <div className="flex flex-col items-center space-y-2">
+                                    <svg
+                                      className="h-12 w-12 text-gray-300"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={1}
+                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                      />
+                                    </svg>
+                                    <p>No pending follow-ups found</p>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* History Tab Content */}
+                {activeTab === "history" && (
+                  <div className="overflow-x-auto -mx-4 sm:mx-0">
+                    <div className="inline-block min-w-full align-middle">
+                      <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-slate-50 sticky top-0">
+                            <tr>
+                              {[
+                                "Lead No.",
+                                "Customer Say",
+                                "Status",
+                                "Enquiry Status",
+                                "Received Date",
+                                "State",
+                                "Project Name",
+                                "Sales Type",
+                                "Product Date",
+                                "Project Value",
+                                "Item 1",
+                                "Qty 1",
+                                "Item 2",
+                                "Qty 2",
+                                "Item 3",
+                                "Qty 3",
+                                "Item 4",
+                                "Qty 4",
+                                "Item 5",
+                                "Qty 5",
+                                "Next Action",
+                                "Call Date",
+                                "Call Time",
+                              ].map((header) => (
+                                <th
+                                  key={header}
+                                  className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap"
+                                >
+                                  {header}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {filteredHistoryFollowUps.length > 0 ? (
+                              filteredHistoryFollowUps.map((followUp, index) => (
+                                <tr key={index} className="hover:bg-slate-50 transition-colors">
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
+                                    {followUp.leadNo}
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                    <div
+                                      className="max-w-[150px] sm:max-w-[200px] truncate"
+                                      title={followUp.customerSay}
+                                    >
+                                      {followUp.customerSay}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4">
+                                    <span
+                                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                        followUp.status === "Completed"
+                                          ? "bg-green-100 text-green-800"
+                                          : followUp.status === "Pending"
+                                            ? "bg-amber-100 text-amber-800"
+                                            : "bg-red-100 text-red-800"
+                                      }`}
+                                    >
+                                      {followUp.status}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                    <div
+                                      className="max-w-[100px] sm:max-w-[120px] truncate"
+                                      title={followUp.enquiryReceivedStatus}
+                                    >
+                                      {followUp.enquiryReceivedStatus}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                    {followUp.enquiryReceivedDate}
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                    <div
+                                      className="max-w-[80px] sm:max-w-[100px] truncate"
+                                      title={followUp.enquiryState}
+                                    >
+                                      {followUp.enquiryState}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                    <div
+                                      className="max-w-[100px] sm:max-w-[120px] truncate"
+                                      title={followUp.projectName}
+                                    >
+                                      {followUp.projectName}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                    {followUp.salesType}
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                    {followUp.requiredProductDate}
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                    {followUp.projectApproxValue}
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                    <div className="max-w-[100px] sm:max-w-[120px] truncate" title={followUp.itemName1}>
+                                      {followUp.itemName1}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                    {followUp.quantity1}
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                    <div className="max-w-[100px] sm:max-w-[120px] truncate" title={followUp.itemName2}>
+                                      {followUp.itemName2}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                    {followUp.quantity2}
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                    <div className="max-w-[100px] sm:max-w-[120px] truncate" title={followUp.itemName3}>
+                                      {followUp.itemName3}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                    {followUp.quantity3}
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                    <div className="max-w-[100px] sm:max-w-[120px] truncate" title={followUp.itemName4}>
+                                      {followUp.itemName4}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                    {followUp.quantity4}
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                    <div className="max-w-[100px] sm:max-w-[120px] truncate" title={followUp.itemName5}>
+                                      {followUp.itemName5}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                    {followUp.quantity5}
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                    <div
+                                      className="max-w-[100px] sm:max-w-[120px] truncate"
+                                      title={followUp.nextAction}
+                                    >
+                                      {followUp.nextAction}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                    {followUp.nextCallDate}
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                    {followUp.nextCallTime}
+                                  </td>
+                                </tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan={23} className="px-4 py-8 text-center text-sm text-slate-500">
+                                  <div className="flex flex-col items-center space-y-2">
+                                    <svg
+                                      className="h-12 w-12 text-gray-300"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={1}
+                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                      />
+                                    </svg>
+                                    <p>No history found</p>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Responsive Popup Modal */}
+        {showPopup && (
+          <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${fadeIn}`}>
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowPopup(false)}></div>
+            <div
+              className={`relative bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden ${slideIn}`}
+            >
+              {/* Modal Header - Sticky */}
+              <div className="sticky top-0 bg-white border-b p-4 sm:p-6 flex justify-between items-center z-10">
+                <h3 className="text-lg sm:text-xl font-bold text-gray-900 truncate pr-4">
+                  Follow-up Details: {selectedFollowUp?.leadId}
+                </h3>
+                <button
+                  onClick={() => setShowPopup(false)}
+                  className="flex-shrink-0 text-gray-500 hover:text-gray-700 focus:outline-none p-1"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-6 w-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Modal Content - Scrollable */}
+              <div className="overflow-y-auto max-h-[calc(90vh-140px)]">
+                <div className="p-4 sm:p-6 space-y-6">
+                  {/* Responsive Grid Layout */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                    {/* Lead Number */}
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-500">Lead Number</p>
+                      <p className="text-base font-semibold break-words">{selectedFollowUp?.leadId}</p>
+                    </div>
+
+                    {/* Person Name */}
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-500">Person Name</p>
+                      <p className="text-base break-words">{selectedFollowUp?.personName}</p>
+                    </div>
+
+                    {/* Phone Number */}
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-500">Phone Number</p>
+                      <p className="text-base break-words">{selectedFollowUp?.phoneNumber}</p>
+                    </div>
+
+                    {/* Lead Source */}
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-500">Lead Source</p>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          selectedFollowUp?.priority === "High"
+                            ? "bg-red-100 text-red-800"
+                            : selectedFollowUp?.priority === "Medium"
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-slate-100 text-slate-800"
+                        }`}
+                      >
+                        {selectedFollowUp?.leadSource}
+                      </span>
+                    </div>
+
+                    {/* Company Name */}
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-500">Company Name</p>
+                      <p className="text-base break-words">{selectedFollowUp?.companyName}</p>
+                    </div>
+
+                    {/* Location */}
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-500">Location</p>
+                      <p className="text-base break-words">{selectedFollowUp?.location}</p>
+                    </div>
+
+                    {/* Created Date */}
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-500">Created Date</p>
+                      <p className="text-base">{formatPopupDate(selectedFollowUp?.createdAt)}</p>
+                    </div>
+
+                    {/* Priority */}
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-500">Priority</p>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          selectedFollowUp?.priority === "High"
+                            ? "bg-red-100 text-red-800"
+                            : selectedFollowUp?.priority === "Medium"
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-slate-100 text-slate-800"
+                        }`}
+                      >
+                        {selectedFollowUp?.priority}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Customer Say - Full width */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-500">What Customer Said</p>
+                    <div className="p-4 bg-gray-50 rounded-md">
+                      <p className="text-base break-words">{selectedFollowUp?.customerSay}</p>
+                    </div>
+                  </div>
+
+                  {/* Enquiry Status - Full width */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-500">Enquiry Status</p>
+                    <p className="text-base break-words">{selectedFollowUp?.enquiryStatus}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer - Sticky */}
+              <div className="sticky bottom-0 border-t bg-white p-4 sm:p-6 flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3">
+                <button
+                  onClick={() => setShowPopup(false)}
+                  className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-colors"
+                >
+                  Close
+                </button>
+                <Link
+                  to={`/follow-up/new?leadId=${selectedFollowUp?.leadId}&leadNo=${selectedFollowUp?.leadId}`}
+                  className="w-full sm:w-auto"
+                >
+                  <button className="w-full px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-colors">
+                    Call Now <ArrowRightIcon className="ml-1 h-4 w-4 inline" />
+                  </button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -556,7 +556,7 @@ const fetchLatestQuotationNumber = async (enquiryNo) => {
         Make Quotation
       </label>
     </div>
-    <div className="flex items-center space-x-2">
+    {/* <div className="flex items-center space-x-2">
       <input
         type="radio"
         id="quotation-validation"
@@ -583,7 +583,7 @@ const fetchLatestQuotationNumber = async (enquiryNo) => {
       <label htmlFor="quotation-validation" className="text-sm text-gray-700">
         Quotation Validation
       </label>
-    </div>
+    </div> */}
     <div className="flex items-center space-x-2">
       <input
         type="radio"
