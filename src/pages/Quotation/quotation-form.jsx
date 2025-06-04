@@ -115,10 +115,10 @@ const QuotationForm = ({
               const referenceName = row.c[21] ? row.c[21].v : ""
               if (referenceName && !referenceOptionsData.includes(referenceName)) {
                 referenceOptionsData.push(referenceName)
-          
+
                 referenceDetailsMap[referenceName] = {
                   mobile: row.c[22] ? row.c[22].v : "",
-                  phone: row.c[83] ? row.c[83].v : "" // Add phone number from column CF
+                  phone: row.c[83] ? row.c[83].v : "", // Add phone number from column CF
                 }
               }
             }
@@ -244,6 +244,11 @@ const QuotationForm = ({
     fetchProductData()
   }, [])
 
+  // NEW: Function to handle quotation number updates
+  const handleQuotationNumberUpdate = (newQuotationNumber) => {
+    handleInputChange("quotationNo", newQuotationNumber)
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -277,6 +282,7 @@ const QuotationForm = ({
             handleInputChange={handleInputChange}
             companyOptions={companyOptions}
             dropdownData={dropdownData}
+            onQuotationNumberUpdate={handleQuotationNumberUpdate}
           />
         </div>
       </div>

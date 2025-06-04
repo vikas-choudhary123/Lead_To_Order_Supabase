@@ -1,7 +1,15 @@
 "use client"
 
-const ConsigneeDetails = ({ quotationData, handleInputChange, companyOptions, dropdownData }) => {
-  const handleCompanyChange = (e) => {
+import { getCompanyPrefix, getNextQuotationNumber } from "./quotation-service"
+
+const ConsigneeDetails = ({ 
+  quotationData, 
+  handleInputChange, 
+  companyOptions, 
+  dropdownData,
+  onQuotationNumberUpdate // New prop to update quotation number
+}) => {
+  const handleCompanyChange = async (e) => {
     const selectedCompany = e.target.value
     handleInputChange("consigneeName", selectedCompany)
 
@@ -14,6 +22,19 @@ const ConsigneeDetails = ({ quotationData, handleInputChange, companyOptions, dr
       handleInputChange("consigneeContactNo", companyDetails.contactNo)
       handleInputChange("consigneeGSTIN", companyDetails.gstin)
       handleInputChange("consigneeStateCode", companyDetails.stateCode)
+
+      // NEW: Get company prefix and update quotation number
+      try {
+        const companyPrefix = await getCompanyPrefix(selectedCompany)
+        const newQuotationNumber = await getNextQuotationNumber(companyPrefix)
+        
+        // Update quotation number through callback
+        if (onQuotationNumberUpdate) {
+          onQuotationNumberUpdate(newQuotationNumber)
+        }
+      } catch (error) {
+        console.error("Error updating quotation number:", error)
+      }
     } else {
       handleInputChange("consigneeAddress", "")
       handleInputChange("consigneeState", "")
@@ -30,18 +51,18 @@ const ConsigneeDetails = ({ quotationData, handleInputChange, companyOptions, dr
       <div className="space-y-4">
         <div className="space-y-2">
           <label className="block text-sm font-medium">Company Name</label>
-          <select
+          <input
+            list="companyOptions"
             value={quotationData.consigneeName}
             onChange={handleCompanyChange}
             className="w-full p-2 border border-gray-300 rounded-md"
             required
-          >
+          />
+          <datalist id="companyOptions">
             {companyOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
+              <option key={option} value={option} />
             ))}
-          </select>
+          </datalist>
         </div>
 
         <div className="space-y-2">

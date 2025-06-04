@@ -24,6 +24,34 @@ function FollowUp() {
   const [companyFilter, setCompanyFilter] = useState("all")
   const [personFilter, setPersonFilter] = useState("all")
   const [phoneFilter, setPhoneFilter] = useState("all")
+  const [visibleColumns, setVisibleColumns] = useState({
+    timestamp: true,
+    leadNo: true,
+    companyName: true,
+    customerSay: true,
+    status: true,
+    enquiryStatus: true,
+    receivedDate: true,
+    state: true,
+    projectName: true,
+    salesType: true,
+    productDate: true,
+    projectValue: true,
+    item1: true,
+    qty1: true,
+    item2: true,
+    qty2: true,
+    item3: true,
+    qty3: true,
+    item4: true,
+    qty4: true,
+    item5: true,
+    qty5: true,
+    nextAction: true,
+    callDate: true,
+    callTime: true,
+  })
+  const [showColumnDropdown, setShowColumnDropdown] = useState(false)
 
   // Helper function to determine priority based on lead source
   const determinePriority = (source) => {
@@ -161,23 +189,53 @@ function FollowUp() {
   const checkDateFilter = (followUp, filterType) => {
     if (filterType === "all") return true
 
-    // Get the text value from column CL (nextCallDate field)
-    const columnCLValue = followUp.nextCallDate
-    if (!columnCLValue) return false
+    if (activeTab === "pending") {
+      // Get the text value from column CL (nextCallDate field)
+      const columnCLValue = followUp.nextCallDate
+      if (!columnCLValue) return false
 
-    // Convert the column CL value to lowercase for comparison
-    const columnCLText = String(columnCLValue).toLowerCase()
+      // Convert the column CL value to lowercase for comparison
+      const columnCLText = String(columnCLValue).toLowerCase()
 
-    // Match the filter type with the text in column CL
-    switch (filterType) {
-      case "today":
-        return columnCLText.includes("today")
-      case "overdue":
-        return columnCLText.includes("overdue")
-      case "upcoming":
-        return columnCLText.includes("upcoming")
-      default:
-        return true
+      // Match the filter type with the text in column CL
+      switch (filterType) {
+        case "today":
+          return columnCLText.includes("today")
+        case "overdue":
+          return columnCLText.includes("overdue")
+        case "upcoming":
+          return columnCLText.includes("upcoming")
+        default:
+          return true
+      }
+    } else {
+      // History tab filtering
+      const nextCallDate = followUp.nextCallDate
+      if (!nextCallDate) return false
+
+      try {
+        // Parse the date from DD/MM/YYYY format
+        const [day, month, year] = nextCallDate.split("/")
+        const followUpDate = new Date(year, month - 1, day)
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+
+        switch (filterType) {
+          case "today":
+            return (
+              followUpDate.getDate() === today.getDate() &&
+              followUpDate.getMonth() === today.getMonth() &&
+              followUpDate.getFullYear() === today.getFullYear()
+            )
+          case "older":
+            return followUpDate < today
+          default:
+            return true
+        }
+      } catch (error) {
+        console.error("Error parsing date:", error)
+        return false
+      }
     }
   }
 
@@ -233,6 +291,7 @@ function FollowUp() {
               // Only include rows where column K has data, column L is null/empty, and user has access
               if (hasColumnK && isColumnLEmpty && shouldInclude) {
                 const followUpItem = {
+                  timestamp: row.c[27] ? formatDateToDDMMYYYY(row.c[27].v) : "", // Column A (index 0)
                   id: row.c[0] ? row.c[0].v : "",
                   leadId: row.c[1] ? row.c[1].v : "",
                   companyName: row.c[4] ? row.c[4].v : "",
@@ -271,7 +330,9 @@ function FollowUp() {
 
               if (shouldInclude) {
                 const followUpItem = {
+                  timestamp: row.c[0] ? formatDateToDDMMYYYY(row.c[0].v) : "", // Column A (index 0)
                   leadNo: row.c[1] ? row.c[1].v : "",
+                  companyName: row.c[26] ? row.c[26].v : "", // Column AA (index 26)
                   customerSay: row.c[2] ? row.c[2].v : "",
                   status: row.c[3] ? row.c[3].v : "",
                   enquiryReceivedStatus: row.c[4] ? row.c[4].v : "",
@@ -499,46 +560,111 @@ function FollowUp() {
     return matchesSearch && matchesFilterType && matchesDateFilter
   })
 
-
   // Add this function inside your FollowUp component
-const calculateDateFilterCounts = () => {
-  const counts = {
-    today: 0,
-    overdue: 0,
-    upcoming: 0
-  };
+  const calculateDateFilterCounts = () => {
+    const counts = {
+      today: 0,
+      overdue: 0,
+      upcoming: 0,
+      older: 0,
+    }
 
-  // Calculate counts for pending follow-ups
-  pendingFollowUps.forEach(followUp => {
-    const columnCLValue = followUp.nextCallDate;
-    if (!columnCLValue) return;
+    // Calculate counts for pending follow-ups
+    pendingFollowUps.forEach((followUp) => {
+      const columnCLValue = followUp.nextCallDate
+      if (!columnCLValue) return
 
-    const columnCLText = String(columnCLValue).toLowerCase();
-    
-    if (columnCLText.includes("today")) counts.today++;
-    if (columnCLText.includes("overdue")) counts.overdue++;
-    if (columnCLText.includes("upcoming")) counts.upcoming++;
-  });
+      const columnCLText = String(columnCLValue).toLowerCase()
 
-  // Calculate counts for history follow-ups if needed
-  if (activeTab === "history") {
-    historyFollowUps.forEach(followUp => {
-      const columnZValue = followUp.historyDateFilter;
-      if (!columnZValue) return;
+      if (columnCLText.includes("today")) counts.today++
+      if (columnCLText.includes("overdue")) counts.overdue++
+      if (columnCLText.includes("upcoming")) counts.upcoming++
+    })
 
-      const columnZText = String(columnZValue).toLowerCase();
-      
-      if (columnZText.includes("today")) counts.today++;
-      if (columnZText.includes("overdue")) counts.overdue++;
-      if (columnZText.includes("upcoming")) counts.upcoming++;
-    });
+    // Calculate counts for history follow-ups
+    historyFollowUps.forEach((followUp) => {
+      const nextCallDate = followUp.nextCallDate
+      if (!nextCallDate) return
+
+      try {
+        const [day, month, year] = nextCallDate.split("/")
+        const followUpDate = new Date(year, month - 1, day)
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+
+        if (
+          followUpDate.getDate() === today.getDate() &&
+          followUpDate.getMonth() === today.getMonth() &&
+          followUpDate.getFullYear() === today.getFullYear()
+        ) {
+          counts.today++
+        } else if (followUpDate < today) {
+          counts.older++
+        }
+      } catch (error) {
+        console.error("Error parsing date:", error)
+      }
+    })
+
+    return counts
   }
 
-  return counts;
-};
+  const handleColumnToggle = (columnKey) => {
+    setVisibleColumns((prev) => ({
+      ...prev,
+      [columnKey]: !prev[columnKey],
+    }))
+  }
 
-// Get the counts
-const dateFilterCounts = calculateDateFilterCounts();
+  const handleSelectAll = () => {
+    const allSelected = Object.values(visibleColumns).every(Boolean)
+    const newState = Object.fromEntries(Object.keys(visibleColumns).map((key) => [key, !allSelected]))
+    setVisibleColumns(newState)
+  }
+
+  const columnOptions = [
+    { key: "timestamp", label: "Timestamp" },
+    { key: "leadNo", label: "Lead No." },
+    { key: "companyName", label: "Company Name" },
+    { key: "customerSay", label: "Customer Say" },
+    { key: "status", label: "Status" },
+    { key: "enquiryStatus", label: "Enquiry Status" },
+    { key: "receivedDate", label: "Received Date" },
+    { key: "state", label: "State" },
+    { key: "projectName", label: "Project Name" },
+    { key: "salesType", label: "Sales Type" },
+    { key: "productDate", label: "Product Date" },
+    { key: "projectValue", label: "Project Value" },
+    { key: "item1", label: "Item 1" },
+    { key: "qty1", label: "Qty 1" },
+    { key: "item2", label: "Item 2" },
+    { key: "qty2", label: "Qty 2" },
+    { key: "item3", label: "Item 3" },
+    { key: "qty3", label: "Qty 3" },
+    { key: "item4", label: "Item 4" },
+    { key: "qty4", label: "Qty 4" },
+    { key: "item5", label: "Item 5" },
+    { key: "qty5", label: "Qty 5" },
+    { key: "nextAction", label: "Next Action" },
+    { key: "callDate", label: "Call Date" },
+    { key: "callTime", label: "Call Time" },
+  ]
+
+  // Get the counts
+  const dateFilterCounts = calculateDateFilterCounts()
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showColumnDropdown && !event.target.closest(".relative")) {
+        setShowColumnDropdown(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [showColumnDropdown])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -560,88 +686,154 @@ const dateFilterCounts = calculateDateFilterCounts();
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-row gap-2 lg:gap-3">
               {/* Company Name Filter - Only show for pending tab */}
               {activeTab === "pending" && (
-  <div className="min-w-0">
-    <input
-      list="company-options"
-      value={companyFilter === "all" ? "" : companyFilter}
-      onChange={(e) => setCompanyFilter(e.target.value || "all")}
-      placeholder="Select or type company"
-      className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
-    />
-    <datalist id="company-options">
-      <option value="all">All Companies</option>
-      {Array.from(new Set(pendingFollowUps.map((item) => item.companyName)))
-        .filter(Boolean)
-        .map((company) => (
-          <option key={company} value={company} />
-        ))}
-    </datalist>
-  </div>
-)}
-
-
+                <div className="min-w-0">
+                  <input
+                    list="company-options"
+                    value={companyFilter === "all" ? "" : companyFilter}
+                    onChange={(e) => setCompanyFilter(e.target.value || "all")}
+                    placeholder="Select or type company"
+                    className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                  />
+                  <datalist id="company-options">
+                    <option value="all">All Companies</option>
+                    {Array.from(new Set(pendingFollowUps.map((item) => item.companyName)))
+                      .filter(Boolean)
+                      .map((company) => (
+                        <option key={company} value={company} />
+                      ))}
+                  </datalist>
+                </div>
+              )}
 
               {/* Person Name Filter - Only show for pending tab */}
               {activeTab === "pending" && (
-  <div className="min-w-0">
-    <input
-      list="person-options"
-      value={personFilter === "all" ? "" : personFilter}
-      onChange={(e) => setPersonFilter(e.target.value || "all")}
-      placeholder="Select or type person"
-      className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
-    />
-    <datalist id="person-options">
-      <option value="all">All Persons</option>
-      {Array.from(new Set(pendingFollowUps.map((item) => item.personName)))
-        .filter(Boolean)
-        .map((person) => (
-          <option key={person} value={person} />
-        ))}
-    </datalist>
-  </div>
-)}
-
+                <div className="min-w-0">
+                  <input
+                    list="person-options"
+                    value={personFilter === "all" ? "" : personFilter}
+                    onChange={(e) => setPersonFilter(e.target.value || "all")}
+                    placeholder="Select or type person"
+                    className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                  />
+                  <datalist id="person-options">
+                    <option value="all">All Persons</option>
+                    {Array.from(new Set(pendingFollowUps.map((item) => item.personName)))
+                      .filter(Boolean)
+                      .map((person) => (
+                        <option key={person} value={person} />
+                      ))}
+                  </datalist>
+                </div>
+              )}
 
               {/* Phone Number Filter - Only show for pending tab */}
               {activeTab === "pending" && (
-  <div className="min-w-0">
-    <input
-      list="phone-options"
-      value={phoneFilter === "all" ? "" : phoneFilter}
-      onChange={(e) => setPhoneFilter(e.target.value || "all")}
-      placeholder="Select or type number"
-      className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
-    />
-    <datalist id="phone-options">
-      <option value="all">All Numbers</option>
-      {Array.from(
-        new Set(
-          pendingFollowUps
-            .map((item) => (item.phoneNumber ? item.phoneNumber.toString().trim() : ""))
-            .filter(Boolean),
-        ),
-      ).map((phone) => (
-        <option key={phone} value={phone} />
-      ))}
-    </datalist>
-  </div>
-)}
+                <div className="min-w-0">
+                  <input
+                    list="phone-options"
+                    value={phoneFilter === "all" ? "" : phoneFilter}
+                    onChange={(e) => setPhoneFilter(e.target.value || "all")}
+                    placeholder="Select or type number"
+                    className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                  />
+                  <datalist id="phone-options">
+                    <option value="all">All Numbers</option>
+                    {Array.from(
+                      new Set(
+                        pendingFollowUps
+                          .map((item) => (item.phoneNumber ? item.phoneNumber.toString().trim() : ""))
+                          .filter(Boolean),
+                      ),
+                    ).map((phone) => (
+                      <option key={phone} value={phone} />
+                    ))}
+                  </datalist>
+                </div>
+              )}
 
               {/* Date Filter */}
-              {/* Date Filter */}
-<div className="min-w-0">
-  <select
-    value={dateFilter}
-    onChange={(e) => setDateFilter(e.target.value)}
-    className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
-  >
-    <option value="all">All</option>
-    <option value="today">Today ({dateFilterCounts.today})</option>
-    <option value="overdue">Overdue ({dateFilterCounts.overdue})</option>
-    <option value="upcoming">Upcoming ({dateFilterCounts.upcoming})</option>
-  </select>
-</div>
+              <div className="min-w-0">
+                <select
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                >
+                  <option value="all">All</option>
+                  {activeTab === "pending" ? (
+                    <>
+                      <option value="today">Today ({dateFilterCounts.today})</option>
+                      <option value="overdue">Overdue ({dateFilterCounts.overdue})</option>
+                      <option value="upcoming">Upcoming ({dateFilterCounts.upcoming})</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="today">Today's Calls</option>
+                      <option value="older">Older Calls</option>
+                    </>
+                  )}
+                </select>
+              </div>
+
+              {/* Column Selection Dropdown - Only show for history tab */}
+              {activeTab === "history" && (
+                <div className="min-w-0 relative">
+                  <button
+                    onClick={() => setShowColumnDropdown(!showColumnDropdown)}
+                    className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white flex items-center justify-between"
+                  >
+                    <span>Select Columns</span>
+                    <svg
+                      className={`w-4 h-4 transition-transform ${showColumnDropdown ? "rotate-180" : ""}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {showColumnDropdown && (
+                    <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-300 rounded-md shadow-lg z-50 max-h-80 overflow-y-auto">
+                      <div className="p-2">
+                        {/* Select All Option */}
+                        <div className="flex items-center p-2 hover:bg-gray-50 rounded">
+                          <input
+                            type="checkbox"
+                            id="select-all"
+                            checked={Object.values(visibleColumns).every(Boolean)}
+                            onChange={handleSelectAll}
+                            className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
+                          />
+                          <label htmlFor="select-all" className="ml-2 text-sm font-medium text-gray-900 cursor-pointer">
+                            All Columns
+                          </label>
+                        </div>
+
+                        <hr className="my-2" />
+
+                        {/* Individual Column Options */}
+                        {columnOptions.map((option) => (
+                          <div key={option.key} className="flex items-center p-2 hover:bg-gray-50 rounded">
+                            <input
+                              type="checkbox"
+                              id={`column-${option.key}`}
+                              checked={visibleColumns[option.key]}
+                              onChange={() => handleColumnToggle(option.key)}
+                              className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
+                            />
+                            <label
+                              htmlFor={`column-${option.key}`}
+                              className="ml-2 text-sm text-gray-700 cursor-pointer flex-1"
+                            >
+                              {option.label}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Filter Dropdown */}
               <div className="min-w-0">
@@ -732,6 +924,12 @@ const dateFilterCounts = calculateDateFilterCounts();
                                 scope="col"
                                 className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap"
                               >
+                                Timestamp
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap"
+                              >
                                 Lead No.
                               </th>
                               <th
@@ -798,6 +996,9 @@ const dateFilterCounts = calculateDateFilterCounts();
                                         </button>
                                       </Link>
                                     </div>
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                    {followUp.timestamp}
                                   </td>
                                   <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
                                     {followUp.leadId}
@@ -902,163 +1103,335 @@ const dateFilterCounts = calculateDateFilterCounts();
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-slate-50 sticky top-0">
                             <tr>
-                              {[
-                                "Lead No.",
-                                "Customer Say",
-                                "Status",
-                                "Enquiry Status",
-                                "Received Date",
-                                "State",
-                                "Project Name",
-                                "Sales Type",
-                                "Product Date",
-                                "Project Value",
-                                "Item 1",
-                                "Qty 1",
-                                "Item 2",
-                                "Qty 2",
-                                "Item 3",
-                                "Qty 3",
-                                "Item 4",
-                                "Qty 4",
-                                "Item 5",
-                                "Qty 5",
-                                "Next Action",
-                                "Call Date",
-                                "Call Time",
-                              ].map((header) => (
-                                <th
-                                  key={header}
-                                  className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap"
-                                >
-                                  {header}
+                              {visibleColumns.timestamp && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Timestamp
                                 </th>
-                              ))}
+                              )}
+                              {visibleColumns.leadNo && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Lead No.
+                                </th>
+                              )}
+                              {visibleColumns.companyName && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Company Name
+                                </th>
+                              )}
+                              {visibleColumns.customerSay && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Customer Say
+                                </th>
+                              )}
+                              {visibleColumns.status && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Status
+                                </th>
+                              )}
+                              {visibleColumns.enquiryStatus && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Enquiry Status
+                                </th>
+                              )}
+                              {visibleColumns.receivedDate && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Received Date
+                                </th>
+                              )}
+                              {visibleColumns.state && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  State
+                                </th>
+                              )}
+                              {visibleColumns.projectName && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Project Name
+                                </th>
+                              )}
+                              {visibleColumns.salesType && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Sales Type
+                                </th>
+                              )}
+                              {visibleColumns.productDate && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Product Date
+                                </th>
+                              )}
+                              {visibleColumns.projectValue && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Project Value
+                                </th>
+                              )}
+                              {visibleColumns.item1 && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Item 1
+                                </th>
+                              )}
+                              {visibleColumns.qty1 && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Qty 1
+                                </th>
+                              )}
+                              {visibleColumns.item2 && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Item 2
+                                </th>
+                              )}
+                              {visibleColumns.qty2 && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Qty 2
+                                </th>
+                              )}
+                              {visibleColumns.item3 && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Item 3
+                                </th>
+                              )}
+                              {visibleColumns.qty3 && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Qty 3
+                                </th>
+                              )}
+                              {visibleColumns.item4 && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Item 4
+                                </th>
+                              )}
+                              {visibleColumns.qty4 && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Qty 4
+                                </th>
+                              )}
+                              {visibleColumns.item5 && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Item 5
+                                </th>
+                              )}
+                              {visibleColumns.qty5 && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Qty 5
+                                </th>
+                              )}
+                              {visibleColumns.nextAction && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Next Action
+                                </th>
+                              )}
+                              {visibleColumns.callDate && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Call Date
+                                </th>
+                              )}
+                              {visibleColumns.callTime && (
+                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                  Call Time
+                                </th>
+                              )}
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
                             {filteredHistoryFollowUps.length > 0 ? (
                               filteredHistoryFollowUps.map((followUp, index) => (
                                 <tr key={index} className="hover:bg-slate-50 transition-colors">
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
-                                    {followUp.leadNo}
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
-                                    <div
-                                      className="max-w-[150px] sm:max-w-[200px] truncate"
-                                      title={followUp.customerSay}
-                                    >
-                                      {followUp.customerSay}
-                                    </div>
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4">
-                                    <span
-                                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                        followUp.status === "Completed"
-                                          ? "bg-green-100 text-green-800"
-                                          : followUp.status === "Pending"
-                                            ? "bg-amber-100 text-amber-800"
-                                            : "bg-red-100 text-red-800"
-                                      }`}
-                                    >
-                                      {followUp.status}
-                                    </span>
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
-                                    <div
-                                      className="max-w-[100px] sm:max-w-[120px] truncate"
-                                      title={followUp.enquiryReceivedStatus}
-                                    >
-                                      {followUp.enquiryReceivedStatus}
-                                    </div>
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
-                                    {followUp.enquiryReceivedDate}
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
-                                    <div
-                                      className="max-w-[80px] sm:max-w-[100px] truncate"
-                                      title={followUp.enquiryState}
-                                    >
-                                      {followUp.enquiryState}
-                                    </div>
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
-                                    <div
-                                      className="max-w-[100px] sm:max-w-[120px] truncate"
-                                      title={followUp.projectName}
-                                    >
-                                      {followUp.projectName}
-                                    </div>
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
-                                    {followUp.salesType}
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
-                                    {followUp.requiredProductDate}
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
-                                    {followUp.projectApproxValue}
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
-                                    <div className="max-w-[100px] sm:max-w-[120px] truncate" title={followUp.itemName1}>
-                                      {followUp.itemName1}
-                                    </div>
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
-                                    {followUp.quantity1}
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
-                                    <div className="max-w-[100px] sm:max-w-[120px] truncate" title={followUp.itemName2}>
-                                      {followUp.itemName2}
-                                    </div>
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
-                                    {followUp.quantity2}
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
-                                    <div className="max-w-[100px] sm:max-w-[120px] truncate" title={followUp.itemName3}>
-                                      {followUp.itemName3}
-                                    </div>
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
-                                    {followUp.quantity3}
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
-                                    <div className="max-w-[100px] sm:max-w-[120px] truncate" title={followUp.itemName4}>
-                                      {followUp.itemName4}
-                                    </div>
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
-                                    {followUp.quantity4}
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
-                                    <div className="max-w-[100px] sm:max-w-[120px] truncate" title={followUp.itemName5}>
-                                      {followUp.itemName5}
-                                    </div>
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
-                                    {followUp.quantity5}
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
-                                    <div
-                                      className="max-w-[100px] sm:max-w-[120px] truncate"
-                                      title={followUp.nextAction}
-                                    >
-                                      {followUp.nextAction}
-                                    </div>
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
-                                    {followUp.nextCallDate}
-                                  </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
-                                    {followUp.nextCallTime}
-                                  </td>
+                                  {visibleColumns.timestamp && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                      {followUp.timestamp}
+                                    </td>
+                                  )}
+                                  {visibleColumns.leadNo && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
+                                      {followUp.leadNo}
+                                    </td>
+                                  )}
+                                  {visibleColumns.companyName && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                      <div
+                                        className="max-w-[120px] sm:max-w-[150px] truncate"
+                                        title={followUp.companyName}
+                                      >
+                                        {followUp.companyName}
+                                      </div>
+                                    </td>
+                                  )}
+                                  {visibleColumns.customerSay && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                      <div
+                                        className="max-w-[150px] sm:max-w-[200px] truncate"
+                                        title={followUp.customerSay}
+                                      >
+                                        {followUp.customerSay}
+                                      </div>
+                                    </td>
+                                  )}
+                                  {visibleColumns.status && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4">
+                                      <span
+                                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                          followUp.status === "Completed"
+                                            ? "bg-green-100 text-green-800"
+                                            : followUp.status === "Pending"
+                                              ? "bg-amber-100 text-amber-800"
+                                              : "bg-red-100 text-red-800"
+                                        }`}
+                                      >
+                                        {followUp.status}
+                                      </span>
+                                    </td>
+                                  )}
+                                  {visibleColumns.enquiryStatus && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                      <div
+                                        className="max-w-[100px] sm:max-w-[120px] truncate"
+                                        title={followUp.enquiryReceivedStatus}
+                                      >
+                                        {followUp.enquiryReceivedStatus}
+                                      </div>
+                                    </td>
+                                  )}
+                                  {visibleColumns.receivedDate && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                      {followUp.enquiryReceivedDate}
+                                    </td>
+                                  )}
+                                  {visibleColumns.state && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                      <div
+                                        className="max-w-[80px] sm:max-w-[100px] truncate"
+                                        title={followUp.enquiryState}
+                                      >
+                                        {followUp.enquiryState}
+                                      </div>
+                                    </td>
+                                  )}
+                                  {visibleColumns.projectName && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                      <div
+                                        className="max-w-[100px] sm:max-w-[120px] truncate"
+                                        title={followUp.projectName}
+                                      >
+                                        {followUp.projectName}
+                                      </div>
+                                    </td>
+                                  )}
+                                  {visibleColumns.salesType && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                      {followUp.salesType}
+                                    </td>
+                                  )}
+                                  {visibleColumns.productDate && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                      {followUp.requiredProductDate}
+                                    </td>
+                                  )}
+                                  {visibleColumns.projectValue && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                      {followUp.projectApproxValue}
+                                    </td>
+                                  )}
+                                  {visibleColumns.item1 && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                      <div
+                                        className="max-w-[100px] sm:max-w-[120px] truncate"
+                                        title={followUp.itemName1}
+                                      >
+                                        {followUp.itemName1}
+                                      </div>
+                                    </td>
+                                  )}
+                                  {visibleColumns.qty1 && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                      {followUp.quantity1}
+                                    </td>
+                                  )}
+                                  {visibleColumns.item2 && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                      <div
+                                        className="max-w-[100px] sm:max-w-[120px] truncate"
+                                        title={followUp.itemName2}
+                                      >
+                                        {followUp.itemName2}
+                                      </div>
+                                    </td>
+                                  )}
+                                  {visibleColumns.qty2 && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                      {followUp.quantity2}
+                                    </td>
+                                  )}
+                                  {visibleColumns.item3 && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                      <div
+                                        className="max-w-[100px] sm:max-w-[120px] truncate"
+                                        title={followUp.itemName3}
+                                      >
+                                        {followUp.itemName3}
+                                      </div>
+                                    </td>
+                                  )}
+                                  {visibleColumns.qty3 && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                      {followUp.quantity3}
+                                    </td>
+                                  )}
+                                  {visibleColumns.item4 && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                      <div
+                                        className="max-w-[100px] sm:max-w-[120px] truncate"
+                                        title={followUp.itemName4}
+                                      >
+                                        {followUp.itemName4}
+                                      </div>
+                                    </td>
+                                  )}
+                                  {visibleColumns.qty4 && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                      {followUp.quantity4}
+                                    </td>
+                                  )}
+                                  {visibleColumns.item5 && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                      <div
+                                        className="max-w-[100px] sm:max-w-[120px] truncate"
+                                        title={followUp.itemName5}
+                                      >
+                                        {followUp.itemName5}
+                                      </div>
+                                    </td>
+                                  )}
+                                  {visibleColumns.qty5 && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                      {followUp.quantity5}
+                                    </td>
+                                  )}
+                                  {visibleColumns.nextAction && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+                                      <div
+                                        className="max-w-[100px] sm:max-w-[120px] truncate"
+                                        title={followUp.nextAction}
+                                      >
+                                        {followUp.nextAction}
+                                      </div>
+                                    </td>
+                                  )}
+                                  {visibleColumns.callDate && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                      {followUp.nextCallDate}
+                                    </td>
+                                  )}
+                                  {visibleColumns.callTime && (
+                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+                                      {followUp.nextCallTime}
+                                    </td>
+                                  )}
                                 </tr>
                               ))
                             ) : (
                               <tr>
-                                <td colSpan={23} className="px-4 py-8 text-center text-sm text-slate-500">
+                                <td
+                                  colSpan={Object.values(visibleColumns).filter(Boolean).length}
+                                  className="px-4 py-8 text-center text-sm text-slate-500"
+                                >
                                   <div className="flex flex-col items-center space-y-2">
                                     <svg
                                       className="h-12 w-12 text-gray-300"

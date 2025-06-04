@@ -13,6 +13,7 @@ function NewCallTracker() {
   const [searchParams] = useSearchParams()
   const leadId = searchParams.get("leadId")
   const { showNotification } = useContext(AuthContext)
+  const [customerFeedbackOptions, setCustomerFeedbackOptions] = useState([])
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [currentStage, setCurrentStage] = useState("")
@@ -114,7 +115,7 @@ const fetchLatestQuotationNumber = async (enquiryNo) => {
 
   // Fetch dropdown options from DROPDOWN sheet column G
   useEffect(() => {
-    const fetchEnquiryStatusOptions = async () => {
+    const fetchDropdownOptions = async () => {
       try {
         setIsLoadingDropdown(true)
         
@@ -130,30 +131,37 @@ const fetchLatestQuotationNumber = async (enquiryNo) => {
         
         const data = JSON.parse(jsonData)
         
-        // Extract column G values (skip header row)
+        // Extract values from columns
         if (data && data.table && data.table.rows) {
-          const options = []
+          const statusOptions = []
+          const feedbackOptions = []
           
           // Skip the header row (index 0)
           data.table.rows.slice(0).forEach(row => {
-            // Column G is index 6
+            // Column G is index 6 for enquiry status
             if (row.c && row.c[6] && row.c[6].v) {
-              options.push(row.c[6].v)
+              statusOptions.push(row.c[6].v)
+            }
+            // Column CG is index 86 for customer feedback
+            if (row.c && row.c[84] && row.c[84].v) {
+              feedbackOptions.push(row.c[84].v.toString())
             }
           })
           
-          setEnquiryStatusOptions(options)
+          setEnquiryStatusOptions(statusOptions)
+          setCustomerFeedbackOptions(feedbackOptions)
         }
       } catch (error) {
         console.error("Error fetching dropdown options:", error)
         // Fallback options if fetch fails
         setEnquiryStatusOptions(["hot", "warm", "cold"])
+        setCustomerFeedbackOptions(["Feedback 1", "Feedback 2", "Feedback 3"])
       } finally {
         setIsLoadingDropdown(false)
       }
     }
     
-    fetchEnquiryStatusOptions()
+    fetchDropdownOptions()
   }, [])
 
   // Update form data when leadId changes
@@ -523,18 +531,24 @@ const fetchLatestQuotationNumber = async (enquiryNo) => {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="customerFeedback" className="block text-sm font-medium text-gray-700">
-                What Did Customer Say
-              </label>
-              <textarea
-                id="customerFeedback"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 min-h-[100px]"
-                placeholder="Enter customer feedback"
-                value={formData.customerFeedback}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
+  <label htmlFor="customerFeedback" className="block text-sm font-medium text-gray-700">
+    What Did Customer Say
+  </label>
+  <input
+    list="customer-feedback-options"
+    id="customerFeedback"
+    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+    placeholder="Select or type customer feedback"
+    value={formData.customerFeedback}
+    onChange={handleInputChange}
+    required
+  />
+  <datalist id="customer-feedback-options">
+    {customerFeedbackOptions.map((feedback, index) => (
+      <option key={index} value={feedback} />
+    ))}
+  </datalist>
+</div>
 
 
 <div className="space-y-2">

@@ -10,6 +10,7 @@ function NewFollowUp() {
   const leadId = searchParams.get("leadId")
   const leadNo = searchParams.get("leadNo")
   const { showNotification } = useContext(AuthContext)
+  const [customerFeedbackOptions, setCustomerFeedbackOptions] = useState([])
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [enquiryStatus, setEnquiryStatus] = useState("")
@@ -54,6 +55,8 @@ function NewFollowUp() {
         const categories = []
         const nobs = []
         const approaches = [] // New array for enquiry approaches
+        const feedbackOptions = [] // New array for customer feedback (column CG - index 86)
+
 
         data.table.rows.slice(0).forEach((row) => {
           // Existing column processing...
@@ -61,10 +64,14 @@ function NewFollowUp() {
           if (row.c && row.c[3] && row.c[3].v) types.push(row.c[3].v.toString())
           if (row.c && row.c[76] && row.c[76].v) categories.push(row.c[76].v.toString())
           if (row.c && row.c[37] && row.c[37].v) nobs.push(row.c[37].v.toString())
-
+            // Add column CG (index 86) processing for customer feedback options
+          
           // Add column AM (index 38) processing
           if (row.c && row.c[38] && row.c[38].v) {
             approaches.push(row.c[38].v.toString())
+          }
+          if (row.c && row.c[84] && row.c[84].v) {
+            feedbackOptions.push(row.c[84].v.toString())
           }
         })
 
@@ -73,6 +80,7 @@ function NewFollowUp() {
         setProductCategories(categories)
         setNobOptions(nobs)
         setEnquiryApproachOptions(approaches) // Set the new state
+        setCustomerFeedbackOptions(feedbackOptions) // Set the customer feedback options
       }
     } catch (error) {
       console.error("Error fetching dropdown values:", error)
@@ -263,16 +271,22 @@ function NewFollowUp() {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="customerFeedback" className="block text-sm font-medium text-gray-700">
-                What did the customer say?
-              </label>
-              <textarea
-                id="customerFeedback"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 min-h-[100px]"
-                placeholder="Enter customer feedback"
-                required
-              />
-            </div>
+  <label htmlFor="customerFeedback" className="block text-sm font-medium text-gray-700">
+    What did the customer say?
+  </label>
+  <input
+    list="customer-feedback-options"
+    id="customerFeedback"
+    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+    placeholder="Select or type customer feedback"
+    required
+  />
+  <datalist id="customer-feedback-options">
+    {customerFeedbackOptions.map((feedback, index) => (
+      <option key={index} value={feedback} />
+    ))}
+  </datalist>
+</div>
 
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">Lead Status</label>

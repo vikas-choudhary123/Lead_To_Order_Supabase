@@ -32,6 +32,47 @@ function CallTracker() {
   const [showCallingDaysDropdown, setShowCallingDaysDropdown] = useState(false)
   const [showEnquiryNoDropdown, setShowEnquiryNoDropdown] = useState(false)
   const [showCurrentStageDropdown, setShowCurrentStageDropdown] = useState(false)
+  
+  const [visibleColumns, setVisibleColumns] = useState({
+    timestamp: true,
+    enquiryNo: true,
+    enquiryStatus: true,
+    customerFeedback: true,
+    currentStage: true,
+    sendQuotationNo: true,
+    quotationSharedBy: true,
+    quotationNumber: true,
+    valueWithoutTax: true,
+    valueWithTax: true,
+    quotationUpload: true,
+    quotationRemarks: true,
+    validatorName: true,
+    sendStatus: true,
+    validationRemark: true,
+    faqVideo: true,
+    productVideo: true,
+    offerVideo: true,
+    productCatalog: true,
+    productImage: true,
+    nextCallDate: true,
+    nextCallTime: true,
+    orderStatus: true,
+    acceptanceVia: true,
+    paymentMode: true,
+    paymentTerms: true,
+    transportMode: true,
+    registrationFrom: true,
+    orderVideo: true,
+    acceptanceFile: true,
+    orderRemark: true,
+    apologyVideo: true,
+    reasonStatus: true,
+    reasonRemark: true,
+    holdReason: true,
+    holdingDate: true,
+    holdRemark: true,
+  })
+  const [showColumnDropdown, setShowColumnDropdown] = useState(false)
 
   // Helper function to determine priority based on status
   const determinePriority = (status) => {
@@ -56,7 +97,7 @@ function CallTracker() {
 
         // JavaScript months are 0-indexed, but we need to display them as 1-indexed
         // Also ensure day and month are padded with leading zeros if needed
-        return `${day.toString().padStart(2, "0")}/${month.toString().padStart(2, "0")}/${year}`
+        return `${day.toString().padStart(2, "0")}/${(month + 1).toString().padStart(2, "0")}/${year}`
       }
 
       // Handle other date formats if needed
@@ -154,23 +195,92 @@ function CallTracker() {
     }
   }
 
-  // Helper function to check calling days filter
-  const matchesCallingDaysFilter = (dateStr, activeTab) => {
-    if (callingDaysFilter.length === 0) return true
-
-    return callingDaysFilter.some((filter) => {
+// Replace the matchesCallingDaysFilter function with this updated version
+const matchesCallingDaysFilter = (dateStr, activeTab) => {
+  if (callingDaysFilter.length === 0) return true;
+  
+  // Convert to lowercase for case-insensitive comparison
+  const dateText = dateStr ? dateStr.toLowerCase() : '';
+  
+  return callingDaysFilter.some((filter) => {
+    if (activeTab === "history") {
+      // Special handling for history tab
       switch (filter) {
         case "today":
-          return isToday(dateStr)
-        case "overdue":
-          return isOverdue(dateStr)
-        case "upcoming":
-          return isUpcoming(dateStr)
+          return isToday(dateStr); // Use the isToday helper function
+        case "older":
+          return !isToday(dateStr); // Older days call
         default:
-          return false
+          return false;
       }
-    })
-  }
+    } else {
+      // Original handling for other tabs
+      switch (filter) {
+        case "today":
+          return dateText.includes("today");
+        case "overdue":
+          return dateText.includes("overdue");
+        case "upcoming":
+          return dateText.includes("upcoming");
+        default:
+          return false;
+      }
+    }
+  });
+};
+
+const handleColumnToggle = (columnKey) => {
+  setVisibleColumns((prev) => ({
+    ...prev,
+    [columnKey]: !prev[columnKey],
+  }))
+}
+
+const handleSelectAll = () => {
+  const allSelected = Object.values(visibleColumns).every(Boolean)
+  const newState = Object.fromEntries(Object.keys(visibleColumns).map((key) => [key, !allSelected]))
+  setVisibleColumns(newState)
+}
+
+const columnOptions = [
+  { key: "timestamp", label: "Timestamp" },
+  { key: "enquiryNo", label: "Enquiry No." },
+  { key: "enquiryStatus", label: "Enquiry Status" },
+  { key: "customerFeedback", label: "What Did Customer Say" },
+  { key: "currentStage", label: "Current Stage" },
+  { key: "sendQuotationNo", label: "Send Quotation No." },
+  { key: "quotationSharedBy", label: "Quotation Shared By" },
+  { key: "quotationNumber", label: "Quotation Number" },
+  { key: "valueWithoutTax", label: "Value Without Tax" },
+  { key: "valueWithTax", label: "Value With Tax" },
+  { key: "quotationUpload", label: "Quotation Upload" },
+  { key: "quotationRemarks", label: "Quotation Remarks" },
+  { key: "validatorName", label: "Validator Name" },
+  { key: "sendStatus", label: "Send Status" },
+  { key: "validationRemark", label: "Validation Remark" },
+  { key: "faqVideo", label: "FAQ Video" },
+  { key: "productVideo", label: "Product Video" },
+  { key: "offerVideo", label: "Offer Video" },
+  { key: "productCatalog", label: "Product Catalog" },
+  { key: "productImage", label: "Product Image" },
+  { key: "nextCallDate", label: "Next Call Date" },
+  { key: "nextCallTime", label: "Next Call Time" },
+  { key: "orderStatus", label: "Order Status" },
+  { key: "acceptanceVia", label: "Acceptance Via" },
+  { key: "paymentMode", label: "Payment Mode" },
+  { key: "paymentTerms", label: "Payment Terms" },
+  { key: "transportMode", label: "Transport Mode" },
+  { key: "registrationFrom", label: "Registration From" },
+  { key: "orderVideo", label: "Order Video" },
+  { key: "acceptanceFile", label: "Acceptance File" },
+  { key: "orderRemark", label: "Remark" },
+  { key: "apologyVideo", label: "Apology Video" },
+  { key: "reasonStatus", label: "Reason Status" },
+  { key: "reasonRemark", label: "Reason Remark" },
+  { key: "holdReason", label: "Hold Reason" },
+  { key: "holdingDate", label: "Holding Date" },
+  { key: "holdRemark", label: "Hold Remark" },
+]
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -179,6 +289,7 @@ function CallTracker() {
         setShowCallingDaysDropdown(false)
         setShowEnquiryNoDropdown(false)
         setShowCurrentStageDropdown(false)
+        setShowColumnDropdown(false)
       }
     }
     
@@ -251,6 +362,7 @@ function CallTracker() {
               if (shouldInclude) {
                 const callTrackerItem = {
                   id: index + 1,
+                  timestamp: row.c[52] ? formatDateToDDMMYYYY(row.c[52].v) : "", // Column AB - Timestamp
                   leadId: row.c[1] ? row.c[1].v : "", // Column B - Lead Number
                   receiverName: row.c[2] ? row.c[2].v : "", // Column C - Lead Receiver Name
                   leadSource: row.c[3] ? row.c[3].v : "", // Column D - Lead Source
@@ -264,7 +376,8 @@ function CallTracker() {
                   dueDate: "", // You might want to add logic to calculate due date
                   assignedTo: assignedUser, // Add assigned user to the tracker item
                   currentStage: row.c[57] ? row.c[57].v : "", // Column BF - Current Stage
-                  callingDate: row.c[90] ? formatDateToDDMMYYYY(row.c[90].v) : "", // Column CM - Calling Date
+                  // callingDate: row.c[90] ? formatDateToDDMMYYYY(row.c[90].v) : "", // Column CM - Calling Date
+                  callingDate: row.c[90] ? String(row.c[90].v).toLowerCase() : "", // Column CM - Calling Date 
                 }
 
                 pendingCallTrackerData.push(callTrackerItem)
@@ -305,14 +418,14 @@ if (historyData && historyData.table && historyData.table.rows) {
           valueWithTax: row.c[9] ? row.c[9].v : "", // Column J - Value With Tax
           quotationUpload: row.c[10] ? row.c[10].v : "", // Column K - Quotation Upload
           quotationRemarks: row.c[11] ? row.c[11].v : "", // Column L - Quotation Remarks
-          validatorName: row.c[12] ? row.c[12].v : "", // Column M - Validator Name
-          sendStatus: row.c[13] ? row.c[13].v : "", // Column N - Send Status
-          validationRemark: row.c[14] ? row.c[14].v : "", // Column O - Validation Remark
-          faqVideo: row.c[15] ? row.c[15].v : "", // Column P - FAQ Video
-          productVideo: row.c[16] ? row.c[16].v : "", // Column Q - Product Video
-          offerVideo: row.c[17] ? row.c[17].v : "", // Column R - Offer Video
-          productCatalog: row.c[18] ? row.c[18].v : "", // Column S - Product Catalog
-          productImage: row.c[19] ? row.c[19].v : "", // Column T - Product Image
+          // validatorName: row.c[12] ? row.c[12].v : "", // Column M - Validator Name
+          // sendStatus: row.c[13] ? row.c[13].v : "", // Column N - Send Status
+          // validationRemark: row.c[14] ? row.c[14].v : "", // Column O - Validation Remark
+          // faqVideo: row.c[15] ? row.c[15].v : "", // Column P - FAQ Video
+          // productVideo: row.c[16] ? row.c[16].v : "", // Column Q - Product Video
+          // offerVideo: row.c[17] ? row.c[17].v : "", // Column R - Offer Video
+          // productCatalog: row.c[18] ? row.c[18].v : "", // Column S - Product Catalog
+          // productImage: row.c[19] ? row.c[19].v : "", // Column T - Product Image
           nextCallDate: formatDateToDDMMYYYY(row.c[20] ? row.c[20].v : ""), // Column U - Next Call Date
           nextCallTime: formatTimeTo12Hour(row.c[21] ? row.c[21].v : ""), // Column V - Next Call Time
           orderStatus: row.c[22] ? row.c[22].v : "", // Column W - Is Order Received? Status
@@ -331,7 +444,8 @@ if (historyData && historyData.table && historyData.table.rows) {
           holdingDate: formatDateToDDMMYYYY(row.c[35] ? row.c[35].v : ""), // Column AJ - Holding Date
           holdRemark: row.c[36] ? row.c[36].v : "", // Column AK - Hold Remark
           priority: determinePriority(row.c[2] ? row.c[2].v : ""), // Determine priority based on status
-          callingDate: formatDateToDDMMYYYY(row.c[41] ? row.c[41].v : ""), // Column AP - Calling Date
+          // callingDate: formatDateToDDMMYYYY(row.c[41] ? row.c[41].v : ""), // Column AP - Calling Date
+          callingDate: row.c[41] ? String(row.c[41].v).toLowerCase() : "", // Column AP - Calling Date 
           assignedTo: assignedUser, // Add assigned user to the history item
         }
 
@@ -361,6 +475,7 @@ if (historyData && historyData.table && historyData.table.rows) {
               if (shouldInclude) {
                 const directEnquiryItem = {
                   id: index + 1,
+                   timestamp: row.c[37] ? formatDateToDDMMYYYY(row.c[37].v) : "", // Column AL - Timestamp
                   leadId: row.c[1] ? row.c[1].v : "", // Column B - Lead Number
                   receiverName: row.c[2] ? row.c[2].v : "", // Column C - Lead Receiver Name
                   leadSource: row.c[3] ? row.c[3].v : "", // Column D - Lead Source
@@ -373,7 +488,8 @@ if (historyData && historyData.table && historyData.table.rows) {
                   dueDate: "", // You might want to add logic to calculate due date
                   assignedTo: assignedUser, // Add assigned user to the tracker item
                   currentStage: row.c[42] ? row.c[42].v : "", // Column AQ - Current Stage
-                  callingDate: row.c[76] ? formatDateToDDMMYYYY(row.c[76].v) : "", // Column BY - Calling Date
+                  // callingDate: row.c[76] ? formatDateToDDMMYYYY(row.c[76].v) : "", // Column BY - Calling Date
+                  callingDate: row.c[76] ? String(row.c[76].v).toLowerCase() : "", // Column BY - Calling Date as text
                 }
 
                 directEnquiryPendingData.push(directEnquiryItem)
@@ -557,6 +673,38 @@ if (historyData && historyData.table && historyData.table.rows) {
     }
   }
 
+  // Add this function inside your CallTracker component
+  const calculateFilterCounts = () => {
+    const counts = {
+      today: 0,
+      overdue: 0,
+      upcoming: 0,
+      older: 0
+    };
+  
+    // Calculate counts based on active tab
+    if (activeTab === "pending" || activeTab === "directEnquiry") {
+      const trackers = activeTab === "pending" ? pendingCallTrackers : directEnquiryPendingTrackers;
+      
+      trackers.forEach(tracker => {
+        const dateStr = tracker.callingDate ? tracker.callingDate.toLowerCase() : "";
+        if (dateStr.includes("today")) counts.today++;
+        else if (dateStr.includes("overdue")) counts.overdue++;
+        else if (dateStr.includes("upcoming")) counts.upcoming++;
+      });
+    } else if (activeTab === "history") {
+      historyCallTrackers.forEach(tracker => {
+        const dateStr = tracker.callingDate;
+        if (isToday(dateStr)) counts.today++;
+        else counts.older++;
+      });
+    }
+  
+    return counts;
+  };
+
+const filterCounts = calculateFilterCounts();
+
   return (
     <div className="container mx-auto py-10 px-4">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -581,71 +729,112 @@ if (historyData && historyData.table && historyData.table.rows) {
           </div>
 
           {/* Calling Days Filter */}
-          <div className="relative dropdown-container">
-            <button
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white flex items-center"
-              onClick={toggleCallingDaysDropdown}
-            >
-              <span>Calling Days {callingDaysFilter.length > 0 && `(${callingDaysFilter.length})`}</span>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className={`h-4 w-4 ml-2 transition-transform ${showCallingDaysDropdown ? 'rotate-180' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            {showCallingDaysDropdown && (
-              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-10 min-w-full">
-                <div className="p-2">
-                  <label className="flex items-center p-2 hover:bg-gray-50 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="mr-2"
-                      checked={callingDaysFilter.includes("today")}
-                      onChange={() => handleCallingDaysChange("today")}
-                    />
-                    <span>Today</span>
-                  </label>
-                  <label className="flex items-center p-2 hover:bg-gray-50 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="mr-2"
-                      checked={callingDaysFilter.includes("overdue")}
-                      onChange={() => handleCallingDaysChange("overdue")}
-                    />
-                    <span>Overdue</span>
-                  </label>
-                  <label className="flex items-center p-2 hover:bg-gray-50 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="mr-2"
-                      checked={callingDaysFilter.includes("upcoming")}
-                      onChange={() => handleCallingDaysChange("upcoming")}
-                    />
-                    <span>Upcoming</span>
-                  </label>
-                </div>
+       {/* Calling Days Filter */}
+<div className="relative dropdown-container">
+  <button
+    className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white flex items-center"
+    onClick={toggleCallingDaysDropdown}
+  >
+    <span>Calling Days {callingDaysFilter.length > 0 && `(${callingDaysFilter.length})`}</span>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      className={`h-4 w-4 ml-2 transition-transform ${showCallingDaysDropdown ? 'rotate-180' : ''}`}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+  </button>
+  {showCallingDaysDropdown && (
+    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-10 min-w-full">
+      <div className="p-2">
+        {activeTab === "history" ? (
+          <>
+            <label className="flex items-center justify-between p-2 hover:bg-gray-50 cursor-pointer w-full">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  className="mr-2"
+                  checked={callingDaysFilter.includes("today")}
+                  onChange={() => handleCallingDaysChange("today")}
+                />
+                <span>Today's Calls</span>
               </div>
-            )}
-            {callingDaysFilter.length > 0 && (
-              <div className="mt-1 flex flex-wrap gap-1">
-                {callingDaysFilter.map((filter) => (
-                  <span key={filter} className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">
-                    {filter}
-                    <button
-                      onClick={() => setCallingDaysFilter(callingDaysFilter.filter((item) => item !== filter))}
-                      className="ml-1 text-purple-600 hover:text-purple-800"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
+              <span className="text-xs text-gray-500 ml-2">({filterCounts.today})</span>
+            </label>
+            <label className="flex items-center justify-between p-2 hover:bg-gray-50 cursor-pointer w-full">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  className="mr-2"
+                  checked={callingDaysFilter.includes("older")}
+                  onChange={() => handleCallingDaysChange("older")}
+                />
+                <span>Older Calls</span>
               </div>
-            )}
-          </div>
+              <span className="text-xs text-gray-500 ml-2">({filterCounts.older})</span>
+            </label>
+          </>
+        ) : (
+          <>
+            <label className="flex items-center justify-between p-2 hover:bg-gray-50 cursor-pointer w-full">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  className="mr-2"
+                  checked={callingDaysFilter.includes("today")}
+                  onChange={() => handleCallingDaysChange("today")}
+                />
+                <span>Today</span>
+              </div>
+              <span className="text-xs text-gray-500 ml-2">({filterCounts.today})</span>
+            </label>
+            <label className="flex items-center justify-between p-2 hover:bg-gray-50 cursor-pointer w-full">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  className="mr-2"
+                  checked={callingDaysFilter.includes("overdue")}
+                  onChange={() => handleCallingDaysChange("overdue")}
+                />
+                <span>Overdue</span>
+              </div>
+              <span className="text-xs text-gray-500 ml-2">({filterCounts.overdue})</span>
+            </label>
+            <label className="flex items-center justify-between p-2 hover:bg-gray-50 cursor-pointer w-full">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  className="mr-2"
+                  checked={callingDaysFilter.includes("upcoming")}
+                  onChange={() => handleCallingDaysChange("upcoming")}
+                />
+                <span>Upcoming</span>
+              </div>
+              <span className="text-xs text-gray-500 ml-2">({filterCounts.upcoming})</span>
+            </label>
+          </>
+        )}
+      </div>
+    </div>
+  )}
+  {callingDaysFilter.length > 0 && (
+    <div className="mt-1 flex flex-wrap gap-1">
+      {callingDaysFilter.map((filter) => (
+        <span key={filter} className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">
+          {filter}
+          <button
+            onClick={() => setCallingDaysFilter(callingDaysFilter.filter((item) => item !== filter))}
+            className="ml-1 text-purple-600 hover:text-purple-800"
+          >
+            ×
+          </button>
+        </span>
+      ))}
+    </div>
+  )}
+</div>
 
           {/* Enquiry No Filter */}
           <div className="relative dropdown-container">
@@ -774,6 +963,67 @@ if (historyData && historyData.table && historyData.table.rows) {
             )}
           </div>
 
+          {/* Column Selection Dropdown - Only show for history tab */}
+          {activeTab === "history" && (
+            <div className="relative dropdown-container">
+              <button
+                onClick={() => setShowColumnDropdown(!showColumnDropdown)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white flex items-center"
+              >
+                <span>Select Columns</span>
+                <svg
+                  className={`w-4 h-4 ml-2 transition-transform ${showColumnDropdown ? "rotate-180" : ""}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {showColumnDropdown && (
+                <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-300 rounded-md shadow-lg z-50 max-h-80 overflow-y-auto">
+                  <div className="p-2">
+                    {/* Select All Option */}
+                    <div className="flex items-center p-2 hover:bg-gray-50 rounded">
+                      <input
+                        type="checkbox"
+                        id="select-all-history"
+                        checked={Object.values(visibleColumns).every(Boolean)}
+                        onChange={handleSelectAll}
+                        className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="select-all-history" className="ml-2 text-sm font-medium text-gray-900 cursor-pointer">
+                        All Columns
+                      </label>
+                    </div>
+
+                    <hr className="my-2" />
+
+                    {/* Individual Column Options */}
+                    {columnOptions.map((option) => (
+                      <div key={option.key} className="flex items-center p-2 hover:bg-gray-50 rounded">
+                        <input
+                          type="checkbox"
+                          id={`column-${option.key}`}
+                          checked={visibleColumns[option.key]}
+                          onChange={() => handleColumnToggle(option.key)}
+                          className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                        />
+                        <label
+                          htmlFor={`column-${option.key}`}
+                          className="ml-2 text-sm text-gray-700 cursor-pointer flex-1"
+                        >
+                          {option.label}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Clear Filters Button */}
           {(callingDaysFilter.length > 0 || enquiryNoFilter.length > 0 || currentStageFilter.length > 0) && (
             <button
@@ -854,6 +1104,9 @@ if (historyData && historyData.table && historyData.table.rows) {
                         >
                           Actions
                         </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+      Timestamp
+    </th>
                         <th
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
@@ -925,6 +1178,9 @@ if (historyData && historyData.table && historyData.table.rows) {
                                 </button> */}
                               </div>
                             </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+  {tracker.timestamp}
+</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                               {tracker.leadId}
                             </td>
@@ -990,6 +1246,9 @@ if (historyData && historyData.table && historyData.table.rows) {
                         >
                           Actions
                         </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+      Timestamp
+    </th>
                         <th
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
@@ -1044,6 +1303,9 @@ if (historyData && historyData.table && historyData.table.rows) {
                                 </button>
                               </div>
                             </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+  {tracker.timestamp}
+</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                               {tracker.leadId}
                             </td>
@@ -1088,135 +1350,281 @@ if (historyData && historyData.table && historyData.table.rows) {
     <table className="min-w-full divide-y divide-gray-200">
       <thead className="bg-slate-50">
         <tr>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enquiry No.</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enquiry Status</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">What Did Customer Say</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Stage</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send Quotation No.</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Shared By</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Number</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Value Without Tax</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Value With Tax</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Upload</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Remarks</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Validator Name</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Send Status</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Validation Remark</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send FAQ Video</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send Product Video</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send Offer Video</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send Product Catalog</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send Product Image</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Call Date</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Call Time</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Is Order Received? Status</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acceptance Via</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Mode</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Terms (In Days)</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transport Mode</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CONVEYED FOR REGISTRATION FORM</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Video</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acceptance File Upload</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remark</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Lost Apology Video</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">If No Then Get Relevant Reason Status</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">If No Then Get Relevant Reason Remark</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer Order Hold Reason Category</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Holding Date</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hold Remark</th>
+          {visibleColumns.timestamp && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
+          )}
+          {visibleColumns.enquiryNo && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enquiry No.</th>
+          )}
+          {visibleColumns.enquiryStatus && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enquiry Status</th>
+          )}
+          {visibleColumns.customerFeedback && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">What Did Customer Say</th>
+          )}
+          {visibleColumns.currentStage && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Stage</th>
+          )}
+          {visibleColumns.sendQuotationNo && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send Quotation No.</th>
+          )}
+          {visibleColumns.quotationSharedBy && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Shared By</th>
+          )}
+          {visibleColumns.quotationNumber && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Number</th>
+          )}
+          {visibleColumns.valueWithoutTax && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Value Without Tax</th>
+          )}
+          {visibleColumns.valueWithTax && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Value With Tax</th>
+          )}
+          {visibleColumns.quotationUpload && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Upload</th>
+          )}
+          {visibleColumns.quotationRemarks && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Remarks</th>
+          )}
+          {visibleColumns.validatorName && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Validator Name</th>
+          )}
+          {visibleColumns.sendStatus && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Send Status</th>
+          )}
+          {visibleColumns.validationRemark && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation Validation Remark</th>
+          )}
+          {visibleColumns.faqVideo && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send FAQ Video</th>
+          )}
+          {visibleColumns.productVideo && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send Product Video</th>
+          )}
+          {visibleColumns.offerVideo && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send Offer Video</th>
+          )}
+          {visibleColumns.productCatalog && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send Product Catalog</th>
+          )}
+          {visibleColumns.productImage && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Send Product Image</th>
+          )}
+          {visibleColumns.nextCallDate && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Call Date</th>
+          )}
+          {visibleColumns.nextCallTime && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Call Time</th>
+          )}
+          {visibleColumns.orderStatus && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Is Order Received? Status</th>
+          )}
+          {visibleColumns.acceptanceVia && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acceptance Via</th>
+          )}
+          {visibleColumns.paymentMode && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Mode</th>
+          )}
+          {visibleColumns.paymentTerms && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Terms (In Days)</th>
+          )}
+          {visibleColumns.transportMode && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transport Mode</th>
+          )}
+          {visibleColumns.registrationFrom && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CONVEYED FOR REGISTRATION FORM</th>
+          )}
+          {visibleColumns.orderVideo && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Video</th>
+          )}
+          {visibleColumns.acceptanceFile && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acceptance File Upload</th>
+          )}
+          {visibleColumns.orderRemark && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remark</th>
+          )}
+          {visibleColumns.apologyVideo && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Lost Apology Video</th>
+          )}
+          {visibleColumns.reasonStatus && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">If No Then Get Relevant Reason Status</th>
+          )}
+          {visibleColumns.reasonRemark && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">If No Then Get Relevant Reason Remark</th>
+          )}
+          {visibleColumns.holdReason && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer Order Hold Reason Category</th>
+          )}
+          {visibleColumns.holdingDate && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Holding Date</th>
+          )}
+          {visibleColumns.holdRemark && (
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hold Remark</th>
+          )}
         </tr>
       </thead>
       <tbody className="bg-white divide-y divide-gray-200">
         {filteredHistoryCallTrackers.length > 0 ? (
           filteredHistoryCallTrackers.map((tracker) => (
             <tr key={tracker.id} className="hover:bg-slate-50">
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.timestamp}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{tracker.enquiryNo}</td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    tracker.priority === "High"
-                      ? "bg-red-100 text-red-800"
-                      : tracker.priority === "Medium"
-                        ? "bg-amber-100 text-amber-800"
-                        : "bg-slate-100 text-slate-800"
-                  }`}
-                >
-                  {tracker.enquiryStatus}
-                </span>
-              </td>
-              <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.customerFeedback}>{tracker.customerFeedback}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.currentStage}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.sendQuotationNo}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.quotationSharedBy}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.quotationNumber}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.valueWithoutTax}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.valueWithTax}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-  {tracker.quotationUpload && (
-    <a 
-      href={tracker.quotationUpload} 
-      target="_blank" 
-      rel="noopener noreferrer"
-      className="text-blue-600 hover:underline"
-    >
-      View File
-    </a>
-  )}
-</td>
-              <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.quotationRemarks}>{tracker.quotationRemarks}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.validatorName}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.sendStatus}</td>
-              <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.validationRemark}>{tracker.validationRemark}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.faqVideo}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.productVideo}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.offerVideo}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.productCatalog}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.productImage}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.nextCallDate}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.nextCallTime}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.orderStatus}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.acceptanceVia}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.paymentMode}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.paymentTerms}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.transportMode}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.registrationFrom}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {tracker.orderVideo}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-  {tracker.acceptanceFile && (
-    <a 
-      href={tracker.acceptanceFile} 
-      target="_blank" 
-      rel="noopener noreferrer"
-      className="text-blue-600 hover:underline"
-    >
-      View File
-    </a>
-  )}
-</td>
-              <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.orderRemark}>{tracker.orderRemark}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {tracker.apologyVideo && (
-                  <a href={tracker.apologyVideo} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                    View Video
-                  </a>
-                )}
-              </td>
-              <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.reasonStatus}>{tracker.reasonStatus}</td>
-              <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.reasonRemark}>{tracker.reasonRemark}</td>
-              <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.holdReason}>{tracker.holdReason}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.holdingDate}</td>
-              <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.holdRemark}>{tracker.holdRemark}</td>
+              {visibleColumns.timestamp && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.timestamp}</td>
+              )}
+              {visibleColumns.enquiryNo && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{tracker.enquiryNo}</td>
+              )}
+              {visibleColumns.enquiryStatus && (
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      tracker.priority === "High"
+                        ? "bg-red-100 text-red-800"
+                        : tracker.priority === "Medium"
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-slate-100 text-slate-800"
+                    }`}
+                  >
+                    {tracker.enquiryStatus}
+                  </span>
+                </td>
+              )}
+              {visibleColumns.customerFeedback && (
+                <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.customerFeedback}>{tracker.customerFeedback}</td>
+              )}
+              {visibleColumns.currentStage && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.currentStage}</td>
+              )}
+              {visibleColumns.sendQuotationNo && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.sendQuotationNo}</td>
+              )}
+              {visibleColumns.quotationSharedBy && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.quotationSharedBy}</td>
+              )}
+              {visibleColumns.quotationNumber && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.quotationNumber}</td>
+              )}
+              {visibleColumns.valueWithoutTax && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.valueWithoutTax}</td>
+              )}
+              {visibleColumns.valueWithTax && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.valueWithTax}</td>
+              )}
+              {visibleColumns.quotationUpload && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {tracker.quotationUpload && (
+                    <a 
+                      href={tracker.quotationUpload} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      View File
+                    </a>
+                  )}
+                </td>
+              )}
+              {visibleColumns.quotationRemarks && (
+                <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.quotationRemarks}>{tracker.quotationRemarks}</td>
+              )}
+              {visibleColumns.validatorName && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.validatorName}</td>
+              )}
+              {visibleColumns.sendStatus && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.sendStatus}</td>
+              )}
+              {visibleColumns.validationRemark && (
+                <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.validationRemark}>{tracker.validationRemark}</td>
+              )}
+              {visibleColumns.faqVideo && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.faqVideo}</td>
+              )}
+              {visibleColumns.productVideo && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.productVideo}</td>
+              )}
+              {visibleColumns.offerVideo && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.offerVideo}</td>
+              )}
+              {visibleColumns.productCatalog && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.productCatalog}</td>
+              )}
+              {visibleColumns.productImage && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.productImage}</td>
+              )}
+              {visibleColumns.nextCallDate && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.nextCallDate}</td>
+              )}
+              {visibleColumns.nextCallTime && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.nextCallTime}</td>
+              )}
+              {visibleColumns.orderStatus && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.orderStatus}</td>
+              )}
+              {visibleColumns.acceptanceVia && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.acceptanceVia}</td>
+              )}
+              {visibleColumns.paymentMode && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.paymentMode}</td>
+              )}
+              {visibleColumns.paymentTerms && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.paymentTerms}</td>
+              )}
+              {visibleColumns.transportMode && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.transportMode}</td>
+              )}
+              {visibleColumns.registrationFrom && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.registrationFrom}</td>
+              )}
+              {visibleColumns.orderVideo && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.orderVideo}</td>
+              )}
+              {visibleColumns.acceptanceFile && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {tracker.acceptanceFile && (
+                    <a 
+                      href={tracker.acceptanceFile} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      View File
+                    </a>
+                  )}
+                </td>
+              )}
+              {visibleColumns.orderRemark && (
+                <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.orderRemark}>{tracker.orderRemark}</td>
+              )}
+              {visibleColumns.apologyVideo && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {tracker.apologyVideo && (
+                    <a href={tracker.apologyVideo} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                      View Video
+                    </a>
+                  )}
+                </td>
+              )}
+              {visibleColumns.reasonStatus && (
+                <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.reasonStatus}>{tracker.reasonStatus}</td>
+              )}
+              {visibleColumns.reasonRemark && (
+                <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.reasonRemark}>{tracker.reasonRemark}</td>
+              )}
+              {visibleColumns.holdReason && (
+                <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.holdReason}>{tracker.holdReason}</td>
+              )}
+              {visibleColumns.holdingDate && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.holdingDate}</td>
+              )}
+              {visibleColumns.holdRemark && (
+                <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={tracker.holdRemark}>{tracker.holdRemark}</td>
+              )}
             </tr>
           ))
         ) : (
           <tr>
-            <td colSpan={isAdmin() ? 37 : 36} className="px-6 py-4 text-center text-sm text-slate-500">
-  No history found
-</td>
+            <td colSpan={Object.values(visibleColumns).filter(Boolean).length} className="px-6 py-4 text-center text-sm text-slate-500">
+              No history found
+            </td>
           </tr>
         )}
       </tbody>
