@@ -291,7 +291,7 @@ function FollowUp() {
               // Only include rows where column K has data, column L is null/empty, and user has access
               if (hasColumnK && isColumnLEmpty && shouldInclude) {
                 const followUpItem = {
-                  timestamp: row.c[27] ? formatDateToDDMMYYYY(row.c[27].v) : "", // Column A (index 0)
+                  timestamp: row.c[50] ? formatDateToDDMMYYYY(row.c[50].v) : "", // Column A (index 0)
                   id: row.c[0] ? row.c[0].v : "",
                   leadId: row.c[1] ? row.c[1].v : "",
                   companyName: row.c[4] ? row.c[4].v : "",
