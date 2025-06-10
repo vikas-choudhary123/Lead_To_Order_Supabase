@@ -283,208 +283,262 @@ const fetchLatestQuotationNumber = async (enquiryNo) => {
   
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setIsSubmitting(true)
+    e.preventDefault();
+    setIsSubmitting(true);
   
     try {
-      const currentDate = new Date()
-      const formattedDate = formatDate(currentDate)
-      
+      const currentDate = new Date();
+      const formattedDate = formatDate(currentDate);
+  
       // If there's a quotation file and it's an image, upload it first
-      let imageUrl = ""
+      let imageUrl = "";
       if (currentStage === "make-quotation" && quotationData.quotationFile) {
         // Check if the file is an image
-        if (quotationData.quotationFile.type.startsWith('image/')) {
-          showNotification("Uploading image...", "info")
-          imageUrl = await uploadFileToDrive(quotationData.quotationFile)
-          showNotification("Image uploaded successfully", "success")
+        if (quotationData.quotationFile.type.startsWith("image/")) {
+          showNotification("Uploading image...", "info");
+          imageUrl = await uploadFileToDrive(quotationData.quotationFile);
+          showNotification("Image uploaded successfully", "success");
         }
       }
   
       // If there are order status files, upload them
-      let orderVideoUrl = ""
-      let acceptanceFileUrl = ""
-      let apologyVideoUrl = ""
-      
-      if (currentStage === "order-status") {
-        // if (orderStatusData.orderVideo) {
-        //   showNotification("Uploading order video...", "info")
-        //   orderVideoUrl = await uploadFileToDrive(orderStatusData.orderVideo)
-        //   showNotification("Order video uploaded successfully", "success")
-        // }
+      let acceptanceFileUrl = "";
+      let apologyVideoUrl = "";
+  
+      // Generate order number if status is "yes"
+      let orderNumber = "";
+      if (currentStage === "order-status" && orderStatusData.orderStatus === "yes") {
+        // Get the latest order number from the sheet
+        const latestOrderNumber = await getLatestOrderNumber();
+        orderNumber = generateNextOrderNumber(latestOrderNumber);
         
         if (orderStatusData.acceptanceFile) {
-          showNotification("Uploading acceptance file...", "info")
-          acceptanceFileUrl = await uploadFileToDrive(orderStatusData.acceptanceFile)
-          showNotification("Acceptance file uploaded successfully", "success")
+          showNotification("Uploading acceptance file...", "info");
+          acceptanceFileUrl = await uploadFileToDrive(orderStatusData.acceptanceFile);
+          showNotification("Acceptance file uploaded successfully", "success");
         }
-        
+      } else if (currentStage === "order-status" && orderStatusData.orderStatus === "no") {
         if (orderStatusData.apologyVideo) {
-          showNotification("Uploading apology video...", "info")
-          apologyVideoUrl = await uploadFileToDrive(orderStatusData.apologyVideo)
-          showNotification("Apology video uploaded successfully", "success")
+          showNotification("Uploading apology video...", "info");
+          apologyVideoUrl = await uploadFileToDrive(orderStatusData.apologyVideo);
+          showNotification("Apology video uploaded successfully", "success");
         }
       }
-      
+  
       // Prepare row data based on the selected stage
       let rowData = [
-        formattedDate,                 // Date
-        formData.enquiryNo,            // Enquiry No
-        formData.enquiryStatus,        // Status (hot/warm/cold)
-        formData.customerFeedback,     // Customer feedback
-        currentStage                   // Current Stage
-      ]
-      
+        formattedDate, // Date
+        formData.enquiryNo, // Enquiry No
+        formData.enquiryStatus, // Status (hot/warm/cold)
+        formData.customerFeedback, // Customer feedback
+        currentStage, // Current Stage
+      ];
+  
       // Add stage-specific data based on what's selected
       if (currentStage === "make-quotation") {
         rowData.push(
           quotationData.sendQuotationNo,
           quotationData.quotationSharedBy,
-          quotationData.quotationNumber,    // Column H
+          quotationData.quotationNumber, // Column H
           quotationData.valueWithoutTax,
           quotationData.valueWithTax,
           imageUrl || "", // Add the image URL in column K
           quotationData.remarks // Add the remarks in column L
-        )
+        );
         // Add empty values for columns M-AI (validation, order expected, and order status columns)
-        rowData.push(...new Array(29).fill(""))
+        rowData.push(...new Array(29).fill(""));
       } else if (currentStage === "quotation-validation") {
         // Add empty values for columns F-G
-        rowData.push("", "")
+        rowData.push("", "");
         // Add quotation number in column H
-        rowData.push(validationData.validationQuotationNumber)
+        rowData.push(validationData.validationQuotationNumber);
         // Add empty values for columns I-L (remaining quotation data)
-        rowData.push("", "", "", "")
+        rowData.push("", "", "", "");
         // Add validation data for columns M-T
         rowData.push(
-          validationData.validatorName,            // Column M
-          validationData.sendStatus,               // Column N
-          validationData.validationRemark,         // Column O
-          validationData.faqVideo,                 // Column P
-          validationData.productVideo,             // Column Q
-          validationData.offerVideo,               // Column R
-          validationData.productCatalog,           // Column S
-          validationData.productImage              // Column T
-        )
+          validationData.validatorName, // Column M
+          validationData.sendStatus, // Column N
+          validationData.validationRemark, // Column O
+          validationData.faqVideo, // Column P
+          validationData.productVideo, // Column Q
+          validationData.offerVideo, // Column R
+          validationData.productCatalog, // Column S
+          validationData.productImage // Column T
+        );
         // Add empty values for columns U-AI (order expected and order status columns)
-        rowData.push(...new Array(15).fill(""))
+        rowData.push(...new Array(15).fill(""));
       } else if (currentStage === "order-expected") {
         // Add empty values for columns F-T
-        rowData.push(...new Array(15).fill(""))
+        rowData.push(...new Array(15).fill(""));
         // Add order expected data for columns U-V
         rowData.push(
-          orderExpectedData.nextCallDate,  // Column U
-          orderExpectedData.nextCallTime,   // Column V
-          // orderExpectedData.followupStatus
-        )
-        rowData.push(...new Array(16).fill(""))
-  // Add followup status in column AM
-  rowData.push(orderExpectedData.followupStatus)  // Column AM
+          orderExpectedData.nextCallDate, // Column U
+          orderExpectedData.nextCallTime // Column V
+        );
+        rowData.push(...new Array(16).fill(""));
+        // Add followup status in column AM
+        rowData.push(orderExpectedData.followupStatus); // Column AM
         // Add empty values for columns W-AI (order status columns)
-        rowData.push(...new Array(17).fill(""))
+        rowData.push(...new Array(17).fill(""));
       } else if (currentStage === "order-status") {
         // Add empty values for columns F-G
-        rowData.push("", "")
+        rowData.push("", "");
         // Add quotation number in column H
-        rowData.push(orderStatusData.orderStatusQuotationNumber)
+        rowData.push(orderStatusData.orderStatusQuotationNumber);
         // Add empty values for columns I-V
-        rowData.push(...new Array(14).fill(""))
+        rowData.push(...new Array(14).fill(""));
         // Add order status in column W
-        rowData.push(orderStatusData.orderStatus)
-        
+        rowData.push(orderStatusData.orderStatus);
+  
         // Based on order status, add data to appropriate columns
         if (orderStatusData.orderStatus === "yes") {
           // Add YES data for columns X-AC
           rowData.push(
-            orderStatusData.acceptanceVia,     // Column X
-            orderStatusData.paymentMode,       // Column Y
-            orderStatusData.paymentTerms,      // Column Z
+            orderStatusData.acceptanceVia, // Column X
+            orderStatusData.paymentMode, // Column Y
+            orderStatusData.paymentTerms, // Column Z
             orderStatusData.tranportMode || "", // Column AD (new field)
             orderStatusData.conveyedForRegistration || "", // Column AE (new field)
-            orderStatusData.orderVideo,               // Column AA
-            acceptanceFileUrl || "",           // Column AB
-            orderStatusData.orderRemark,       // Column AC
-          )
-          rowData.push(...new Array(8).fill(""))
-  rowData.push(
-    orderStatusData.creditDays,        // Column AN - Credit Days
-    orderStatusData.creditLimit,       // Column AO - Credit Limit
-  )
+            orderStatusData.orderVideo, // Column AA
+            acceptanceFileUrl || "", // Column AB
+            orderStatusData.orderRemark // Column AC
+          );
+          rowData.push(...new Array(8).fill(""));
+          rowData.push(
+            orderStatusData.creditDays, // Column AN - Credit Days
+            orderStatusData.creditLimit // Column AO - Credit Limit
+          );
+          rowData.push(""); 
+          // Add the generated order number in column AQ (index 42)
+          rowData.push(orderNumber); // Column AQ - Order Number
           // Add empty values for remaining columns (AF-AI)
-          rowData.push(...new Array(4).fill(""))
+          rowData.push(...new Array(4).fill(""));
         } else if (orderStatusData.orderStatus === "no") {
           // Add empty values for YES columns (X-AE)
-          rowData.push(...new Array(8).fill(""))
+          rowData.push(...new Array(8).fill(""));
           // Add NO data for columns AF-AH
           rowData.push(
-            apologyVideoUrl || "",             // Column AF
-            orderStatusData.reasonStatus,      // Column AG
-            orderStatusData.reasonRemark       // Column AH
-          )
+            apologyVideoUrl || "", // Column AF
+            orderStatusData.reasonStatus, // Column AG
+            orderStatusData.reasonRemark // Column AH
+          );
           // Add empty values for HOLD columns (AI-AL)
-          rowData.push(...new Array(3).fill(""))
+          rowData.push(...new Array(3).fill(""));
         } else if (orderStatusData.orderStatus === "hold") {
           // Add empty values for YES and NO columns (X-AH)
-          rowData.push(...new Array(11).fill(""))
+          rowData.push(...new Array(11).fill(""));
           // Add HOLD data for columns AI-AL
           rowData.push(
-            orderStatusData.holdReason,        // Column AI
-            orderStatusData.holdingDate,       // Column AJ
-            orderStatusData.holdRemark         // Column AK
-          )
+            orderStatusData.holdReason, // Column AI
+            orderStatusData.holdingDate, // Column AJ
+            orderStatusData.holdRemark // Column AK
+          );
           // Add empty value for remaining column
-          rowData.push("") // Column AL
+          rowData.push(""); // Column AL
         } else {
           // If no status selected, fill all columns with empty
-          rowData.push(...new Array(12).fill(""))
+          rowData.push(...new Array(12).fill(""));
         }
       } else {
         // Add empty values for all stage-specific columns (F-AI)
-        rowData.push(...new Array(30).fill(""))
+        rowData.push(...new Array(30).fill(""));
       }
-      
+  
       console.log("Row Data to be submitted:", rowData);
-      
+  
       // Script URL - replace with your Google Apps Script URL
-      const scriptUrl = "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
-      
+      const scriptUrl =
+        "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec";
+  
       // Parameters for Google Apps Script
       const params = {
         sheetName: "Enquiry Tracker",
         action: "insert",
-        rowData: JSON.stringify(rowData)
-      }
+        rowData: JSON.stringify(rowData),
+      };
   
       // Create URL-encoded string for the parameters
-      const urlParams = new URLSearchParams()
+      const urlParams = new URLSearchParams();
       for (const key in params) {
-        urlParams.append(key, params[key])
+        urlParams.append(key, params[key]);
       }
-      
+  
       // Send the data
       const response = await fetch(scriptUrl, {
         method: "POST",
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
+          "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: urlParams
-      })
+        body: urlParams,
+      });
   
-      const result = await response.json()
-      
+      const result = await response.json();
+  
       if (result.success) {
-        showNotification("Call tracker updated successfully", "success")
-        navigate("/call-tracker")
+        showNotification("Call tracker updated successfully", "success");
+        navigate("/call-tracker");
       } else {
-        showNotification("Error updating call tracker: " + (result.error || "Unknown error"), "error")
+        showNotification(
+          "Error updating call tracker: " + (result.error || "Unknown error"),
+          "error"
+        );
       }
     } catch (error) {
-      console.error("Error submitting form:", error)
-      showNotification("Error submitting form: " + error.message, "error")
+      console.error("Error submitting form:", error);
+      showNotification("Error submitting form: " + error.message, "error");
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
+  
+  // Helper function to get the latest order number from the sheet
+  const getLatestOrderNumber = async () => {
+    try {
+      const scriptUrl =
+        "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec";
+      const params = {
+        action: "getLatestOrderNumber",
+        sheetName: "Enquiry Tracker",
+      };
+  
+      const urlParams = new URLSearchParams();
+      for (const key in params) {
+        urlParams.append(key, params[key]);
+      }
+  
+      const response = await fetch(scriptUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: urlParams,
+      });
+  
+      const result = await response.json();
+      if (result.success) {
+        return result.latestOrderNumber || "DO-00"; // Return default if none exists
+      }
+      return "DO-00"; // Fallback
+    } catch (error) {
+      console.error("Error fetching latest order number:", error);
+      return "DO-00"; // Fallback
+    }
+  };
+  
+  // Helper function to generate the next order number
+  const generateNextOrderNumber = (latestOrderNumber) => {
+    // Extract the numeric part
+    const match = latestOrderNumber.match(/DO-(\d+)/);
+    let nextNumber = 1;
+  
+    if (match && match[1]) {
+      nextNumber = parseInt(match[1], 10) + 1;
+    }
+  
+    // Format with leading zeros
+    const paddedNumber = String(nextNumber).padStart(2, "0");
+    return `DO-${paddedNumber}`;
+  };
 
   return (
     <div className="container mx-auto py-10 px-4">

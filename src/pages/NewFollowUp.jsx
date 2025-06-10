@@ -166,6 +166,14 @@ function NewFollowUp() {
           // Add empty values if no items
           rowData.push("", "")
         }
+
+        while (rowData.length < 27) {
+          rowData.push("")
+        }
+      
+        // Add tracking status in column AB (index 27)
+        rowData.push(document.getElementById("leadsTrackingStatus").value)
+      
       } else if (enquiryStatus === "not-interested") {
         // Pad columns F-K and then V-X with empty values
         rowData.push("", "", "", "", "", "", "", "", "")
@@ -517,6 +525,21 @@ function NewFollowUp() {
                       ))}
                     </select>
                   </div>
+
+                  <div className="space-y-2">
+        <label htmlFor="leadsTrackingStatus" className="block text-sm font-medium text-gray-700">
+          Leads Tracking Status
+        </label>
+        <select
+          id="leadsTrackingStatus"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+          required
+        >
+          <option value="">Select status</option>
+          <option value="Pending">Pending</option>
+          <option value="Completed">Completed</option>
+        </select>
+      </div>
 
                   {/* <div className="space-y-2">
                     <label htmlFor="requiredDate" className="block text-sm font-medium text-gray-700">
