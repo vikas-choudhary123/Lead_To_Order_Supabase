@@ -237,10 +237,15 @@ const fetchLatestQuotationNumber = async (enquiryNo) => {
             
             const params = {
               action: fileType === "pdf" ? "uploadPDF" : "uploadImage",
-              imageData: base64Data,
-              pdfData: base64Data,
               fileName: file.name,
               mimeType: file.type
+            }
+            
+            // Add the appropriate data parameter based on file type
+            if (fileType === "pdf") {
+              params.pdfData = base64Data;
+            } else {
+              params.imageData = base64Data;
             }
 
             const urlParams = new URLSearchParams()
@@ -291,14 +296,12 @@ const fetchLatestQuotationNumber = async (enquiryNo) => {
       const formattedDate = formatDate(currentDate);
   
       // If there's a quotation file and it's an image, upload it first
-      let imageUrl = "";
+      let fileUrl = "";
       if (currentStage === "make-quotation" && quotationData.quotationFile) {
-        // Check if the file is an image
-        if (quotationData.quotationFile.type.startsWith("image/")) {
-          showNotification("Uploading image...", "info");
-          imageUrl = await uploadFileToDrive(quotationData.quotationFile);
-          showNotification("Image uploaded successfully", "success");
-        }
+        const fileType = quotationData.quotationFile.type.startsWith("image/") ? "image" : "pdf";
+        showNotification(`Uploading ${fileType}...`, "info");
+        fileUrl = await uploadFileToDrive(quotationData.quotationFile, fileType);
+        showNotification(`${fileType.charAt(0).toUpperCase() + fileType.slice(1)} uploaded successfully`, "success");
       }
   
       // If there are order status files, upload them
@@ -342,7 +345,7 @@ const fetchLatestQuotationNumber = async (enquiryNo) => {
           quotationData.quotationNumber, // Column H
           quotationData.valueWithoutTax,
           quotationData.valueWithTax,
-          imageUrl || "", // Add the image URL in column K
+          fileUrl || "", // Add the image URL in column K
           quotationData.remarks // Add the remarks in column L
         );
         // Add empty values for columns M-AI (validation, order expected, and order status columns)
