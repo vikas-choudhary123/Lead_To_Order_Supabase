@@ -285,18 +285,107 @@ function Quotation() {
     }
   }
 
-  const handleGenerateLink = () => {
-    setIsGenerating(true)
+ // Replace the handleGenerateLink function in your React component with this updated version:
 
-    const quotationId = `quotation_${Date.now()}`
-    localStorage.setItem(quotationId, JSON.stringify(quotationData))
+// Replace the handleGenerateLink function in your React component with this updated version:
 
-    const link = `${window.location.origin}${window.location.pathname}?view=${quotationId}`
+const handleGenerateLink = async () => {
+  setIsGenerating(true);
 
-    setQuotationLink(link)
-    setIsGenerating(false)
-    alert("Quotation link has been successfully generated and is ready to share.")
+  try {
+    // First generate the PDF
+    const base64Data = generatePDFFromData(quotationData, selectedReferences, specialDiscount);
+
+    const byteCharacters = atob(base64Data);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: "application/pdf" });
+
+    // Upload PDF to Google Drive (this creates a permanent copy)
+    const scriptUrl = "https://script.google.com/macros/s/AKfycbzVseC0GMn77c4hbt-caHpWgb4zmh99VByIaNfReJjBsR4eUZ63uaLJ670c3p116t3lcQ/exec";
+    const pdfFileName = `Quotation_${quotationData.quotationNo}.pdf`;
+
+    const pdfResponse = await fetch(scriptUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        sheetName: "Send",
+        action: "uploadPDF",
+        pdfData: base64Data,
+        fileName: pdfFileName,
+      }),
+    });
+
+    const pdfResult = await pdfResponse.json();
+
+    if (!pdfResult.success) {
+      throw new Error("Failed to upload PDF");
+    }
+
+    const permanentPdfUrl = pdfResult.fileUrl;
+    const permanentFileId = pdfResult.fileId; // NEW: Get the file ID
+
+    // FIXED: Pass the permanent file ID instead of base64Data to avoid duplicate PDF creation
+    const sendResponse = await fetch(scriptUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        sheetName: "Send",
+        action: "insertAndEmail",
+        quotationNo: quotationData.quotationNo,
+        consigneeContactName: quotationData.consigneeContactName,
+        permanentFileId: permanentFileId, // FIXED: Pass file ID instead of pdfData
+        fileName: pdfFileName,
+        consigneeName: quotationData.consigneeName || quotationData.consigneeContactName,
+      }),
+    });
+
+    const sendResult = await sendResponse.json();
+
+    if (!sendResult.success) {
+      throw new Error("Failed to save to Send sheet or send email: " + sendResult.error);
+    }
+
+    // Create local storage link (for your own reference)
+    const quotationId = `quotation_${Date.now()}`;
+    localStorage.setItem(quotationId, JSON.stringify(quotationData));
+    const localLink = `${window.location.origin}${window.location.pathname}?view=${quotationId}`;
+
+    // Set the permanent URL for your reference (not sent in email)
+    setQuotationLink(localLink);
+    setPdfUrl(permanentPdfUrl);
+    setIsGenerating(false);
+    
+    if (sendResult.emailSent) {
+      alert(
+        `✅ Email sent successfully!\n\n` +
+        `📧 Email sent to: ${sendResult.emailAddress}\n` +
+        `📄 Temporary PDF URL sent (expires in 10 days)\n` +
+        `⏰ PDF expires at: ${sendResult.pdfExpiresAt}\n\n` +
+        `🔗 Your permanent reference link: ${localLink}\n` +
+        `📎 Permanent PDF: ${permanentPdfUrl}`
+      );
+    } else {
+      alert(
+        `⚠️ Quotation link generated but email could not be sent.\n\n` +
+        `Error: ${sendResult.emailError || "No email address provided"}\n\n` +
+        `🔗 Your reference link: ${localLink}\n` +
+        `📎 Permanent PDF: ${permanentPdfUrl}`
+      );
+    }
+  } catch (error) {
+    console.error("Error generating link:", error);
+    alert("Failed to generate link: " + error.message);
+    setIsGenerating(false);
   }
+};
 
   const handleSaveQuotation = async () => {
     if (!quotationData.consigneeName) {
