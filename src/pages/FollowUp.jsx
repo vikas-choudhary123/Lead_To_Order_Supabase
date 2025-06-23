@@ -674,7 +674,7 @@ function FollowUp() {
           {/* Title Section */}
           <div className="flex-shrink-0">
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-amber-500 to-orange-600 bg-clip-text text-transparent">
-              Follow-Up Tracker
+              Call Tracker
             </h1>
             <p className="text-slate-600 mt-1 text-sm sm:text-base">Track and manage all your follow-up calls</p>
             {isAdmin() && <p className="text-green-600 font-semibold mt-1 text-sm">Admin View: Showing all data</p>}
@@ -854,7 +854,7 @@ function FollowUp() {
               <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
               <input
                 type="search"
-                placeholder="Search follow-ups..."
+                placeholder="Search Call Tracker..."
                 className="pl-8 w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -867,7 +867,7 @@ function FollowUp() {
         <div className="bg-white rounded-lg shadow-lg overflow-hidden">
           {/* Card Header */}
           <div className="p-4 sm:p-6 border-b border-gray-200">
-            <h2 className="text-lg sm:text-xl font-bold text-gray-900">All Follow-Ups</h2>
+            <h2 className="text-lg sm:text-xl font-bold text-gray-900">All Call Tracker</h2>
           </div>
 
           {/* Card Content */}

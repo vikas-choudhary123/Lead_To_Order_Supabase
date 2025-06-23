@@ -489,6 +489,8 @@ if (historyData && historyData.table && historyData.table.rows) {
                   assignedTo: assignedUser, // Add assigned user to the tracker item
                   currentStage: row.c[42] ? row.c[42].v : "", // Column AQ - Current Stage
                   // callingDate: row.c[76] ? formatDateToDDMMYYYY(row.c[76].v) : "", // Column BY - Calling Date
+                  callingDate1: row.c[58] ? formatDateToDDMMYYYY(row.c[58].v) : "", // Column BY - Calling Date as text
+                  
                   callingDate: row.c[76] ? String(row.c[76].v).toLowerCase() : "", // Column BY - Calling Date as text
                 }
 
@@ -710,7 +712,7 @@ const filterCounts = calculateFilterCounts();
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-            Call Tracker
+            Enquiry Tracker
           </h1>
           <p className="text-slate-600 mt-1">Track the progress of enquiries through the sales pipeline</p>
           {isAdmin() && <p className="text-green-600 font-semibold mt-1">Admin View: Showing all data</p>}
@@ -721,7 +723,7 @@ const filterCounts = calculateFilterCounts();
             <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
             <input
               type="search"
-              placeholder="Search call trackers..."
+              placeholder="Search Enquiry trackers..."
               className="pl-8 w-[200px] md:w-[300px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -1049,7 +1051,7 @@ const filterCounts = calculateFilterCounts();
 
       <div className="bg-white rounded-lg shadow-md">
         <div className="p-6 border-b">
-          <h2 className="text-xl font-bold">All Call Trackers</h2>
+          <h2 className="text-xl font-bold">All Enquiry Trackers</h2>
         </div>
         <div className="p-6">
           <div className="mb-4">
@@ -1089,7 +1091,7 @@ const filterCounts = calculateFilterCounts();
 
           {isLoading ? (
             <div className="p-8 text-center">
-              <p className="text-slate-500">Loading call tracker data...</p>
+              <p className="text-slate-500">Loading Enquiry tracker data...</p>
             </div>
           ) : (
             <>
@@ -1329,7 +1331,7 @@ const filterCounts = calculateFilterCounts();
                               {tracker.currentStage}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {tracker.callingDate}
+                              {tracker.callingDate1}
                             </td>
                           </tr>
                         ))

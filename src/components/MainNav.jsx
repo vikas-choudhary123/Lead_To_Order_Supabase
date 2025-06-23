@@ -32,13 +32,13 @@ function MainNav({ logout }) {
     },
     {
       href: "/follow-up",
-      label: "Follow-Up",
+      label: "Call Tracker",
       icon: <PhoneCallIcon className="h-5 w-5 mr-2" />,
       active: location.pathname.startsWith("/follow-up"),
     },
     {
       href: "/call-tracker",
-      label: "Call Tracker",
+      label: "Enquiry Tracker",
       icon: <BarChartIcon className="h-5 w-5 mr-2" />,
       active: location.pathname.startsWith("/call-tracker"),
     },
