@@ -145,24 +145,24 @@ setCreditLimitOptions(["10000", "25000", "50000", "100000"])
       try {
         setIsLoadingQuotations(true)
         
-        // Fetch data from FMS sheet
+        // First try fetching from FMS sheet (for pending enquiries)
         const fmsUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=FMS"
-        const response = await fetch(fmsUrl)
-        const text = await response.text()
+        const fmsResponse = await fetch(fmsUrl)
+        const fmsText = await fmsResponse.text()
         
         // Extract the JSON part from the response
-        const jsonStart = text.indexOf('{')
-        const jsonEnd = text.lastIndexOf('}') + 1
-        const jsonData = text.substring(jsonStart, jsonEnd)
+        const fmsJsonStart = fmsText.indexOf('{')
+        const fmsJsonEnd = fmsText.lastIndexOf('}') + 1
+        const fmsJsonData = fmsText.substring(fmsJsonStart, fmsJsonEnd)
         
-        const data = JSON.parse(jsonData)
+        const fmsData = JSON.parse(fmsJsonData)
         
-        // Find matching quotation numbers where column B matches the enquiry number
-        if (data && data.table && data.table.rows) {
-          const matchingQuotations = []
-          
-          data.table.rows.forEach(row => {
-            // Column B is index 1 (enquiry number) and column H is index 7 (quotation number)
+        const matchingQuotations = []
+        
+        // Check FMS sheet first (for pending enquiries)
+        if (fmsData && fmsData.table && fmsData.table.rows) {
+          fmsData.table.rows.forEach(row => {
+            // Column B is index 1 (enquiry number) and column BI is index 60 (quotation number)
             if (row.c && 
                 row.c[1] && 
                 row.c[1].v && 
@@ -172,13 +172,40 @@ setCreditLimitOptions(["10000", "25000", "50000", "100000"])
               matchingQuotations.push(row.c[60].v)
             }
           })
+        }
+        
+        // If no matches found in FMS, try ENQUIRY TO ORDER sheet (for direct enquiries)
+        if (matchingQuotations.length === 0) {
+          const enquiryUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=ENQUIRY TO ORDER"
+          const enquiryResponse = await fetch(enquiryUrl)
+          const enquiryText = await enquiryResponse.text()
           
-          setQuotationNumbers(matchingQuotations)
+          const enquiryJsonStart = enquiryText.indexOf('{')
+          const enquiryJsonEnd = enquiryText.lastIndexOf('}') + 1
+          const enquiryJsonData = enquiryText.substring(enquiryJsonStart, enquiryJsonEnd)
           
-          // If we found matches and the form field is empty, auto-fill with the first match
-          if (matchingQuotations.length > 0 && !formData.orderStatusQuotationNumber) {
-            onFieldChange('orderStatusQuotationNumber', matchingQuotations[0])
+          const enquiryData = JSON.parse(enquiryJsonData)
+          
+          if (enquiryData && enquiryData.table && enquiryData.table.rows) {
+            enquiryData.table.rows.forEach(row => {
+              // Column B is index 1 (enquiry number) and column AT is index 45 (quotation number)
+              if (row.c && 
+                  row.c[1] && 
+                  row.c[1].v && 
+                  row.c[1].v.toString() === enquiryNo.toString() &&
+                  row.c[45] && 
+                  row.c[45].v) {
+                matchingQuotations.push(row.c[45].v)
+              }
+            })
           }
+        }
+        
+        setQuotationNumbers(matchingQuotations)
+        
+        // If we found matches and the form field is empty, auto-fill with the first match
+        if (matchingQuotations.length > 0 && !formData.orderStatusQuotationNumber) {
+          onFieldChange('orderStatusQuotationNumber', matchingQuotations[0])
         }
       } catch (error) {
         console.error("Error fetching quotation numbers:", error)
