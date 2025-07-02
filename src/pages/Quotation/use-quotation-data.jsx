@@ -88,6 +88,44 @@ export const useQuotationData = (initialSpecialDiscount = 0) => {
         [field]: value,
       }
 
+      // NEW: Handle items array update
+      if (field === "items") {
+        newData.items = value
+
+        // Recalculate totals when items change
+        const totalFlatDiscount = value.reduce((sum, item) => sum + Number(item.flatDiscount), 0)
+        const subtotal = value.reduce((sum, item) => sum + item.amount, 0)
+        const taxableAmount = subtotal
+
+        const shouldUseIGST = checkStateAndCalculateGST(prev.consignorState, prev.consigneeState)
+
+        let cgstAmount = 0
+        let sgstAmount = 0
+        let igstAmount = 0
+
+        if (shouldUseIGST) {
+          igstAmount = Number((taxableAmount * (prev.igstRate / 100)).toFixed(2))
+        } else {
+          cgstAmount = Number((taxableAmount * (prev.cgstRate / 100)).toFixed(2))
+          sgstAmount = Number((taxableAmount * (prev.sgstRate / 100)).toFixed(2))
+        }
+
+        const totalBeforeSpecialDiscount = taxableAmount + cgstAmount + sgstAmount
+        const total = Math.max(0, totalBeforeSpecialDiscount - specialDiscount)
+
+        Object.assign(newData, {
+          totalFlatDiscount,
+          subtotal,
+          isIGST: shouldUseIGST,
+          cgstAmount,
+          sgstAmount,
+          igstAmount,
+          total,
+        })
+
+        return newData
+      }
+
       if (field === "consignorState" || field === "consigneeState") {
         const shouldUseIGST = checkStateAndCalculateGST(
           field === "consignorState" ? value : prev.consignorState,
@@ -96,10 +134,9 @@ export const useQuotationData = (initialSpecialDiscount = 0) => {
 
         newData.isIGST = shouldUseIGST
 
-        // Recalculate with the same logic as quotation
         const totalFlatDiscount = prev.items.reduce((sum, item) => sum + Number(item.flatDiscount), 0)
         const subtotal = prev.items.reduce((sum, item) => sum + item.amount, 0)
-        const taxableAmount = subtotal // Don't subtract flat discount here
+        const taxableAmount = subtotal
 
         let cgstAmount = 0
         let sgstAmount = 0
@@ -129,14 +166,13 @@ export const useQuotationData = (initialSpecialDiscount = 0) => {
     })
   }
 
-  // Handle item changes - EXACTLY like quotation code
+  // Handle item changes
   const handleItemChange = (id, field, value) => {
     setQuotationData((prev) => {
       const newItems = prev.items.map((item) => {
         if (item.id === id) {
           const updatedItem = { ...item, [field]: value }
 
-          // Ensure numeric calculations
           if (field === "qty" || field === "rate" || field === "discount" || field === "flatDiscount") {
             const baseAmount = Number(updatedItem.qty) * Number(updatedItem.rate)
             const discountedAmount = baseAmount * (1 - Number(updatedItem.discount) / 100)
@@ -148,11 +184,9 @@ export const useQuotationData = (initialSpecialDiscount = 0) => {
         return item
       })
 
-      // Calculate total flat discount from all items
       const totalFlatDiscount = newItems.reduce((sum, item) => sum + Number(item.flatDiscount), 0)
       const subtotal = Number(newItems.reduce((sum, item) => sum + item.amount, 0))
-      // Remove the subtraction of totalFlatDiscount from taxable amount
-      const taxableAmount = subtotal // Changed from (subtotal - totalFlatDiscount)
+      const taxableAmount = subtotal
 
       const shouldUseIGST = checkStateAndCalculateGST(prev.consignorState, prev.consigneeState)
 
@@ -184,13 +218,11 @@ export const useQuotationData = (initialSpecialDiscount = 0) => {
     })
   }
 
-  // Handle flat discount change - EXACTLY like quotation code
   const handleFlatDiscountChange = (value) => {
     setQuotationData((prev) => {
       const numValue = Number(value)
       const subtotal = prev.items.reduce((sum, item) => sum + item.amount, 0)
-      // Remove the subtraction of numValue from taxable amount
-      const taxableAmount = subtotal // Changed from (subtotal - numValue)
+      const taxableAmount = subtotal
 
       let cgstAmount = 0
       let sgstAmount = 0
@@ -218,14 +250,12 @@ export const useQuotationData = (initialSpecialDiscount = 0) => {
     })
   }
 
-  // Handle special discount change - EXACTLY like quotation code
   const handleSpecialDiscountChange = (value) => {
     const discount = Number(value) || 0
     setSpecialDiscount(discount)
 
     setQuotationData((prev) => {
-      // Update the total with special discount
-      const taxableAmount = prev.subtotal // Don't subtract totalFlatDiscount
+      const taxableAmount = prev.subtotal
       const totalBeforeSpecialDiscount = taxableAmount + prev.cgstAmount + prev.sgstAmount
       const newTotal = Math.max(0, totalBeforeSpecialDiscount - discount)
 

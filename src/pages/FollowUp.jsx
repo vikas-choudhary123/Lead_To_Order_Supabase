@@ -50,6 +50,7 @@ function FollowUp() {
     nextAction: true,
     callDate: true,
     callTime: true,
+    itemQty: true, // Add this line
   })
   const [showColumnDropdown, setShowColumnDropdown] = useState(false)
 
@@ -184,6 +185,22 @@ function FollowUp() {
     }
   }
 
+  // Add this helper function after the other helper functions (around line 100)
+const formatItemQty = (itemQtyString) => {
+  if (!itemQtyString) return ""
+  
+  try {
+    const items = JSON.parse(itemQtyString)
+    return items
+      .filter(item => item.name && item.quantity && item.quantity !== "0")
+      .map(item => `${item.name} : ${item.quantity}`)
+      .join(", ")
+  } catch (error) {
+    console.error("Error parsing item quantity:", error)
+    return itemQtyString // Return original string if parsing fails
+  }
+}
+
   // Helper function to check date filter condition
   // Helper function to check date filter condition
   const checkDateFilter = (followUp, filterType) => {
@@ -291,7 +308,8 @@ function FollowUp() {
               // Only include rows where column K has data, column L is null/empty, and user has access
               if (hasColumnK && isColumnLEmpty && shouldInclude) {
                 const followUpItem = {
-                  timestamp: row.c[50] ? formatDateToDDMMYYYY(row.c[50].v) : "", // Column A (index 0)
+                  // timestamp: row.c[50] ? formatDateToDDMMYYYY(row.c[50].v) : "", // Column A (index 0)
+                  timestamp: row.c[0] ? formatDateToDDMMYYYY(row.c[0].v) : "", // Column A (index 0)
                   id: row.c[0] ? row.c[0].v : "",
                   leadId: row.c[1] ? row.c[1].v : "",
                   companyName: row.c[4] ? row.c[4].v : "",
@@ -305,6 +323,7 @@ function FollowUp() {
                   nextCallDate: row.c[89] ? row.c[89].v : "", // Column CL (index 89) for date filtering
                   priority: determinePriority(row.c[3] ? row.c[3].v : ""),
                   assignedTo: assignedUser, // Add assigned user to the follow-up item
+                  itemQty: row.c[96] ? row.c[96].v : "",
                 }
 
                 pendingFollowUpData.push(followUpItem)
@@ -357,6 +376,7 @@ function FollowUp() {
                   nextCallTime: row.c[23] ? formatNextCallTime(row.c[23].v) : "",
                   historyDateFilter: row.c[25] ? row.c[25].v : "",
                   assignedTo: assignedUser, // Add assigned user to the history item
+                  itemQty: row.c[28] ? row.c[28].v : "", // Add this line - Column AC (index 28)
                 }
 
                 historyFollowUpData.push(followUpItem)
@@ -648,6 +668,7 @@ function FollowUp() {
     { key: "nextAction", label: "Next Action" },
     { key: "callDate", label: "Call Date" },
     { key: "callTime", label: "Call Time" },
+    { key: "itemQty", label: "Item/Qty" }, // Add this line
   ]
 
   // Get the counts
@@ -975,13 +996,19 @@ function FollowUp() {
                                 Enquiry Status
                               </th>
                               {isAdmin() && (
-                                <th
-                                  scope="col"
-                                  className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap"
-                                >
-                                  Assigned To
-                                </th>
-                              )}
+  <th
+    scope="col"
+    className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap"
+  >
+    Assigned To
+  </th>
+)}
+<th
+  scope="col"
+  className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap"
+>
+  Item/Qty
+</th>
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
@@ -1057,18 +1084,26 @@ function FollowUp() {
                                     </div>
                                   </td>
                                   {isAdmin() && (
-                                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
-                                      {followUp.assignedTo}
-                                    </td>
-                                  )}
+  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500 whitespace-nowrap">
+    {followUp.assignedTo}
+  </td>
+)}
+<td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+  <div
+    className="min-w-[300px] break-words whitespace-normal"
+    title={formatItemQty(followUp.itemQty)}
+  >
+    {formatItemQty(followUp.itemQty)}
+  </div>
+</td>
                                 </tr>
                               ))
                             ) : (
                               <tr>
-                                <td
-                                  colSpan={isAdmin() ? 10 : 9}
-                                  className="px-4 py-8 text-center text-sm text-slate-500"
-                                >
+                       <td
+  colSpan={isAdmin() ? 12 : 11} // Increased by 1 for the new column
+  className="px-4 py-8 text-center text-sm text-slate-500"
+>
                                   <div className="flex flex-col items-center space-y-2">
                                     <svg
                                       className="h-12 w-12 text-gray-300"
@@ -1224,10 +1259,15 @@ function FollowUp() {
                                 </th>
                               )}
                               {visibleColumns.callTime && (
-                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                                  Call Time
-                                </th>
-                              )}
+  <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+    Call Time
+  </th>
+)}
+{visibleColumns.itemQty && (
+  <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+    Item/Qty
+  </th>
+)}
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
@@ -1424,6 +1464,16 @@ function FollowUp() {
                                       {followUp.nextCallTime}
                                     </td>
                                   )}
+                                  {visibleColumns.itemQty && (
+  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
+    <div
+      className="min-w-[300px] break-words whitespace-normal"
+      title={formatItemQty(followUp.itemQty)}
+    >
+      {formatItemQty(followUp.itemQty)}
+    </div>
+  </td>
+)}
                                 </tr>
                               ))
                             ) : (

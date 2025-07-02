@@ -195,6 +195,22 @@ function CallTracker() {
     }
   }
 
+  const formatItemQty = (itemQtyString) => {
+    if (!itemQtyString) return ""
+    
+    try {
+      const items = JSON.parse(itemQtyString)
+      return items
+        .filter(item => item.name && item.quantity && item.quantity !== "0")
+        .map(item => `${item.name} : ${item.quantity}`)
+        .join(", ")
+    } catch (error) {
+      console.error("Error parsing item quantity:", error)
+      return itemQtyString // Return original string if parsing fails
+    }
+  }
+  
+
 // Replace the matchesCallingDaysFilter function with this updated version
 const matchesCallingDaysFilter = (dateStr, activeTab) => {
   if (callingDaysFilter.length === 0) return true;
@@ -378,6 +394,7 @@ const columnOptions = [
                   currentStage: row.c[57] ? row.c[57].v : "", // Column BF - Current Stage
                   // callingDate: row.c[90] ? formatDateToDDMMYYYY(row.c[90].v) : "", // Column CM - Calling Date
                   callingDate: row.c[90] ? String(row.c[90].v).toLowerCase() : "", // Column CM - Calling Date 
+                  itemQty: row.c[96] ? row.c[96].v : "", 
                 }
 
                 pendingCallTrackerData.push(callTrackerItem)
@@ -447,6 +464,7 @@ if (historyData && historyData.table && historyData.table.rows) {
           // callingDate: formatDateToDDMMYYYY(row.c[41] ? row.c[41].v : ""), // Column AP - Calling Date
           callingDate: row.c[41] ? String(row.c[41].v).toLowerCase() : "", // Column AP - Calling Date 
           assignedTo: assignedUser, // Add assigned user to the history item
+          itemQty: row.c[28] ? row.c[28].v : "",
         }
 
         historyCallTrackerData.push(callTrackerItem)
@@ -492,6 +510,7 @@ if (historyData && historyData.table && historyData.table.rows) {
                   callingDate1: row.c[58] ? formatDateToDDMMYYYY(row.c[58].v) : "", // Column BY - Calling Date as text
                   
                   callingDate: row.c[76] ? String(row.c[76].v).toLowerCase() : "", // Column BY - Calling Date as text
+                  itemQty: row.c[79] ? row.c[79].v : "",
                 }
 
                 directEnquiryPendingData.push(directEnquiryItem)
@@ -1156,6 +1175,12 @@ const filterCounts = calculateFilterCounts();
                             Assigned To
                           </th>
                         )}
+                        <th
+  scope="col"
+  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+>
+  Item/Qty
+</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -1223,11 +1248,22 @@ const filterCounts = calculateFilterCounts();
                                 {tracker.assignedTo}
                               </td>
                             )}
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+  <div
+    className="min-w-[300px] break-words whitespace-normal"
+    title={formatItemQty(tracker.itemQty)}
+  >
+    {formatItemQty(tracker.itemQty)}
+  </div>
+</td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={isAdmin() ? 10 : 9} className="px-6 py-4 text-center text-sm text-slate-500">
+                          <td
+  colSpan={isAdmin() ? 11 : 10} // Updated to include the new Item/Qty column
+  className="px-6 py-4 text-center text-sm text-slate-500"
+>
                             No pending call trackers found
                           </td>
                         </tr>
@@ -1281,6 +1317,12 @@ const filterCounts = calculateFilterCounts();
                         >
                           Calling Date
                         </th>
+                        <th
+  scope="col"
+  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+>
+  Item/Qty
+</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -1333,11 +1375,19 @@ const filterCounts = calculateFilterCounts();
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               {tracker.callingDate1}
                             </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+  <div
+    className="min-w-[300px] break-words whitespace-normal"
+    title={formatItemQty(tracker.itemQty)}
+  >
+    {formatItemQty(tracker.itemQty)}
+  </div>
+</td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={6} className="px-6 py-4 text-center text-sm text-slate-500">
+                          <td colSpan={7} className="px-6 py-4 text-center text-sm text-slate-500">
                             No direct enquiry pending trackers found
                           </td>
                         </tr>

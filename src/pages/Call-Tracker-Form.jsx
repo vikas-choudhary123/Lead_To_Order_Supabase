@@ -294,7 +294,7 @@ const [assignToProjectOptions, setAssignToProjectOptions] = useState([])
 
   // Function to handle adding a new item
   const addItem = () => {
-    if (items.length < 10) { // Only add if less than 10 items
+    if (items.length < 300) { // Only add if less than 10 items
       const newId = (items.length + 1).toString()
       setItems([...items, { id: newId, name: "", quantity: "" }])
     }
@@ -330,6 +330,7 @@ const [assignToProjectOptions, setAssignToProjectOptions] = useState([])
 
   // Function to handle form submission
 // Function to handle form submission
+// Replace the existing handleSubmit function with this modified version
 const handleSubmit = async () => {
   setIsSubmitting(true)
   try {
@@ -361,20 +362,20 @@ const handleSubmit = async () => {
       enquiryFormData.enquiryApproach, // S: Enquiry Approach
     )
 
-    // Add item details (columns T-AC)
-    // Process up to 5 items (name and quantity pairs)
-    const allItems = [...items]
+    // Handle first 10 items (columns T-AC)
+    const first10Items = items.slice(0, 10)
     
-    // Ensure we have exactly 5 items (adding empty ones if needed)
-    while (allItems.length < 5) {
-      allItems.push({ id: `empty-${allItems.length + 1}`, name: "", quantity: "" })
-    }
-    
-    // Add all 5 items, each with name and quantity
-    allItems.slice(0, 5).forEach(item => {
-      rowData.push(item.name) // Item name
-      rowData.push(item.quantity) // Quantity
+    // Add first 10 items in pairs (name, quantity)
+    first10Items.forEach((item) => {
+      rowData.push(item.name || "") // Product name
+      rowData.push(item.quantity || "0") // Quantity (0 if null/empty)
     })
+
+    // If less than 10 items, fill remaining slots with empty values
+    const remainingSlots = 10 - first10Items.length
+    for (let i = 0; i < remainingSlots; i++) {
+      rowData.push("", "0") // Empty name and 0 quantity
+    }
 
     // Add expected form data
     rowData.push(
@@ -395,6 +396,22 @@ const handleSubmit = async () => {
     
     // Add SC Name at column BX (index 75)
     rowData.push(newCallTrackerData.scName || "") // BX: SC Name
+
+    // Add empty columns up to column CB (index 81) for additional items JSON
+    while (rowData.length < 79) {
+      rowData.push("")
+    }
+
+    // Handle items 11 and onwards as JSON in column CB (index 81)
+    if (items.length > 10) {
+      const additionalItems = items.slice(10).map(item => ({
+        name: item.name || "",
+        quantity: item.quantity || "0"
+      }))
+      rowData.push(JSON.stringify(additionalItems)) // Column CB
+    } else {
+      rowData.push("") // Empty if no additional items
+    }
 
     console.log("Row Data to be submitted:", rowData)
 
@@ -791,10 +808,10 @@ const handleSubmit = async () => {
                 <button
   type="button"
   onClick={addItem}
-  disabled={items.length >= 10}
-  className={`px-3 py-1 text-xs border border-amber-200 text-amber-600 hover:bg-amber-50 rounded-md ${items.length >= 10 ? 'opacity-50 cursor-not-allowed' : ''}`}
+  disabled={items.length >= 300}
+  className={`px-3 py-1 text-xs border border-amber-200 text-amber-600 hover:bg-amber-50 rounded-md ${items.length >= 300 ? 'opacity-50 cursor-not-allowed' : ''}`}
 >
-  + Add Item {items.length >= 10 ? '(Max reached)' : ''}
+  + Add Item {items.length >= 300 ? '(Max reached)' : ''}
 </button>
               </div>
 

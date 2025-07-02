@@ -2,12 +2,17 @@
 
 import { getCompanyPrefix, getNextQuotationNumber } from "./quotation-service"
 
-const ConsigneeDetails = ({ 
-  quotationData, 
-  handleInputChange, 
-  companyOptions, 
+const ConsigneeDetails = ({
+  quotationData,
+  handleInputChange,
+  companyOptions,
   dropdownData,
-  onQuotationNumberUpdate // New prop to update quotation number
+  onQuotationNumberUpdate,
+  onAutoFillItems,
+  showLeadNoDropdown,
+  setShowLeadNoDropdown,
+  leadNoOptions,
+  handleLeadNoSelect,
 }) => {
   const handleCompanyChange = async (e) => {
     const selectedCompany = e.target.value
@@ -23,17 +28,25 @@ const ConsigneeDetails = ({
       handleInputChange("consigneeGSTIN", companyDetails.gstin)
       handleInputChange("consigneeStateCode", companyDetails.stateCode)
 
-      // NEW: Get company prefix and update quotation number
+      // Get company prefix and update quotation number
       try {
         const companyPrefix = await getCompanyPrefix(selectedCompany)
         const newQuotationNumber = await getNextQuotationNumber(companyPrefix)
-        
-        // Update quotation number through callback
+
         if (onQuotationNumberUpdate) {
           onQuotationNumberUpdate(newQuotationNumber)
         }
       } catch (error) {
         console.error("Error updating quotation number:", error)
+      }
+
+      // Auto-fill items based on company selection
+      if (onAutoFillItems) {
+        try {
+          await onAutoFillItems(selectedCompany)
+        } catch (error) {
+          console.error("Error auto-filling items:", error)
+        }
       }
     } else {
       handleInputChange("consigneeAddress", "")
@@ -45,10 +58,46 @@ const ConsigneeDetails = ({
     }
   }
 
+  const handleLeadNoChange = (e) => {
+    const selectedLeadNo = e.target.value
+    if (handleLeadNoSelect) {
+      handleLeadNoSelect(selectedLeadNo)
+    }
+  }
+
   return (
     <>
-      <h3 className="text-lg font-medium mb-4">Consignee Details</h3>
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-medium">Consignee Details</h3>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowLeadNoDropdown(!showLeadNoDropdown)}
+            className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            {showLeadNoDropdown ? "Remove" : "Show"} Lead No.
+          </button>
+        </div>
+      </div>
+
       <div className="space-y-4">
+        {showLeadNoDropdown && (
+          <div className="space-y-2 p-3 bg-gray-50 rounded-md">
+            <label className="block text-sm font-medium">Lead No.</label>
+            <input
+              list="leadNoOptions"
+              onChange={handleLeadNoChange}
+              className="w-full p-2 border border-gray-300 rounded-md"
+              placeholder="Select or type lead number"
+            />
+            <datalist id="leadNoOptions">
+              {leadNoOptions.map((option) => (
+                <option key={option} value={option} />
+              ))}
+            </datalist>
+          </div>
+        )}
+
         <div className="space-y-2">
           <label className="block text-sm font-medium">Company Name</label>
           <input
