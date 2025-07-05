@@ -401,6 +401,20 @@ const handleGenerateLink = async () => {
     setIsSubmitting(true)
 
     try {
+      // Calculate grand total
+      const taxableAmount = Math.max(0, quotationData.subtotal - quotationData.totalFlatDiscount)
+      let grandTotal = 0
+      
+      if (quotationData.isIGST) {
+        const igstAmt = taxableAmount * (quotationData.igstRate / 100)
+        grandTotal = taxableAmount + igstAmt - (Number(specialDiscount) || 0)
+      } else {
+        const cgstAmt = taxableAmount * (quotationData.cgstRate / 100)
+        const sgstAmt = taxableAmount * (quotationData.sgstRate / 100)
+        grandTotal = taxableAmount + cgstAmt + sgstAmt - (Number(specialDiscount) || 0)
+      }
+      
+      const finalGrandTotal = Math.max(0, grandTotal).toFixed(2)
       const base64Data = generatePDFFromData(quotationData, selectedReferences, specialDiscount)
 
       let finalQuotationNo = quotationData.quotationNo
@@ -530,6 +544,7 @@ const handleGenerateLink = async () => {
         itemsString,
         specialOffersString, // Add special offers before PDF URL
         pdfUrl,
+        finalGrandTotal,
       ]
 
       const sheetParams = {
