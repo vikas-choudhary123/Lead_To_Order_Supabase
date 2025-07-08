@@ -328,6 +328,13 @@ const [assignToProjectOptions, setAssignToProjectOptions] = useState([])
     }
   }
 
+  const calculateTotalQuantity = () => {
+    return items.reduce((total, item) => {
+      const quantity = parseInt(item.quantity) || 0
+      return total + quantity
+    }, 0)
+  }
+
   // Function to handle form submission
 // Function to handle form submission
 // Replace the existing handleSubmit function with this modified version
@@ -412,6 +419,9 @@ const handleSubmit = async () => {
     } else {
       rowData.push("") // Empty if no additional items
     }
+
+    // Add total quantity in column CC (index 82)
+    rowData.push(calculateTotalQuantity().toString())
 
     console.log("Row Data to be submitted:", rowData)
 

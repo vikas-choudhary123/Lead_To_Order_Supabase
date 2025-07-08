@@ -114,129 +114,138 @@ function NewFollowUp() {
     }))
   }
 
-  // Replace the existing handleSubmit function with this modified version
-const handleSubmit = async (e) => {
-  e.preventDefault()
-  setIsSubmitting(true)
-
-  try {
-    const currentDate = new Date()
-    const formattedDate = formatDate(currentDate)
-
-    // Prepare base row data (columns A-E)
-    const rowData = [
-      formattedDate, // A: Current date
-      formData.leadNo, // B: Lead Number
-      document.getElementById("customerFeedback").value, // C: Customer feedback
-      leadStatus, // D: Hot/Cold/Warm status
-      enquiryStatus, // E: Enquiry Status
-    ]
-
-    // Handle different scenarios
-    if (enquiryStatus === "expected") {
-      // Explicitly add columns F-K as empty (6 empty columns)
-      rowData.push("", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "")
-
-      // Then add columns V, W, X
-      rowData.push(
-        document.getElementById("nextAction").value, // V: Next action
-        document.getElementById("nextCallDate").value, // W: Next call date
-        document.getElementById("nextCallTime").value, // X: Next call time
-      )
-    } 
-    else if (enquiryStatus === "yes") {
-      // Add columns F-K
-      rowData.push(
-        document.getElementById("enquiryDate").value, // F: Enquiry Received Date
-        document.getElementById("enquiryState").value, // G: Enquiry for State
-        document.getElementById("projectName").value, // H: Project Name (NOB)
-        document.getElementById("salesType").value, // I: Sales Type
-        formData.enquiryApproach, // J: Enquiry Approach
-        "", // K: Project Value (empty)
-      )
-
-      // Handle first 5 items (columns L-U)
-      const first5Items = items.slice(0, 5)
-      
-      // Add first 5 items in pairs (name, quantity)
-      first5Items.forEach((item) => {
-        rowData.push(item.name || "") // Product category
-        rowData.push(item.quantity || "0") // Quantity (0 if null/empty)
-      })
-
-      // If less than 5 items, fill remaining slots with empty values
-      const remainingSlots = 5 - first5Items.length
-      for (let i = 0; i < remainingSlots; i++) {
-        rowData.push("", "0") // Empty name and 0 quantity
-      }
-
-      // Pad to reach column AB (index 27)
-      while (rowData.length < 27) {
-        rowData.push("")
-      }
-
-      // Add tracking status in column AB (index 27)
-      rowData.push(document.getElementById("leadsTrackingStatus").value)
-
-      // Handle items 6 and onwards as JSON in column AC (index 28)
-      if (items.length > 5) {
-        const additionalItems = items.slice(5).map(item => ({
-          name: item.name || "",
-          quantity: item.quantity || "0"
-        }))
-        rowData.push(JSON.stringify(additionalItems)) // Column AC
-      } else {
-        rowData.push("") // Empty if no additional items
-      }
-      
-    } else if (enquiryStatus === "not-interested") {
-      // Pad columns F-K and then V-X with empty values
-      rowData.push("", "", "", "", "", "", "", "", "")
-    }
-
-    console.log("Row Data to be submitted:", rowData)
-
-    // Script URL - replace with your Google Apps Script URL
-    const scriptUrl =
-      "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
-
-    // Parameters for Google Apps Script
-    const params = {
-      sheetName: "Leads Tracker",
-      action: "insert",
-      rowData: JSON.stringify(rowData),
-    }
-
-    // Create URL-encoded string for the parameters
-    const urlParams = new URLSearchParams()
-    for (const key in params) {
-      urlParams.append(key, params[key])
-    }
-
-    // Send the data
-    const response = await fetch(scriptUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: urlParams,
-    })
-
-    const result = await response.json()
-
-    if (result.success) {
-      showNotification("Follow-up recorded successfully", "success")
-      navigate("/follow-up")
-    } else {
-      showNotification("Error recording follow-up: " + (result.error || "Unknown error"), "error")
-    }
-  } catch (error) {
-    console.error("Error submitting form:", error)
-    showNotification("Error submitting form: " + error.message, "error")
-  } finally {
-    setIsSubmitting(false)
+  const calculateTotalQuantity = () => {
+    return items.reduce((total, item) => {
+      const quantity = parseInt(item.quantity) || 0
+      return total + quantity
+    }, 0)
   }
-}
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+  
+    try {
+      const currentDate = new Date()
+      const formattedDate = formatDate(currentDate)
+  
+      // Prepare base row data (columns A-E)
+      const rowData = [
+        formattedDate, // A: Current date
+        formData.leadNo, // B: Lead Number
+        document.getElementById("customerFeedback").value, // C: Customer feedback
+        leadStatus, // D: Hot/Cold/Warm status
+        enquiryStatus, // E: Enquiry Status
+      ]
+  
+      // Handle different scenarios
+      if (enquiryStatus === "expected") {
+        // Explicitly add columns F-K as empty (6 empty columns)
+        rowData.push("", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "")
+  
+        // Then add columns V, W, X
+        rowData.push(
+          document.getElementById("nextAction").value, // V: Next action
+          document.getElementById("nextCallDate").value, // W: Next call date
+          document.getElementById("nextCallTime").value, // X: Next call time
+        )
+      } 
+      else if (enquiryStatus === "yes") {
+        // Add columns F-K
+        rowData.push(
+          document.getElementById("enquiryDate").value, // F: Enquiry Received Date
+          document.getElementById("enquiryState").value, // G: Enquiry for State
+          document.getElementById("projectName").value, // H: Project Name (NOB)
+          document.getElementById("salesType").value, // I: Sales Type
+          formData.enquiryApproach, // J: Enquiry Approach
+          "", // K: Project Value (empty)
+        )
+  
+        // Handle first 5 items (columns L-U)
+        const first5Items = items.slice(0, 5)
+        
+        // Add first 5 items in pairs (name, quantity)
+        first5Items.forEach((item) => {
+          rowData.push(item.name || "") // Product category
+          rowData.push(item.quantity || "0") // Quantity (0 if null/empty)
+        })
+  
+        // If less than 5 items, fill remaining slots with empty values
+        const remainingSlots = 5 - first5Items.length
+        for (let i = 0; i < remainingSlots; i++) {
+          rowData.push("", "0") // Empty name and 0 quantity
+        }
+  
+        // Pad to reach column AB (index 27)
+        while (rowData.length < 27) {
+          rowData.push("")
+        }
+  
+        // Add tracking status in column AB (index 27)
+        rowData.push(document.getElementById("leadsTrackingStatus").value)
+  
+        // Handle items 6 and onwards as JSON in column AC (index 28)
+        if (items.length > 5) {
+          const additionalItems = items.slice(5).map(item => ({
+            name: item.name || "",
+            quantity: item.quantity || "0"
+          }))
+          rowData.push(JSON.stringify(additionalItems)) // Column AC
+        } else {
+          rowData.push("") // Empty if no additional items
+        }
+  
+        // Add total quantity in column AD (index 29)
+        rowData.push(calculateTotalQuantity().toString())
+        
+      } else if (enquiryStatus === "not-interested") {
+        // Pad columns F-K and then V-X with empty values
+        rowData.push("", "", "", "", "", "", "", "", "")
+      }
+  
+      console.log("Row Data to be submitted:", rowData)
+  
+      // Script URL - replace with your Google Apps Script URL
+      const scriptUrl =
+        "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
+  
+      // Parameters for Google Apps Script
+      const params = {
+        sheetName: "Leads Tracker",
+        action: "insert",
+        rowData: JSON.stringify(rowData),
+      }
+  
+      // Create URL-encoded string for the parameters
+      const urlParams = new URLSearchParams()
+      for (const key in params) {
+        urlParams.append(key, params[key])
+      }
+  
+      // Send the data
+      const response = await fetch(scriptUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: urlParams,
+      })
+  
+      const result = await response.json()
+  
+      if (result.success) {
+        showNotification("Follow-up recorded successfully", "success")
+        navigate("/follow-up")
+      } else {
+        showNotification("Error recording follow-up: " + (result.error || "Unknown error"), "error")
+      }
+    } catch (error) {
+      console.error("Error submitting form:", error)
+      showNotification("Error submitting form: " + error.message, "error")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   // Function to format date as dd/mm/yyyy
   const formatDate = (date) => {
