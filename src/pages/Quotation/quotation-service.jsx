@@ -48,13 +48,14 @@ export const getNextQuotationNumber = async (companyPrefix = "NBD") => {
 }
 
 // NEW: Function to get company prefix from FMS sheet
+// NEW: Enhanced function to get company prefix from both FMS and ENQUIRY TO ORDER sheets
 export const getCompanyPrefix = async (companyName) => {
   const scriptUrl =
     "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
 
   try {
     const params = {
-      sheetName: "FMS",
+      sheetName: "FMS", // This parameter is still needed but the script will check both sheets
       action: "getCompanyPrefix",
       companyName: companyName,
     }
@@ -75,8 +76,10 @@ export const getCompanyPrefix = async (companyName) => {
     const result = await response.json()
 
     if (result.success && result.prefix) {
+      console.log("Retrieved company prefix:", result.prefix, "for company:", companyName)
       return result.prefix
     } else {
+      console.log("No prefix found, using default NBD")
       return "NBD" // Default fallback
     }
   } catch (error) {
