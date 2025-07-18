@@ -1,195 +1,100 @@
 "use client"
 
-import { getCompanyPrefix, getNextQuotationNumber } from "./quotation-service"
-
-const ConsigneeDetails = ({
-  quotationData,
-  handleInputChange,
-  companyOptions,
-  dropdownData,
-  onQuotationNumberUpdate,
-  onAutoFillItems,
-  showLeadNoDropdown,
-  setShowLeadNoDropdown,
-  leadNoOptions,
-  handleLeadNoSelect,
-}) => {
-  const handleCompanyChange = async (e) => {
-    const selectedCompany = e.target.value
-    handleInputChange("consigneeName", selectedCompany)
-
-    if (selectedCompany && dropdownData.companies && dropdownData.companies[selectedCompany]) {
-      const companyDetails = dropdownData.companies[selectedCompany]
-
-      handleInputChange("consigneeAddress", companyDetails.address)
-      handleInputChange("consigneeState", companyDetails.state)
-      handleInputChange("consigneeContactName", companyDetails.contactName)
-      handleInputChange("consigneeContactNo", companyDetails.contactNo)
-      handleInputChange("consigneeGSTIN", companyDetails.gstin)
-      handleInputChange("consigneeStateCode", companyDetails.stateCode)
-
-      // Get company prefix and update quotation number
-      try {
-        const companyPrefix = await getCompanyPrefix(selectedCompany)
-        const newQuotationNumber = await getNextQuotationNumber(companyPrefix)
-
-        if (onQuotationNumberUpdate) {
-          onQuotationNumberUpdate(newQuotationNumber)
-        }
-      } catch (error) {
-        console.error("Error updating quotation number:", error)
-      }
-
-      // Auto-fill items based on company selection
-      if (onAutoFillItems) {
-        try {
-          await onAutoFillItems(selectedCompany)
-        } catch (error) {
-          console.error("Error auto-filling items:", error)
-        }
-      }
-    } else {
-      handleInputChange("consigneeAddress", "")
-      handleInputChange("consigneeState", "")
-      handleInputChange("consigneeContactName", "")
-      handleInputChange("consigneeContactNo", "")
-      handleInputChange("consigneeGSTIN", "")
-      handleInputChange("consigneeStateCode", "")
-    }
-  }
-
-  const handleLeadNoChange = (e) => {
-    const selectedLeadNo = e.target.value
-    if (handleLeadNoSelect) {
-      handleLeadNoSelect(selectedLeadNo)
-    }
-  }
-
+const ConsigneeDetails = ({ quotationData, handleInputChange, isUserDisabled = false }) => {
   return (
-    <>
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-medium">Consignee Details</h3>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowLeadNoDropdown(!showLeadNoDropdown)}
-            className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            {showLeadNoDropdown ? "Remove" : "Show"} Lead No.
-          </button>
-        </div>
-      </div>
+    <div className="space-y-4 mt-6">
+      <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Consignee Details</h3>
 
-      <div className="space-y-4">
-        {showLeadNoDropdown && (
-          <div className="space-y-2 p-3 bg-gray-50 rounded-md">
-            <label className="block text-sm font-medium">Lead No.</label>
-            <input
-              list="leadNoOptions"
-              onChange={handleLeadNoChange}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              placeholder="Select or type lead number"
-            />
-            <datalist id="leadNoOptions">
-              {leadNoOptions.map((option) => (
-                <option key={option} value={option} />
-              ))}
-            </datalist>
-          </div>
-        )}
-
-        <div className="space-y-2">
-          <label className="block text-sm font-medium">Company Name</label>
-          <input
-            list="companyOptions"
-            value={quotationData.consigneeName}
-            onChange={handleCompanyChange}
-            className="w-full p-2 border border-gray-300 rounded-md"
-            required
-          />
-          <datalist id="companyOptions">
-            {companyOptions.map((option) => (
-              <option key={option} value={option} />
-            ))}
-          </datalist>
-        </div>
-
-        <div className="space-y-2">
-          <label className="block text-sm font-medium">Address</label>
-          <textarea
-            value={quotationData.consigneeAddress}
-            onChange={(e) => handleInputChange("consigneeAddress", e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-md"
-            rows={3}
-            placeholder="Enter address"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <label className="block text-sm font-medium">Ship To</label>
-          <textarea
-            value={quotationData.shipTo || ""}
-            onChange={(e) => handleInputChange("shipTo", e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-md"
-            rows={3}
-            placeholder="Enter shipping address if different from billing address"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <label className="block text-sm font-medium">State</label>
+      <div className="grid grid-cols-1 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
           <input
             type="text"
-            value={quotationData.consigneeState}
-            onChange={(e) => handleInputChange("consigneeState", e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-md"
-            placeholder="Enter State"
+            value={quotationData?.consigneeName || ""}
+            onChange={(e) => !isUserDisabled && handleInputChange("consigneeName", e.target.value)}
+            className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+              isUserDisabled ? "bg-gray-100 cursor-not-allowed" : ""
+            }`}
+            placeholder="Enter consignee name"
+            disabled={isUserDisabled}
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="block text-sm font-medium">Contact Name</label>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+          <textarea
+            value={quotationData?.consigneeAddress || ""}
+            onChange={(e) => !isUserDisabled && handleInputChange("consigneeAddress", e.target.value)}
+            className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+              isUserDisabled ? "bg-gray-100 cursor-not-allowed" : ""
+            }`}
+            rows="3"
+            placeholder="Enter consignee address"
+            disabled={isUserDisabled}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Mobile</label>
             <input
               type="text"
-              value={quotationData.consigneeContactName}
-              onChange={(e) => handleInputChange("consigneeContactName", e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-md"
+              value={quotationData?.consigneeMobile || ""}
+              onChange={(e) => !isUserDisabled && handleInputChange("consigneeMobile", e.target.value)}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                isUserDisabled ? "bg-gray-100 cursor-not-allowed" : ""
+              }`}
+              placeholder="Enter mobile number"
+              disabled={isUserDisabled}
             />
           </div>
-          <div className="space-y-2">
-            <label className="block text-sm font-medium">Contact No.</label>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
             <input
               type="text"
-              value={quotationData.consigneeContactNo}
-              onChange={(e) => handleInputChange("consigneeContactNo", e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-md"
+              value={quotationData?.consigneePhone || ""}
+              onChange={(e) => !isUserDisabled && handleInputChange("consigneePhone", e.target.value)}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                isUserDisabled ? "bg-gray-100 cursor-not-allowed" : ""
+              }`}
+              placeholder="Enter phone number"
+              disabled={isUserDisabled}
             />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="block text-sm font-medium">GSTIN</label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">GSTIN</label>
             <input
               type="text"
-              value={quotationData.consigneeGSTIN}
-              onChange={(e) => handleInputChange("consigneeGSTIN", e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-md"
+              value={quotationData?.consigneeGSTIN || ""}
+              onChange={(e) => !isUserDisabled && handleInputChange("consigneeGSTIN", e.target.value)}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                isUserDisabled ? "bg-gray-100 cursor-not-allowed" : ""
+              }`}
+              placeholder="Enter GSTIN"
+              disabled={isUserDisabled}
             />
           </div>
-          <div className="space-y-2">
-            <label className="block text-sm font-medium">State Code</label>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">State Code</label>
             <input
               type="text"
-              value={quotationData.consigneeStateCode}
-              onChange={(e) => handleInputChange("consigneeStateCode", e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-md"
+              value={quotationData?.consigneeStateCode || ""}
+              onChange={(e) => !isUserDisabled && handleInputChange("consigneeStateCode", e.target.value)}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                isUserDisabled ? "bg-gray-100 cursor-not-allowed" : ""
+              }`}
+              placeholder="Enter state code"
+              disabled={isUserDisabled}
             />
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 

@@ -672,27 +672,34 @@ export const generatePDFFromData = (quotationData, selectedReferences, specialDi
     currentY += 50
   }
 
+  // Add main document border (4 sides)
+  const addMainBorder = () => {
+    doc.setDrawColor(0, 0, 0)
+    doc.setLineWidth(1)
+    doc.rect(margin - 5, margin - 5, pageWidth - 2 * margin + 10, pageHeight - 2 * margin + 10)
+  }
+
   // Only add header on first page
   addPageHeader()
 
-  // FROM and TO sections side by side - With proper borders and background
+  // FROM and TO sections side by side - In one combined box
   const sectionWidth = (pageWidth - 3 * margin) / 2
   const sectionHeight = 55
   
-  // FROM section border and background
+  // Combined box for both FROM and TO sections
   doc.setFillColor(250, 250, 250) // Very light gray background
-  doc.rect(margin, currentY, sectionWidth, sectionHeight, "F")
+  doc.rect(margin, currentY, pageWidth - 2 * margin, sectionHeight, "F")
   doc.setDrawColor(0, 0, 0)
   doc.setLineWidth(0.5)
-  doc.rect(margin, currentY, sectionWidth, sectionHeight)
+  doc.rect(margin, currentY, pageWidth - 2 * margin, sectionHeight)
 
-  // TO section border and background
-  const toSectionX = margin + sectionWidth + 5
-  doc.setFillColor(250, 250, 250) // Very light gray background
-  doc.rect(toSectionX, currentY, sectionWidth, sectionHeight, "F")
+  // Add vertical separator line between FROM and TO
+  const separatorX = margin + sectionWidth + 7.5
   doc.setDrawColor(0, 0, 0)
   doc.setLineWidth(0.5)
-  doc.rect(toSectionX, currentY, sectionWidth, sectionHeight)
+  doc.line(separatorX, currentY, separatorX, currentY + sectionHeight)
+
+  const toSectionX = margin + sectionWidth + 15
 
   const consignorDetails = [
     String(selectedReferences && selectedReferences[0] ? selectedReferences[0] : "NEERAJ SIR"),
@@ -753,7 +760,7 @@ export const generatePDFFromData = (quotationData, selectedReferences, specialDi
   let toY = currentY + 17
   consigneeDetails.forEach((line) => {
     if (toY < currentY + sectionHeight - 3) {
-      const wrappedLines = wrapText(line, sectionWidth - 15)
+      const wrappedLines = wrapText(line, sectionWidth - 10)
       wrappedLines.forEach((wrappedLine) => {
         if (toY < currentY + sectionHeight - 3) {
           doc.text(wrappedLine, toSectionX + 5, toY)
@@ -872,18 +879,33 @@ export const generatePDFFromData = (quotationData, selectedReferences, specialDi
   currentY = summaryCurrentY + 15
 
   // Check if we need a new page for terms and bank details
-  checkSpace(60)
+  checkSpace(80)
 
-  // Terms & Conditions and Bank Details - Clean Layout with proper spacing
+  // Terms & Conditions and Bank Details - Combined in one section like FROM/TO
+  const termsBoxHeight = 65
+  
+  // Combined box for both Terms & Conditions and Bank Details sections
+  doc.setFillColor(250, 250, 250) // Very light gray background
+  doc.rect(margin, currentY, pageWidth - 2 * margin, termsBoxHeight, "F")
+  doc.setDrawColor(0, 0, 0)
+  doc.setLineWidth(0.5)
+  doc.rect(margin, currentY, pageWidth - 2 * margin, termsBoxHeight)
+
+  // Add vertical separator line between Terms and Bank Details
+  const termsSeparatorX = margin + sectionWidth + 7.5
+  doc.setDrawColor(0, 0, 0)
+  doc.setLineWidth(0.5)
+  doc.line(termsSeparatorX, currentY, termsSeparatorX, currentY + termsBoxHeight)
+
   const leftColumnX = margin
-  const rightColumnX = pageWidth / 2 + 5
-  const columnWidth = (pageWidth - 3 * margin) / 2 - 5
+  const rightColumnX = margin + sectionWidth + 15
+  const columnWidth = sectionWidth - 10
 
-  // Terms & Conditions (left column)
+  // Terms & Conditions header
   doc.setFont("helvetica", "bold")
   doc.setFontSize(11)
   doc.setTextColor(0, 50, 100) // Dark blue for section headers
-  doc.text("Terms & Conditions:", leftColumnX, currentY)
+  doc.text("Terms & Conditions:", leftColumnX + 5, currentY + 10)
 
   const terms = [
     { label: "Validity", value: quotationData.validity || "The above quoted prices are valid up to 5 days from date of offer." },
@@ -894,32 +916,36 @@ export const generatePDFFromData = (quotationData, selectedReferences, specialDi
     { label: "Taxes", value: quotationData.taxes || "Extra as per actual." },
   ]
 
-  let termsY = currentY + 12
-  doc.setFontSize(9)
+  let termsY = currentY + 15
+  doc.setFontSize(8)
 
   terms.forEach((term) => {
-    // Label in bold
-    doc.setFont("helvetica", "bold")
-    doc.setTextColor(0, 0, 0)
-    doc.text(`${term.label}:`, leftColumnX, termsY)
-    
-    // Value in normal font with proper spacing
-    doc.setFont("helvetica", "normal")
-    const labelWidth = 35 // Fixed width for consistent alignment
-    const wrappedLines = wrapText(term.value, columnWidth - labelWidth)
-    
-    wrappedLines.forEach((line, index) => {
-      doc.text(line, leftColumnX + labelWidth, termsY + (index * 4))
-    })
-    
-    termsY += Math.max(7, wrappedLines.length * 4) + 2
+    if (termsY < currentY + termsBoxHeight - 5) {
+      // Label in bold
+      doc.setFont("helvetica", "bold")
+      doc.setTextColor(0, 0, 0)
+      doc.text(`${term.label}:`, leftColumnX + 5, termsY)
+      
+      // Value in normal font with proper spacing
+      doc.setFont("helvetica", "normal")
+      const labelWidth = 30 // Fixed width for consistent alignment
+      const wrappedLines = wrapText(term.value, columnWidth - labelWidth - 10)
+      
+      wrappedLines.forEach((line, index) => {
+        if (termsY + (index * 3) < currentY + termsBoxHeight - 5) {
+          doc.text(line, leftColumnX + 5 + labelWidth, termsY + (index * 3))
+        }
+      })
+      
+      termsY += Math.max(5, wrappedLines.length * 3) + 1
+    }
   })
 
-  // Bank Details (right column) - Fixed spacing and alignment
+  // Bank Details header
   doc.setFont("helvetica", "bold")
   doc.setFontSize(11)
   doc.setTextColor(0, 50, 100) // Dark blue for section headers
-  doc.text("Bank Details:", rightColumnX, currentY)
+  doc.text("Bank Details:", rightColumnX + 5, currentY + 10)
 
   const bankDetails = [
     { label: "Account No", value: String(quotationData.accountNo || "438605000447") },
@@ -931,28 +957,32 @@ export const generatePDFFromData = (quotationData, selectedReferences, specialDi
     { label: "PAN", value: String(quotationData.pan || "AAGCD9326H") },
   ]
 
-  let bankY = currentY + 12
-  doc.setFontSize(9)
+  let bankY = currentY + 15
+  doc.setFontSize(8)
 
   bankDetails.forEach((detail) => {
-    // Label in bold
-    doc.setFont("helvetica", "bold")
-    doc.setTextColor(0, 0, 0)
-    doc.text(`${detail.label}:`, rightColumnX, bankY)
-    
-    // Value in normal font with proper spacing
-    doc.setFont("helvetica", "normal")
-    const labelWidth = 35 // Fixed width for consistent alignment
-    const wrappedLines = wrapText(String(detail.value || ""), columnWidth - labelWidth)
-    
-    wrappedLines.forEach((line, index) => {
-      doc.text(line, rightColumnX + labelWidth, bankY + (index * 4))
-    })
-    
-    bankY += Math.max(7, wrappedLines.length * 4) + 2
+    if (bankY < currentY + termsBoxHeight - 5) {
+      // Label in bold
+      doc.setFont("helvetica", "bold")
+      doc.setTextColor(0, 0, 0)
+      doc.text(`${detail.label}:`, rightColumnX + 5, bankY)
+      
+      // Value in normal font with proper spacing
+      doc.setFont("helvetica", "normal")
+      const labelWidth = 30 // Fixed width for consistent alignment
+      const wrappedLines = wrapText(String(detail.value || ""), columnWidth - labelWidth - 10)
+      
+      wrappedLines.forEach((line, index) => {
+        if (bankY + (index * 3) < currentY + termsBoxHeight - 5) {
+          doc.text(line, rightColumnX + 5 + labelWidth, bankY + (index * 3))
+        }
+      })
+      
+      bankY += Math.max(5, wrappedLines.length * 3) + 1
+    }
   })
 
-  currentY = Math.max(termsY, bankY) + 20
+  currentY += termsBoxHeight + 20
 
   // Signature section
   const signatureY = currentY
@@ -1026,6 +1056,9 @@ export const generatePDFFromData = (quotationData, selectedReferences, specialDi
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i)
 
+    // Add main document border on each page
+    addMainBorder()
+
     doc.setFontSize(7)
     doc.setTextColor(120, 120, 120)
     doc.setFont("helvetica", "normal")
@@ -1041,7 +1074,3 @@ export const generatePDFFromData = (quotationData, selectedReferences, specialDi
 
   return doc.output("datauristring").split(",")[1]
 }
-
-
-
-
