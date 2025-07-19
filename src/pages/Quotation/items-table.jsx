@@ -13,6 +13,7 @@ const ItemsTable = ({
     productData,
     setQuotationData,
     handleSpecialDiscountChange, // Add this
+    isLoading, // Add this prop
   }) => {
   const [hideDisc, setHideDisc] = useState(false)
   const [hideFlatDisc, setHideFlatDisc] = useState(false)
@@ -32,6 +33,7 @@ const ItemsTable = ({
   return (
     <div className="bg-white border rounded-lg p-4 shadow-sm">
       <div className="space-y-4">
+        
         <div className="flex justify-between items-center">
           <h3 className="text-lg font-medium">Items</h3>
           <div className="flex gap-2 flex-wrap">
@@ -62,13 +64,19 @@ const ItemsTable = ({
             <button
               className="px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50"
               onClick={handleAddItem}
+              disabled={isLoading} // Disable button while loading
             >
               <PlusIcon className="h-4 w-4 inline mr-1" /> Add Item
             </button>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto relative">
+          {isLoading && (
+            <div className="absolute inset-0 bg-white bg-opacity-70 flex items-center justify-center z-10">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          )}
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -106,6 +114,7 @@ const ItemsTable = ({
                         }}
                         list={`code-list-${item.id}`}
                         className="w-24 p-1 border border-gray-300 rounded-md"
+                        disabled={isLoading} // Disable while loading
                       />
                       <datalist id={`code-list-${item.id}`}>
                         {productCodes.map((code) => (
@@ -131,6 +140,7 @@ const ItemsTable = ({
                         list={`name-list-${item.id}`}
                         className="w-full p-1 border border-gray-300 rounded-md"
                         placeholder="Enter item name"
+                        disabled={isLoading} // Disable while loading
                         required
                       />
                       <datalist id={`name-list-${item.id}`}>
@@ -148,6 +158,7 @@ const ItemsTable = ({
                         onChange={(e) => handleItemChange(item.id, "description", e.target.value)}
                         className="w-full p-1 border border-gray-300 rounded-md"
                         placeholder="Enter description"
+                        disabled={isLoading} // Disable while loading
                       />
                     </div>
                   </td>
@@ -156,6 +167,7 @@ const ItemsTable = ({
                       value={item.gst}
                       onChange={(e) => handleItemChange(item.id, "gst", Number.parseInt(e.target.value))}
                       className="w-20 p-1 border border-gray-300 rounded-md"
+                      disabled={isLoading} // Disable while loading
                     >
                       <option value="0">0%</option>
                       <option value="18">18%</option>
@@ -169,6 +181,7 @@ const ItemsTable = ({
                       className="w-16 p-1 border border-gray-300 rounded-md"
                       placeholder="0"
                       required
+                      disabled={isLoading} // Disable while loading
                     />
                   </td>
                   <td className="px-4 py-2">
@@ -176,6 +189,7 @@ const ItemsTable = ({
                       value={item.units}
                       onChange={(e) => handleItemChange(item.id, "units", e.target.value)}
                       className="w-20 p-1 border border-gray-300 rounded-md"
+                      disabled={isLoading} // Disable while loading
                     >
                       <option value="Nos">Nos</option>
                       <option value="Pcs">Pcs</option>
@@ -190,6 +204,7 @@ const ItemsTable = ({
                       onChange={(e) => handleItemChange(item.id, "rate", Number.parseFloat(e.target.value) || 0)}
                       className="w-24 p-1 border border-gray-300 rounded-md"
                       placeholder="0.00"
+                      disabled={isLoading} // Disable while loading
                       required
                     />
                   </td>
@@ -203,6 +218,7 @@ const ItemsTable = ({
                         placeholder="0%"
                         min="0"
                         max="100"
+                        disabled={isLoading} // Disable while loading
                       />
                     </td>
                   )}
@@ -217,6 +233,7 @@ const ItemsTable = ({
                         className="w-24 p-1 border border-gray-300 rounded-md"
                         placeholder="0.00"
                         min="0"
+                        disabled={isLoading} // Disable while loading
                       />
                     </td>
                   )}
@@ -262,7 +279,8 @@ const ItemsTable = ({
                           total,
                         })
                       }}
-                      disabled={quotationData.items.length <= 1}
+                      // disabled={quotationData.items.length <= 1}
+                      disabled={quotationData.items.length <= 1 || isLoading} // Disable while 
                     >
                       <TrashIcon className="h-4 w-4" />
                     </button>
@@ -344,6 +362,7 @@ const ItemsTable = ({
                       className="w-24 p-1 border border-gray-300 rounded-md"
                       min="0"
                       placeholder="0.00"
+                      disabled={isLoading} // Disable while loading
                     />
                   </td>
                   <td></td>

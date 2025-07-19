@@ -45,6 +45,7 @@ const QuotationForm = ({
   const [productCodes, setProductCodes] = useState([])
   const [productNames, setProductNames] = useState([])
   const [productData, setProductData] = useState({})
+  const [isItemsLoading, setIsItemsLoading] = useState(false);
 
   // NEW: Lead number states
   const [showLeadNoDropdown, setShowLeadNoDropdown] = useState(false)
@@ -364,8 +365,10 @@ useEffect(() => {
 // NEW: Handle lead number selection and autofill
 const handleLeadNoSelect = async (selectedLeadNo) => {
   if (!selectedLeadNo || selectedLeadNo === "Select Lead No." || !leadNoData[selectedLeadNo]) {
-    return
+    return;
   }
+
+  setIsItemsLoading(true); // Start loading
 
   const leadData = leadNoData[selectedLeadNo]
   console.log("Selected lead data:", leadData)
@@ -435,6 +438,7 @@ const handleLeadNoSelect = async (selectedLeadNo) => {
   if (leadData.sheet === "FMS") {
     const row = leadData.rowData
     const baValue = row[52] ? safeToString(row[52].v) : ""
+    const bbValue = row[53] ? safeToString(row[53].v) : ""
     const biValue = row[60] ? safeToString(row[60].v) : ""
 
     console.log("FMS Lead - BA Value:", baValue, "BI Value:", biValue)
@@ -497,11 +501,12 @@ const handleLeadNoSelect = async (selectedLeadNo) => {
   } else if (leadData.sheet === "ENQUIRY") {
     const row = leadData.rowData
     const alValue = row[37] ? safeToString(row[37].v) : ""
+    const amValue = row[38] ? safeToString(row[38].v) : ""
     const atValue = row[45] ? safeToString(row[45].v) : ""
 
     console.log("ENQUIRY Lead - AL Value:", alValue, "AT Value:", atValue)
 
-    if (alValue !== "" && atValue === "") {
+    if (alValue !== "" && amValue === "") {
       console.log("Processing ENQUIRY lead items...")
 
       // FIRST: Process regular columns R-AK (indices 17-36) - 10 items
@@ -646,6 +651,7 @@ const handleLeadNoSelect = async (selectedLeadNo) => {
   } else {
     console.log("No items found for this lead")
   }
+  
 }
 
   // Function to auto-fill items based on company selection
@@ -881,6 +887,8 @@ const handleLeadNoSelect = async (selectedLeadNo) => {
       }
     } catch (error) {
       console.error("Error auto-filling items:", error)
+    } finally {
+      setIsItemsLoading(false); // Stop loading regardless of success/failure
     }
   }
 
@@ -937,6 +945,7 @@ const handleLeadNoSelect = async (selectedLeadNo) => {
         productCodes={productCodes}
         productNames={productNames}
         productData={productData}
+        isLoading={isItemsLoading} // Add this prop
       />
 
       <TermsAndConditions
