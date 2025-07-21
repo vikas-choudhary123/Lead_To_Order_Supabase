@@ -1,6 +1,5 @@
 "use client"
 import { PlusIcon, TrashIcon } from "../../components/Icons"
-import { useState } from "react"
 
 const ItemsTable = ({
     quotationData,
@@ -12,13 +11,17 @@ const ItemsTable = ({
     productNames,
     productData,
     setQuotationData,
-    handleSpecialDiscountChange, // Add this
-    isLoading, // Add this prop
+    handleSpecialDiscountChange,
+    isLoading,
+    hiddenColumns,
+    setHiddenColumns,
   }) => {
-  const [hideDisc, setHideDisc] = useState(false)
-  const [hideFlatDisc, setHideFlatDisc] = useState(false)
-  const [hideTotalFlatDisc, setHideTotalFlatDisc] = useState(false)
-  const [hideSpecialDiscount, setHideSpecialDiscount] = useState(false)
+
+  // Use props instead of local state
+  const hideDisc = hiddenColumns?.hideDisc || false
+  const hideFlatDisc = hiddenColumns?.hideFlatDisc || false
+  const hideTotalFlatDisc = hiddenColumns?.hideTotalFlatDisc || false
+  const hideSpecialDiscount = hiddenColumns?.hideSpecialDiscount || false
 
   const calculateColSpan = () => {
     let baseSpan = 9
@@ -39,32 +42,32 @@ const ItemsTable = ({
           <div className="flex gap-2 flex-wrap">
             <button
               className="px-2 py-1 border border-gray-300 rounded-md text-xs text-gray-700 hover:bg-gray-50"
-              onClick={() => setHideDisc(!hideDisc)}
+              onClick={() => setHiddenColumns(prev => ({ ...prev, hideDisc: !prev.hideDisc }))}
             >
               {hideDisc ? 'Show' : 'Hide'} Disc%
             </button>
             <button
               className="px-2 py-1 border border-gray-300 rounded-md text-xs text-gray-700 hover:bg-gray-50"
-              onClick={() => setHideFlatDisc(!hideFlatDisc)}
+              onClick={() => setHiddenColumns(prev => ({ ...prev, hideFlatDisc: !prev.hideFlatDisc }))}
             >
               {hideFlatDisc ? 'Show' : 'Hide'} Flat Disc
             </button>
             <button
               className="px-2 py-1 border border-gray-300 rounded-md text-xs text-gray-700 hover:bg-gray-50"
-              onClick={() => setHideTotalFlatDisc(!hideTotalFlatDisc)}
+              onClick={() => setHiddenColumns(prev => ({ ...prev, hideTotalFlatDisc: !prev.hideTotalFlatDisc }))}
             >
               {hideTotalFlatDisc ? 'Show' : 'Hide'} Total Flat Disc
             </button>
             <button
               className="px-2 py-1 border border-gray-300 rounded-md text-xs text-gray-700 hover:bg-gray-50"
-              onClick={() => setHideSpecialDiscount(!hideSpecialDiscount)}
+              onClick={() => setHiddenColumns(prev => ({ ...prev, hideSpecialDiscount: !prev.hideSpecialDiscount }))}
             >
               {hideSpecialDiscount ? 'Show' : 'Hide'} Special Disc
             </button>
             <button
               className="px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50"
               onClick={handleAddItem}
-              disabled={isLoading} // Disable button while loading
+              disabled={isLoading}
             >
               <PlusIcon className="h-4 w-4 inline mr-1" /> Add Item
             </button>
@@ -114,7 +117,7 @@ const ItemsTable = ({
                         }}
                         list={`code-list-${item.id}`}
                         className="w-24 p-1 border border-gray-300 rounded-md"
-                        disabled={isLoading} // Disable while loading
+                        disabled={isLoading}
                       />
                       <datalist id={`code-list-${item.id}`}>
                         {productCodes.map((code) => (
@@ -140,7 +143,7 @@ const ItemsTable = ({
                         list={`name-list-${item.id}`}
                         className="w-full p-1 border border-gray-300 rounded-md"
                         placeholder="Enter item name"
-                        disabled={isLoading} // Disable while loading
+                        disabled={isLoading}
                         required
                       />
                       <datalist id={`name-list-${item.id}`}>
@@ -158,7 +161,7 @@ const ItemsTable = ({
                         onChange={(e) => handleItemChange(item.id, "description", e.target.value)}
                         className="w-full p-1 border border-gray-300 rounded-md"
                         placeholder="Enter description"
-                        disabled={isLoading} // Disable while loading
+                        disabled={isLoading}
                       />
                     </div>
                   </td>
@@ -167,7 +170,7 @@ const ItemsTable = ({
                       value={item.gst}
                       onChange={(e) => handleItemChange(item.id, "gst", Number.parseInt(e.target.value))}
                       className="w-20 p-1 border border-gray-300 rounded-md"
-                      disabled={isLoading} // Disable while loading
+                      disabled={isLoading}
                     >
                       <option value="0">0%</option>
                       <option value="18">18%</option>
@@ -181,7 +184,7 @@ const ItemsTable = ({
                       className="w-16 p-1 border border-gray-300 rounded-md"
                       placeholder="0"
                       required
-                      disabled={isLoading} // Disable while loading
+                      disabled={isLoading}
                     />
                   </td>
                   <td className="px-4 py-2">
@@ -189,7 +192,7 @@ const ItemsTable = ({
                       value={item.units}
                       onChange={(e) => handleItemChange(item.id, "units", e.target.value)}
                       className="w-20 p-1 border border-gray-300 rounded-md"
-                      disabled={isLoading} // Disable while loading
+                      disabled={isLoading}
                     >
                       <option value="Nos">Nos</option>
                       <option value="Pcs">Pcs</option>
@@ -204,7 +207,7 @@ const ItemsTable = ({
                       onChange={(e) => handleItemChange(item.id, "rate", Number.parseFloat(e.target.value) || 0)}
                       className="w-24 p-1 border border-gray-300 rounded-md"
                       placeholder="0.00"
-                      disabled={isLoading} // Disable while loading
+                      disabled={isLoading}
                       required
                     />
                   </td>
@@ -218,7 +221,7 @@ const ItemsTable = ({
                         placeholder="0%"
                         min="0"
                         max="100"
-                        disabled={isLoading} // Disable while loading
+                        disabled={isLoading}
                       />
                     </td>
                   )}
@@ -233,7 +236,7 @@ const ItemsTable = ({
                         className="w-24 p-1 border border-gray-300 rounded-md"
                         placeholder="0.00"
                         min="0"
-                        disabled={isLoading} // Disable while loading
+                        disabled={isLoading}
                       />
                     </td>
                   )}
@@ -279,8 +282,7 @@ const ItemsTable = ({
                           total,
                         })
                       }}
-                      // disabled={quotationData.items.length <= 1}
-                      disabled={quotationData.items.length <= 1 || isLoading} // Disable while 
+                      disabled={quotationData.items.length <= 1 || isLoading}
                     >
                       <TrashIcon className="h-4 w-4" />
                     </button>
@@ -362,7 +364,7 @@ const ItemsTable = ({
                       className="w-24 p-1 border border-gray-300 rounded-md"
                       min="0"
                       placeholder="0.00"
-                      disabled={isLoading} // Disable while loading
+                      disabled={isLoading}
                     />
                   </td>
                   <td></td>
@@ -374,7 +376,6 @@ const ItemsTable = ({
                 </td>
                 <td className="px-4 py-2">
                   ₹{(() => {
-                    // Calculate the correct grand total
                     const taxableAmt = Math.max(0, quotationData.subtotal - quotationData.totalFlatDiscount)
                     let grandTotal = 0
                     

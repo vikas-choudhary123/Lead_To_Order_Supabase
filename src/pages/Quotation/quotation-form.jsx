@@ -36,6 +36,9 @@ const QuotationForm = ({
   addSpecialOffer,
   removeSpecialOffer,
   handleSpecialOfferChange,
+  setQuotationData, // ADD THIS LINE
+  hiddenColumns,    // ADD THIS LINE
+  setHiddenColumns, // ADD THIS LINE
 }) => {
   const [dropdownData, setDropdownData] = useState({})
   const [stateOptions, setStateOptions] = useState(["Select State"])
@@ -181,7 +184,6 @@ const QuotationForm = ({
     fetchDropdownData()
   }, [])
 
-  // NEW: Fetch lead numbers from both sheets
   // NEW: Fetch lead numbers from both sheets with filtering conditions
 useEffect(() => {
   const fetchLeadNumbers = async () => {
@@ -360,9 +362,6 @@ useEffect(() => {
   }
 
   // NEW: Handle lead number selection and autofill
-  // NEW: Handle lead number selection and autofill
-// NEW: Handle lead number selection and autofill
-// NEW: Handle lead number selection and autofill
 const handleLeadNoSelect = async (selectedLeadNo) => {
   if (!selectedLeadNo || selectedLeadNo === "Select Lead No." || !leadNoData[selectedLeadNo]) {
     return;
@@ -652,6 +651,7 @@ const handleLeadNoSelect = async (selectedLeadNo) => {
     console.log("No items found for this lead")
   }
   
+  setIsItemsLoading(false); // Stop loading
 }
 
   // Function to auto-fill items based on company selection
@@ -945,7 +945,10 @@ const handleLeadNoSelect = async (selectedLeadNo) => {
         productCodes={productCodes}
         productNames={productNames}
         productData={productData}
-        isLoading={isItemsLoading} // Add this prop
+        setQuotationData={setQuotationData}
+        isLoading={isItemsLoading}
+        hiddenColumns={hiddenColumns}
+        setHiddenColumns={setHiddenColumns}
       />
 
       <TermsAndConditions

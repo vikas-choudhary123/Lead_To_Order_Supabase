@@ -24,6 +24,14 @@ function Quotation() {
   const [specialDiscount, setSpecialDiscount] = useState(0)
   const [selectedReferences, setSelectedReferences] = useState([])
 
+  // NEW: Add hidden columns state
+  const [hiddenColumns, setHiddenColumns] = useState({
+    hideDisc: false,
+    hideFlatDisc: false,
+    hideTotalFlatDisc: false,
+    hideSpecialDiscount: false,
+  })
+
   // Check if we're in view mode
   const params = new URLSearchParams(window.location.search)
   const isViewMode = params.has("view")
@@ -256,7 +264,7 @@ function Quotation() {
     setIsGenerating(true)
 
     try {
-      const base64Data = generatePDFFromData(quotationData, selectedReferences, specialDiscount)
+      const base64Data = generatePDFFromData(quotationData, selectedReferences, specialDiscount, hiddenColumns)
 
       const byteCharacters = atob(base64Data)
       const byteNumbers = new Array(byteCharacters.length)
@@ -285,16 +293,12 @@ function Quotation() {
     }
   }
 
- // Replace the handleGenerateLink function in your React component with this updated version:
-
-// Replace the handleGenerateLink function in your React component with this updated version:
-
 const handleGenerateLink = async () => {
   setIsGenerating(true);
 
   try {
     // First generate the PDF
-    const base64Data = generatePDFFromData(quotationData, selectedReferences, specialDiscount);
+    const base64Data = generatePDFFromData(quotationData, selectedReferences, specialDiscount, hiddenColumns);
 
     const byteCharacters = atob(base64Data);
     const byteNumbers = new Array(byteCharacters.length);
@@ -415,7 +419,7 @@ const handleGenerateLink = async () => {
       }
       
       const finalGrandTotal = Math.max(0, grandTotal).toFixed(2)
-      const base64Data = generatePDFFromData(quotationData, selectedReferences, specialDiscount)
+      const base64Data = generatePDFFromData(quotationData, selectedReferences, specialDiscount, hiddenColumns)
 
       let finalQuotationNo = quotationData.quotationNo
       if (isRevising && selectedQuotation) {
@@ -717,32 +721,34 @@ const handleGenerateLink = async () => {
         <div className="p-4">
           {activeTab === "edit" ? (
             <QuotationForm
-              quotationData={quotationData}
-              handleInputChange={handleInputChange}
-              handleItemChange={handleItemChange}
-              handleFlatDiscountChange={handleFlatDiscountChange}
-              handleAddItem={handleAddItem}
-              handleNoteChange={handleNoteChange}
-              addNote={addNote}
-              removeNote={removeNote}
-              hiddenFields={hiddenFields}
-              toggleFieldVisibility={toggleFieldVisibility}
-              isRevising={isRevising}
-              existingQuotations={existingQuotations}
-              selectedQuotation={selectedQuotation}
-              handleQuotationSelect={handleQuotationSelect}
-              isLoadingQuotation={isLoadingQuotation}
-              handleSpecialDiscountChange={handleSpecialDiscountChangeWrapper}
-  specialDiscount={specialDiscount}
-  setSpecialDiscount={setSpecialDiscount}
-              selectedReferences={selectedReferences}
-              setSelectedReferences={setSelectedReferences}
-              imageform={imageform}
-              addSpecialOffer={addSpecialOffer}
-              removeSpecialOffer={removeSpecialOffer}
-              handleSpecialOfferChange={handleSpecialOfferChange}
-            //   handleSpecialDiscountChange={handleSpecialDiscountChangeWrapper}
-            />
+            quotationData={quotationData}
+            handleInputChange={handleInputChange}
+            handleItemChange={handleItemChange}
+            handleFlatDiscountChange={handleFlatDiscountChange}
+            handleAddItem={handleAddItem}
+            handleNoteChange={handleNoteChange}
+            addNote={addNote}
+            removeNote={removeNote}
+            hiddenFields={hiddenFields}
+            toggleFieldVisibility={toggleFieldVisibility}
+            isRevising={isRevising}
+            existingQuotations={existingQuotations}
+            selectedQuotation={selectedQuotation}
+            handleQuotationSelect={handleQuotationSelect}
+            isLoadingQuotation={isLoadingQuotation}
+            handleSpecialDiscountChange={handleSpecialDiscountChangeWrapper}
+            specialDiscount={specialDiscount}
+            setSpecialDiscount={setSpecialDiscount}
+            selectedReferences={selectedReferences}
+            setSelectedReferences={setSelectedReferences}
+            imageform={imageform}
+            addSpecialOffer={addSpecialOffer}
+            removeSpecialOffer={removeSpecialOffer}
+            handleSpecialOfferChange={handleSpecialOfferChange}
+            setQuotationData={setQuotationData}   // ADD THIS LINE
+            hiddenColumns={hiddenColumns}         // ADD THIS LINE
+            setHiddenColumns={setHiddenColumns}   // ADD THIS LINE
+          />
           ) : (
             <QuotationPreview
               quotationData={quotationData}
@@ -755,6 +761,7 @@ const handleGenerateLink = async () => {
               handleGeneratePDF={handleGeneratePDF}
               isGenerating={isGenerating}
               isSubmitting={isSubmitting}
+              hiddenColumns={hiddenColumns}
             />
           )}
         </div>

@@ -594,7 +594,7 @@
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 
-export const generatePDFFromData = (quotationData, selectedReferences, specialDiscount) => {
+export const generatePDFFromData = (quotationData, selectedReferences, specialDiscount, hiddenColumns = {}) => {
   const doc = new jsPDF("p", "mm", "a4")
 
   const pageWidth = 210
@@ -780,54 +780,120 @@ export const generatePDFFromData = (quotationData, selectedReferences, specialDi
 
   currentY += 8
 
-  // Items table
-  const itemsData = quotationData.items ? quotationData.items.map((item, index) => [
-    String(index + 1),
-    String(item.code || "AFG10017"),
-    String(item.description || item.name || "FISCHER-ANCHOR-FWA 16X180"),
-    String(`${item.gst || 18}%`),
-    String(item.qty || 1),
-    String(item.units || "Nos"),
-    String(formatCurrency(item.rate || 1712121.00)),
-    String(`${item.discount || 0}%`),
-    String(formatCurrency(item.amount || 1712121.00)),
-  ]) : [
-    ["1", "AFG10017", "FISCHER-ANCHOR-FWA 16X180", "18%", "1", "Nos", String(formatCurrency(1712121.00)), "0%", String(formatCurrency(1712121.00))]
+  // FIXED: Add Product Name column to table headers
+  const tableHeaders = ["S.No", "Code", "Product Name", "Description", "GST%", "Qty", "Units", "Rate"]
+  if (!hiddenColumns.hideDisc) tableHeaders.push("Disc%")
+  if (!hiddenColumns.hideFlatDisc) tableHeaders.push("Flat Disc")
+  tableHeaders.push("Amount")
+
+  // FIXED: Add Product Name data to items
+  const itemsData = quotationData.items ? quotationData.items.map((item, index) => {
+    const row = [
+      String(index + 1),                                    // S.No
+      String(item.code || "AFG10017"),                     // Code
+      String(item.name || "FISCHER-ANCHOR-FWA 16X180"),    // Product Name
+      String(item.description || ""),                       // Description (separate from name)
+      String(`${item.gst || 18}%`),                        // GST%
+      String(item.qty || 1),                               // Qty
+      String(item.units || "Nos"),                         // Units
+      String(formatCurrency(item.rate || 1712121.00)),     // Rate
+    ]
+    if (!hiddenColumns.hideDisc) row.push(String(`${item.discount || 0}%`))           // Disc%
+    if (!hiddenColumns.hideFlatDisc) row.push(String(formatCurrency(item.flatDiscount || 0))) // Flat Disc
+    row.push(String(formatCurrency(item.amount || 1712121.00)))                       // Amount
+    return row
+  }) : [
+    (() => {
+      const defaultRow = [
+        "1", 
+        "AFG10017", 
+        "FISCHER-ANCHOR-FWA 16X180",  // Product Name
+        "",                           // Description (empty)
+        "18%", 
+        "1", 
+        "Nos", 
+        String(formatCurrency(1712121.00))
+      ]
+      if (!hiddenColumns.hideDisc) defaultRow.push("0%")
+      if (!hiddenColumns.hideFlatDisc) defaultRow.push(String(formatCurrency(0)))
+      defaultRow.push(String(formatCurrency(1712121.00)))
+      return defaultRow
+    })()
   ]
+
+  // FIXED: Column styles with Product Name column
+  const getColumnStyles = () => {
+    const availableWidth = pageWidth - 2 * margin - 2
+    
+    const styles = {
+      0: { cellWidth: 8, halign: 'center' },   // S.No
+      1: { cellWidth: 15, halign: 'center' },  // Code  
+      2: { cellWidth: 35, halign: 'left' },    // Product Name
+      3: { cellWidth: 30, halign: 'left' },    // Description
+      4: { cellWidth: 10, halign: 'center' },  // GST%
+      5: { cellWidth: 8, halign: 'center' },   // Qty
+      6: { cellWidth: 10, halign: 'center' },  // Units
+      7: { cellWidth: 18, halign: 'right' },   // Rate
+    }
+    
+    let columnIndex = 8
+    let usedWidth = 8 + 15 + 35 + 30 + 10 + 8 + 10 + 18 // 134mm used
+    
+    if (!hiddenColumns.hideDisc) {
+      styles[columnIndex] = { cellWidth: 10, halign: 'center' } // Disc%
+      usedWidth += 10
+      columnIndex++
+    }
+    if (!hiddenColumns.hideFlatDisc) {
+      styles[columnIndex] = { cellWidth: 15, halign: 'right' } // Flat Disc
+      usedWidth += 15
+      columnIndex++
+    }
+    
+    // Amount column gets remaining width
+    const remainingWidth = availableWidth - usedWidth
+    styles[columnIndex] = { 
+      cellWidth: Math.max(18, remainingWidth - 2), 
+      halign: 'right', 
+      fontStyle: 'bold' 
+    }
+    
+    return styles
+  }
 
   autoTable(doc, {
     startY: currentY,
-    head: [["S.No", "Code", "Description", "GST%", "Qty", "Units", "Rate", "Disc%", "Amount"]],
+    head: [tableHeaders],
     body: itemsData,
     margin: { left: margin, right: margin },
+    tableWidth: pageWidth - 2 * margin,
     styles: {
-      fontSize: 8,
-      cellPadding: 3,
+      fontSize: 6.5, // Even smaller font for all columns to fit
+      cellPadding: 1,
       overflow: 'linebreak',
       lineColor: [0, 0, 0],
-      lineWidth: 0.5,
+      lineWidth: 0.2,
       textColor: [0, 0, 0],
       font: 'helvetica',
+      valign: 'middle',
     },
     headStyles: {
-      fillColor: [230, 240, 255], // Light blue header
-      textColor: [0, 50, 100], // Dark blue text
-      fontSize: 9,
+      fillColor: [230, 240, 255],
+      textColor: [0, 50, 100],
+      fontSize: 6.5,
       fontStyle: 'bold',
-      cellPadding: 4,
+      cellPadding: 1.5,
       halign: 'center',
       valign: 'middle',
     },
-    columnStyles: {
-      0: { cellWidth: 12, halign: 'center' },
-      1: { cellWidth: 20, halign: 'center' },
-      2: { cellWidth: 40, halign: 'left' },
-      3: { cellWidth: 15, halign: 'center' },
-      4: { cellWidth: 12, halign: 'center' },
-      5: { cellWidth: 15, halign: 'center' },
-      6: { cellWidth: 25, halign: 'right' },
-      7: { cellWidth: 15, halign: 'center' },
-      8: { cellWidth: 25, halign: 'right', fontStyle: 'bold' },
+    columnStyles: getColumnStyles(),
+    theme: 'grid',
+    tableLineWidth: 0.2,
+    tableLineColor: [0, 0, 0],
+    willDrawCell: function(data) {
+      if (data.cell.x + data.cell.width > pageWidth - margin) {
+        data.cell.width = pageWidth - margin - data.cell.x - 1;
+      }
     },
     didDrawPage: (data) => {
       currentY = data.cursor.y;
@@ -836,53 +902,131 @@ export const generatePDFFromData = (quotationData, selectedReferences, specialDi
 
   currentY = doc.lastAutoTable.finalY + 10
 
-  // Financial summary on the right side
-  const summaryX = pageWidth - margin - 70
-  const summaryY = currentY
+  // FIXED: Financial summary with correct tax calculation
+  // FIXED: Financial summary with proper page break handling
+const summaryWidth = 60
+const summaryX = pageWidth - margin - summaryWidth
 
-  const subtotal = quotationData.subtotal || 1712121.00
-  const cgstAmount = quotationData.cgstAmount || (subtotal * 0.09)
-  const sgstAmount = quotationData.sgstAmount || (subtotal * 0.09)
-  const total = quotationData.total || (subtotal + cgstAmount + sgstAmount)
+// Use actual data from quotationData for correct tax calculation
+const subtotal = quotationData.subtotal || 0
+const totalFlatDiscount = quotationData.totalFlatDiscount || 0
+const taxableAmount = Math.max(0, subtotal - totalFlatDiscount)
 
-  // Draw summary box
-  doc.setDrawColor(0, 0, 0)
-  doc.setLineWidth(0.5)
-  doc.rect(summaryX, summaryY, 70, 40)
+// Check if IGST or CGST+SGST should be used
+const isIGST = quotationData.isIGST
+const igstRate = quotationData.igstRate || 18
+const cgstRate = quotationData.cgstRate || 9
+const sgstRate = quotationData.sgstRate || 9
 
-  const summaryItems = [
-    { label: "Subtotal:", value: String(formatCurrency(subtotal)) },
-    { label: "CGST (9%):", value: String(formatCurrency(cgstAmount)) },
-    { label: "SGST (9%):", value: String(formatCurrency(sgstAmount)) },
-    { label: "Total:", value: String(formatCurrency(total)) }
-  ]
+let taxAmount = 0
+let finalTotal = 0
 
-  let summaryCurrentY = summaryY + 8
+// Build summary items based on tax type
+const summaryItems = [
+  { label: "Subtotal:", value: String(formatCurrency(subtotal)) }
+]
 
-  summaryItems.forEach((item, index) => {
-    if (index === summaryItems.length - 1) { // Total row
-      doc.setFont("helvetica", "bold")
-      doc.setFontSize(10)
-      doc.setFillColor(230, 240, 255) // Light blue background for total
-      doc.rect(summaryX, summaryCurrentY - 3, 70, 8, "F")
-    } else {
-      doc.setFont("helvetica", "normal")
-      doc.setFontSize(9)
-    }
-
-    doc.setTextColor(0, 0, 0)
-    doc.text(item.label, summaryX + 5, summaryCurrentY)
-    doc.text(item.value, summaryX + 65, summaryCurrentY, { align: "right" })
-    summaryCurrentY += 8
+// Add Total Flat Discount if exists and not hidden
+if (!hiddenColumns.hideTotalFlatDisc && totalFlatDiscount > 0) {
+  summaryItems.push({ 
+    label: "Total Flat Discount:", 
+    value: `-${String(formatCurrency(totalFlatDiscount))}` 
   })
+}
 
-  currentY = summaryCurrentY + 15
+// Add Taxable Amount
+summaryItems.push({ 
+  label: "Taxable Amount:", 
+  value: String(formatCurrency(taxableAmount)) 
+})
+
+// Add correct tax based on IGST or CGST+SGST
+if (isIGST) {
+  // Use IGST
+  const igstAmount = quotationData.igstAmount || (taxableAmount * (igstRate / 100))
+  taxAmount = igstAmount
+  summaryItems.push({ 
+    label: `IGST (${igstRate}%):`, 
+    value: String(formatCurrency(igstAmount)) 
+  })
+} else {
+  // Use CGST + SGST
+  const cgstAmount = quotationData.cgstAmount || (taxableAmount * (cgstRate / 100))
+  const sgstAmount = quotationData.sgstAmount || (taxableAmount * (sgstRate / 100))
+  taxAmount = cgstAmount + sgstAmount
+  
+  summaryItems.push({ 
+    label: `CGST (${cgstRate}%):`, 
+    value: String(formatCurrency(cgstAmount)) 
+  })
+  summaryItems.push({ 
+    label: `SGST (${sgstRate}%):`, 
+    value: String(formatCurrency(sgstAmount)) 
+  })
+}
+
+// Add special discount if not hidden and exists
+if (!hiddenColumns.hideSpecialDiscount && specialDiscount > 0) {
+  summaryItems.push({ 
+    label: "Special Discount:", 
+    value: `-${String(formatCurrency(specialDiscount))}` 
+  })
+}
+
+// Calculate final total - ALWAYS calculate instead of using quotationData.total
+finalTotal = taxableAmount + taxAmount - (specialDiscount || 0)
+
+// Add final total
+summaryItems.push({ 
+  label: "Grand Total:", 
+  value: String(formatCurrency(finalTotal)) 
+})
+
+// FIXED: Calculate required height and check for page break
+const summaryHeight = summaryItems.length * 8 + 8
+
+// Check if summary section will fit on current page, if not add new page
+if (checkSpace(summaryHeight + 10)) {
+  // Page was added, adjust summaryX and summaryY for new page
+  const summaryY = currentY
+} else {
+  const summaryY = currentY
+}
+
+// Now draw the summary at the correct position
+const summaryY = currentY
+
+// Draw summary box
+doc.setDrawColor(0, 0, 0)
+doc.setLineWidth(0.5)
+doc.rect(summaryX, summaryY, summaryWidth, summaryHeight)
+
+let summaryCurrentY = summaryY + 8
+
+summaryItems.forEach((item, index) => {
+  if (index === summaryItems.length - 1) { // Total row
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(9)
+    doc.setFillColor(230, 240, 255) // Light blue background for total
+    doc.rect(summaryX, summaryCurrentY - 3, summaryWidth, 7, "F")
+  } else {
+    doc.setFont("helvetica", "normal")
+    doc.setFontSize(8)
+  }
+
+  doc.setTextColor(0, 0, 0)
+  doc.text(item.label, summaryX + 3, summaryCurrentY)
+  doc.text(item.value, summaryX + summaryWidth - 3, summaryCurrentY, { align: "right" })
+  summaryCurrentY += 7
+})
+
+currentY = summaryCurrentY + 15
 
   // Check if we need a new page for terms and bank details
   checkSpace(80)
 
-  // Terms & Conditions and Bank Details - Combined in one section like FROM/TO
-  const termsBoxHeight = 65
+  // Terms & Conditions and Bank Details - FIXED LAYOUT
+  const termsBoxHeight = 60 // Reduced height
   
   // Combined box for both Terms & Conditions and Bank Details sections
   doc.setFillColor(250, 250, 250) // Very light gray background
@@ -903,7 +1047,7 @@ export const generatePDFFromData = (quotationData, selectedReferences, specialDi
 
   // Terms & Conditions header
   doc.setFont("helvetica", "bold")
-  doc.setFontSize(11)
+  doc.setFontSize(10)
   doc.setTextColor(0, 50, 100) // Dark blue for section headers
   doc.text("Terms & Conditions:", leftColumnX + 5, currentY + 10)
 
@@ -917,7 +1061,7 @@ export const generatePDFFromData = (quotationData, selectedReferences, specialDi
   ]
 
   let termsY = currentY + 15
-  doc.setFontSize(8)
+  doc.setFontSize(7) // Smaller font for better fit
 
   terms.forEach((term) => {
     if (termsY < currentY + termsBoxHeight - 5) {
@@ -928,22 +1072,22 @@ export const generatePDFFromData = (quotationData, selectedReferences, specialDi
       
       // Value in normal font with proper spacing
       doc.setFont("helvetica", "normal")
-      const labelWidth = 30 // Fixed width for consistent alignment
-      const wrappedLines = wrapText(term.value, columnWidth - labelWidth - 10)
+      const labelWidth = 25 // Reduced width for better fit
+      const wrappedLines = wrapText(term.value, columnWidth - labelWidth - 5)
       
       wrappedLines.forEach((line, index) => {
-        if (termsY + (index * 3) < currentY + termsBoxHeight - 5) {
-          doc.text(line, leftColumnX + 5 + labelWidth, termsY + (index * 3))
+        if (termsY + (index * 2.5) < currentY + termsBoxHeight - 3) {
+          doc.text(line, leftColumnX + 5 + labelWidth, termsY + (index * 2.5))
         }
       })
       
-      termsY += Math.max(5, wrappedLines.length * 3) + 1
+      termsY += Math.max(4, wrappedLines.length * 2.5) + 1
     }
   })
 
   // Bank Details header
   doc.setFont("helvetica", "bold")
-  doc.setFontSize(11)
+  doc.setFontSize(10)
   doc.setTextColor(0, 50, 100) // Dark blue for section headers
   doc.text("Bank Details:", rightColumnX + 5, currentY + 10)
 
@@ -958,7 +1102,7 @@ export const generatePDFFromData = (quotationData, selectedReferences, specialDi
   ]
 
   let bankY = currentY + 15
-  doc.setFontSize(8)
+  doc.setFontSize(7) // Smaller font for better fit
 
   bankDetails.forEach((detail) => {
     if (bankY < currentY + termsBoxHeight - 5) {
@@ -969,20 +1113,20 @@ export const generatePDFFromData = (quotationData, selectedReferences, specialDi
       
       // Value in normal font with proper spacing
       doc.setFont("helvetica", "normal")
-      const labelWidth = 30 // Fixed width for consistent alignment
-      const wrappedLines = wrapText(String(detail.value || ""), columnWidth - labelWidth - 10)
+      const labelWidth = 25 // Reduced width for better fit
+      const wrappedLines = wrapText(String(detail.value || ""), columnWidth - labelWidth - 5)
       
       wrappedLines.forEach((line, index) => {
-        if (bankY + (index * 3) < currentY + termsBoxHeight - 5) {
-          doc.text(line, rightColumnX + 5 + labelWidth, bankY + (index * 3))
+        if (bankY + (index * 2.5) < currentY + termsBoxHeight - 3) {
+          doc.text(line, rightColumnX + 5 + labelWidth, bankY + (index * 2.5))
         }
       })
       
-      bankY += Math.max(5, wrappedLines.length * 3) + 1
+      bankY += Math.max(4, wrappedLines.length * 2.5) + 1
     }
   })
 
-  currentY += termsBoxHeight + 20
+  currentY += termsBoxHeight + 15
 
   // Signature section
   const signatureY = currentY
@@ -999,54 +1143,54 @@ export const generatePDFFromData = (quotationData, selectedReferences, specialDi
   doc.setFontSize(8)
   doc.text("Authorized Signature", pageWidth - margin - 45, signatureY + 20, { align: "center" })
 
-  // Special offers section (if exists)
+  // Special offers section (if exists and not hidden)
   if (quotationData.specialOffers && quotationData.specialOffers.filter((offer) => offer.trim()).length > 0) {
-    currentY += 30
-    checkSpace(30)
+    currentY += 25
+    checkSpace(25)
     
     doc.setFont("helvetica", "bold")
     doc.setFontSize(10)
     doc.setTextColor(0, 50, 100)
     doc.text("DIVINE EMPIRE'S 10TH ANNIVERSARY SPECIAL OFFER", margin, currentY)
-    currentY += 8
+    currentY += 6
 
     quotationData.specialOffers
       .filter((offer) => offer.trim())
       .forEach((offer) => {
         doc.setTextColor(200, 50, 50)
         doc.setFont("helvetica", "bold")
-        doc.setFontSize(9)
+        doc.setFontSize(8)
         const text = `★ ${offer}`
         const wrappedLines = wrapText(text, pageWidth - 2 * margin)
         wrappedLines.forEach((line) => {
           doc.text(line, margin, currentY)
-          currentY += 5
+          currentY += 4
         })
       })
   }
 
   // Additional notes section (if exists)
   if (quotationData.notes && quotationData.notes.length > 0) {
-    currentY += 15
-    checkSpace(30)
+    currentY += 10
+    checkSpace(20)
     
     doc.setFont("helvetica", "bold")
     doc.setFontSize(10)
     doc.setTextColor(0, 50, 100)
     doc.text("ADDITIONAL NOTES", margin, currentY)
-    currentY += 8
+    currentY += 6
 
     quotationData.notes
       .filter((note) => note.trim())
       .forEach((note) => {
         doc.setTextColor(0, 0, 0)
         doc.setFont("helvetica", "normal")
-        doc.setFontSize(9)
+        doc.setFontSize(8)
         const text = `• ${note}`
         const wrappedLines = wrapText(text, pageWidth - 2 * margin)
         wrappedLines.forEach((line) => {
           doc.text(line, margin, currentY)
-          currentY += 5
+          currentY += 4
         })
       })
   }
@@ -1059,17 +1203,17 @@ export const generatePDFFromData = (quotationData, selectedReferences, specialDi
     // Add main document border on each page
     addMainBorder()
 
-    doc.setFontSize(7)
+    doc.setFontSize(6)
     doc.setTextColor(120, 120, 120)
     doc.setFont("helvetica", "normal")
 
     doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 8, { align: "right" })
 
-    doc.text("Generated by Divine Empire Professional Quotation System", margin, pageHeight - 12)
+    doc.text("Generated by Divine Empire Professional Quotation System", margin, pageHeight - 10)
     doc.text("This is a computer-generated document", margin, pageHeight - 6)
 
     const now = new Date()
-    doc.text(`Generated on: ${now.toLocaleDateString('en-GB')}, ${now.toLocaleTimeString()}`, pageWidth - margin, pageHeight - 12, { align: "right" })
+    doc.text(`Generated on: ${now.toLocaleDateString('en-GB')}, ${now.toLocaleTimeString()}`, pageWidth - margin, pageHeight - 10, { align: "right" })
   }
 
   return doc.output("datauristring").split(",")[1]

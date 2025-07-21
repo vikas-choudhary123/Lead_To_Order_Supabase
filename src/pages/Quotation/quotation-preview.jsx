@@ -12,6 +12,7 @@ const QuotationPreview = ({
   handleGeneratePDF,
   isGenerating,
   isSubmitting,
+  hiddenColumns,
 }) => {
   return (
     <div className="space-y-6">
@@ -20,7 +21,7 @@ const QuotationPreview = ({
           <div className="w-1/3">
             <p className="font-bold">{selectedReferences[0] || "Consignor Name"}</p>
             <p className="text-sm">{quotationData.consignorAddress || "Consignor Address"}</p>
-            <p className="text-sm">Mobile: {quotationData.consignorMobile.split(",")[0] || "N/A"}</p>
+            <p className="text-sm">Mobile: {quotationData.consignorMobile?.split(",")[0] || "N/A"}</p>
             <p className="text-sm">Phone: {quotationData.consignorPhone || "N/A"}</p>
             <p className="text-sm">GSTIN: {quotationData.consignorGSTIN || "N/A"}</p>
             <p className="text-sm">State Code: {quotationData.consignorStateCode || "N/A"}</p>
@@ -78,8 +79,8 @@ const QuotationPreview = ({
                 <th className="border p-2 text-left">Qty</th>
                 <th className="border p-2 text-left">Units</th>
                 <th className="border p-2 text-left">Rate</th>
-                <th className="border p-2 text-left">Disc %</th>
-                <th className="border p-2 text-left">Flat Disc</th>
+                {!hiddenColumns?.hideDisc && <th className="border p-2 text-left">Disc %</th>}
+                {!hiddenColumns?.hideFlatDisc && <th className="border p-2 text-left">Flat Disc</th>}
                 <th className="border p-2 text-left">Amount</th>
               </tr>
             </thead>
@@ -94,27 +95,44 @@ const QuotationPreview = ({
                   <td className="border p-2">{item.qty}</td>
                   <td className="border p-2">{item.units}</td>
                   <td className="border p-2">₹{Number(item.rate).toFixed(2)}</td>
-                  <td className="border p-2">{item.discount}%</td>
-                  <td className="border p-2">₹{Number(item.flatDiscount).toFixed(2)}</td>
+                  {!hiddenColumns?.hideDisc && <td className="border p-2">{item.discount}%</td>}
+                  {!hiddenColumns?.hideFlatDisc && <td className="border p-2">₹{Number(item.flatDiscount).toFixed(2)}</td>}
                   <td className="border p-2">₹{Number(item.amount).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr className="border">
-                <td colSpan="9" className="border p-2 text-right font-bold">
+                <td colSpan={(() => {
+                  let span = 9; // Base columns: S No, Code, Product Name, Description, GST, Qty, Units, Rate, Amount
+                  if (!hiddenColumns?.hideDisc) span += 1;
+                  if (!hiddenColumns?.hideFlatDisc) span += 1;
+                  return span - 1; // Subtract 1 because Amount column is separate
+                })()} className="border p-2 text-right font-bold">
                   Subtotal
                 </td>
                 <td className="border p-2 font-bold">₹{Number(quotationData.subtotal).toFixed(2)}</td>
               </tr>
+              {!hiddenColumns?.hideTotalFlatDisc && (
+                <tr className="border">
+                  <td colSpan={(() => {
+                    let span = 9;
+                    if (!hiddenColumns?.hideDisc) span += 1;
+                    if (!hiddenColumns?.hideFlatDisc) span += 1;
+                    return span - 1;
+                  })()} className="border p-2 text-right">
+                    Total Flat Discount
+                  </td>
+                  <td className="border p-2">-₹{Number(quotationData.totalFlatDiscount).toFixed(2)}</td>
+                </tr>
+              )}
               <tr className="border">
-                <td colSpan="9" className="border p-2 text-right">
-                  Total Flat Discount
-                </td>
-                <td className="border p-2">-₹{Number(quotationData.totalFlatDiscount).toFixed(2)}</td>
-              </tr>
-              <tr className="border">
-                <td colSpan="9" className="border p-2 text-right">
+                <td colSpan={(() => {
+                  let span = 9;
+                  if (!hiddenColumns?.hideDisc) span += 1;
+                  if (!hiddenColumns?.hideFlatDisc) span += 1;
+                  return span - 1;
+                })()} className="border p-2 text-right">
                   Taxable Amount
                 </td>
                 <td className="border p-2">
@@ -171,12 +189,14 @@ const QuotationPreview = ({
                     ).toFixed(2)}
                   </td>
                 </tr>
-                <tr className="border">
-                  <td colSpan="2" className="border p-2 text-right">
-                    Special Discount
-                  </td>
-                  <td className="border p-2">-₹{Number(specialDiscount).toFixed(2)}</td>
-                </tr>
+                {!hiddenColumns?.hideSpecialDiscount && (
+                  <tr className="border">
+                    <td colSpan="2" className="border p-2 text-right">
+                      Special Discount
+                    </td>
+                    <td className="border p-2">-₹{Number(specialDiscount).toFixed(2)}</td>
+                  </tr>
+                )}
                 <tr className="border font-bold">
                   <td colSpan="2" className="border p-2 text-right">
                     Grand Total
