@@ -309,7 +309,7 @@ const formatItemQty = (itemQtyString) => {
               if (hasColumnK && isColumnLEmpty && shouldInclude) {
                 const followUpItem = {
                   // timestamp: row.c[50] ? formatDateToDDMMYYYY(row.c[50].v) : "", // Column A (index 0)
-                  timestamp: row.c[0] ? formatDateToDDMMYYYY(row.c[0].v) : "", // Column A (index 0)
+                  timestamp: row.c[50] ? formatDateToDDMMYYYY(row.c[50].v) : "", // Column A (index 0)
                   id: row.c[0] ? row.c[0].v : "",
                   leadId: row.c[1] ? row.c[1].v : "",
                   companyName: row.c[4] ? row.c[4].v : "",
@@ -945,7 +945,7 @@ const formatItemQty = (itemQtyString) => {
                                 scope="col"
                                 className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap"
                               >
-                                Timestamp
+                                Call Date
                               </th>
                               <th
                                 scope="col"
