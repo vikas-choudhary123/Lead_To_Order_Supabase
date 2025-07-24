@@ -6,6 +6,7 @@ function MakeQuotationForm({ enquiryNo, formData, onFieldChange }) {
   const params = useParams()
   const [sharedByOptions, setSharedByOptions] = useState([])
   const [isLoading, setIsLoading] = useState(false)
+  const [fileError, setFileError] = useState(null)
   
   // Fetch dropdown options from DROPDOWN sheet column E
   useEffect(() => {
@@ -112,7 +113,14 @@ if (data && data.table && data.table.rows) {
   const handleFileChange = (e) => {
     const file = e.target.files[0]
     if (file) {
-      onFieldChange('quotationFile', file)
+      // Validate file size (10MB max)
+      if (file.size > 10 * 1024 * 1024) {
+        setFileError("File size must be less than 10MB")
+        onFieldChange('quotationFile', null)
+      } else {
+        setFileError(null)
+        onFieldChange('quotationFile', file)
+      }
     }
   }
 
@@ -240,9 +248,13 @@ if (data && data.table && data.table.rows) {
                 className="hidden"
                 onChange={handleFileChange}
                 accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                required
               />
             </label>
           </div>
+          {fileError && (
+            <p className="mt-1 text-sm text-red-600">{fileError}</p>
+          )}
           {formData.quotationFile && (
             <div className="flex items-center mt-2 p-2 bg-gray-50 rounded-md">
               <svg className="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
