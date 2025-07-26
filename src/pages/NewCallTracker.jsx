@@ -285,6 +285,40 @@ const fetchLatestQuotationNumber = async (enquiryNo) => {
     }
   }
 
+
+  const getAndReserveNextOrderNumber = async () => {
+    try {
+      const scriptUrl =
+        "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec";
+      const params = {
+        action: "getAndReserveNextOrderNumber",
+        sheetName: "Enquiry Tracker",
+      };
+  
+      const urlParams = new URLSearchParams();
+      for (const key in params) {
+        urlParams.append(key, params[key]);
+      }
+  
+      const response = await fetch(scriptUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: urlParams,
+      });
+  
+      const result = await response.json();
+      if (result.success) {
+        return result.orderNumber;
+      }
+      throw new Error(result.error || "Failed to get order number");
+    } catch (error) {
+      console.error("Error getting next order number:", error);
+      throw error;
+    }
+  };
+
   
 
   const handleSubmit = async (e) => {
@@ -310,23 +344,22 @@ const fetchLatestQuotationNumber = async (enquiryNo) => {
   
       // Generate order number if status is "yes"
       let orderNumber = "";
-      if (currentStage === "order-status" && orderStatusData.orderStatus === "yes") {
-        // Get the latest order number from the sheet
-        const latestOrderNumber = await getLatestOrderNumber();
-        orderNumber = generateNextOrderNumber(latestOrderNumber);
-        
-        if (orderStatusData.acceptanceFile) {
-          showNotification("Uploading acceptance file...", "info");
-          acceptanceFileUrl = await uploadFileToDrive(orderStatusData.acceptanceFile);
-          showNotification("Acceptance file uploaded successfully", "success");
-        }
-      } else if (currentStage === "order-status" && orderStatusData.orderStatus === "no") {
-        if (orderStatusData.apologyVideo) {
-          showNotification("Uploading apology video...", "info");
-          apologyVideoUrl = await uploadFileToDrive(orderStatusData.apologyVideo);
-          showNotification("Apology video uploaded successfully", "success");
-        }
-      }
+if (currentStage === "order-status" && orderStatusData.orderStatus === "yes") {
+  // Get and reserve the next order number atomically
+  orderNumber = await getAndReserveNextOrderNumber();
+  
+  if (orderStatusData.acceptanceFile) {
+    showNotification("Uploading acceptance file...", "info");
+    acceptanceFileUrl = await uploadFileToDrive(orderStatusData.acceptanceFile);
+    showNotification("Acceptance file uploaded successfully", "success");
+  }
+} else if (currentStage === "order-status" && orderStatusData.orderStatus === "no") {
+  if (orderStatusData.apologyVideo) {
+    showNotification("Uploading apology video...", "info");
+    apologyVideoUrl = await uploadFileToDrive(orderStatusData.apologyVideo);
+    showNotification("Apology video uploaded successfully", "success");
+  }
+}
   
       // Prepare row data based on the selected stage
       let rowData = [

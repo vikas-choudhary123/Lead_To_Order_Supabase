@@ -58,64 +58,60 @@ const [assignToProjectOptions, setAssignToProjectOptions] = useState([])
   }, [])
 
   // Function to fetch the last enquiry number from the spreadsheet
+  const getAndReserveNextEnquiryNumber = async () => {
+    try {
+      const scriptUrl = "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec";
+      const params = {
+        action: "getAndReserveNextEnquiryNumber",
+        sheetName: "ENQUIRY TO ORDER",
+      };
+  
+      const urlParams = new URLSearchParams();
+      for (const key in params) {
+        urlParams.append(key, params[key]);
+      }
+  
+      const response = await fetch(scriptUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: urlParams,
+      });
+  
+      const result = await response.json();
+      if (result.success) {
+        return result.enquiryNumber;
+      }
+      throw new Error(result.error || "Failed to get enquiry number");
+    } catch (error) {
+      console.error("Error getting next enquiry number:", error);
+      throw error;
+    }
+  };
+  
+  // Replace the existing fetchLastEnquiryNumber function with this simpler version:
   const fetchLastEnquiryNumber = async () => {
     try {
-      const publicUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=ENQUIRY TO ORDER"
+      // Get the next enquiry number atomically
+      const nextEnquiryNo = await getAndReserveNextEnquiryNumber();
       
-      const response = await fetch(publicUrl)
-      const text = await response.text()
-      
-      const jsonStart = text.indexOf('{')
-      const jsonEnd = text.lastIndexOf('}') + 1
-      const jsonData = text.substring(jsonStart, jsonEnd)
-      
-      const data = JSON.parse(jsonData)
-      
-      if (data && data.table && data.table.rows && data.table.rows.length > 0) {
-        // Get all enquiry numbers (column B, index 1) from non-empty rows
-        const enquiryNumbers = data.table.rows
-          .filter(row => row.c && row.c[1] && row.c[1].v)
-          .map(row => row.c[1].v.toString())
-        
-        // Find the highest enquiry number (assuming format "En-XX" where XX is a number)
-        let maxNumber = 0
-        enquiryNumbers.forEach(num => {
-          if (num.startsWith("En-")) {
-            const numPart = parseInt(num.substring(3), 10)
-            if (!isNaN(numPart) && numPart > maxNumber) {
-              maxNumber = numPart
-            }
-          }
-        })
-        
-        // Generate the next enquiry number
-        const nextNumber = maxNumber + 1
-        const nextEnquiryNo = `En-${nextNumber.toString().padStart(2, "0")}`
-        
-        // Set the next enquiry number
-        setLastEnquiryNo(nextEnquiryNo)
-        setNewCallTrackerData(prev => ({
-          ...prev,
-          enquiryNo: nextEnquiryNo
-        }))
-      } else {
-        // Default to "En-01" if no data found
-        setLastEnquiryNo("En-01")
-        setNewCallTrackerData(prev => ({
-          ...prev,
-          enquiryNo: "En-01"
-        }))
-      }
+      // Set the next enquiry number
+      setLastEnquiryNo(nextEnquiryNo);
+      setNewCallTrackerData(prev => ({
+        ...prev,
+        enquiryNo: nextEnquiryNo
+      }));
     } catch (error) {
-      console.error("Error fetching last enquiry number:", error)
+      console.error("Error fetching next enquiry number:", error);
       // Default to "En-01" if there's an error
-      setLastEnquiryNo("En-01")
+      setLastEnquiryNo("En-01");
       setNewCallTrackerData(prev => ({
         ...prev,
         enquiryNo: "En-01"
-      }))
+      }));
     }
-  }
+  };
 
   // Function to fetch dropdown data from DROPDOWN sheet with updated column references
   const fetchDropdownData = async () => {
@@ -341,15 +337,18 @@ const [assignToProjectOptions, setAssignToProjectOptions] = useState([])
 const handleSubmit = async () => {
   setIsSubmitting(true)
   try {
+    // Get a fresh enquiry number at submission time to ensure uniqueness
+    const enquiryNumber = await getAndReserveNextEnquiryNumber();
+    
     const currentDate = new Date()
     const formattedDate = formatDateToDDMMYYYY(currentDate)
 
-    // Prepare base row data (columns A-E)
+    // Prepare base row data (columns A-E) - use the fresh enquiry number
     const rowData = [
       formattedDate, // A: Current date
-      newCallTrackerData.enquiryNo, // B: Lead Number
+      enquiryNumber, // B: Lead Number - use fresh number instead of newCallTrackerData.enquiryNo
       newCallTrackerData.leadSource, // C: Lead Source
-      newCallTrackerData.companyName, // F: Company Name
+      newCallTrackerData.companyName,
       newCallTrackerData.phoneNumber, // G: Phone Number
       newCallTrackerData.salesPersonName, // H: Sales Person Name
       newCallTrackerData.location, // I: Location
