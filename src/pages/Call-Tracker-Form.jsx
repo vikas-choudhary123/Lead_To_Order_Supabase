@@ -18,7 +18,7 @@ const CallTrackerForm = ({ onClose = () => window.history.back() }) => {
 const [assignToProjectOptions, setAssignToProjectOptions] = useState([])
 
   const [newCallTrackerData, setNewCallTrackerData] = useState({
-    enquiryNo: "",
+    enquiryNo: "Will be generated on submit", // Changed from "" to placeholder
     leadSource: "",
     scName: "", // Added SC Name field
     companyName: "",
@@ -50,14 +50,14 @@ const [assignToProjectOptions, setAssignToProjectOptions] = useState([])
     nextCallTime: "",
   })
 
-  // Fetch dropdown data, company data, and last enquiry number when component mounts
+  // Fetch dropdown data and company data when component mounts - REMOVED fetchLastEnquiryNumber
   useEffect(() => {
     fetchDropdownData()
     fetchCompanyData()
-    fetchLastEnquiryNumber()
+    // Removed: fetchLastEnquiryNumber()
   }, [])
 
-  // Function to fetch the last enquiry number from the spreadsheet
+  // Function to get and reserve next enquiry number atomically
   const getAndReserveNextEnquiryNumber = async () => {
     try {
       const scriptUrl = "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec";
@@ -87,29 +87,6 @@ const [assignToProjectOptions, setAssignToProjectOptions] = useState([])
     } catch (error) {
       console.error("Error getting next enquiry number:", error);
       throw error;
-    }
-  };
-  
-  // Replace the existing fetchLastEnquiryNumber function with this simpler version:
-  const fetchLastEnquiryNumber = async () => {
-    try {
-      // Get the next enquiry number atomically
-      const nextEnquiryNo = await getAndReserveNextEnquiryNumber();
-      
-      // Set the next enquiry number
-      setLastEnquiryNo(nextEnquiryNo);
-      setNewCallTrackerData(prev => ({
-        ...prev,
-        enquiryNo: nextEnquiryNo
-      }));
-    } catch (error) {
-      console.error("Error fetching next enquiry number:", error);
-      // Default to "En-01" if there's an error
-      setLastEnquiryNo("En-01");
-      setNewCallTrackerData(prev => ({
-        ...prev,
-        enquiryNo: "En-01"
-      }));
     }
   };
 
@@ -331,139 +308,138 @@ const [assignToProjectOptions, setAssignToProjectOptions] = useState([])
     }, 0)
   }
 
-  // Function to handle form submission
-// Function to handle form submission
-// Replace the existing handleSubmit function with this modified version
-const handleSubmit = async () => {
-  setIsSubmitting(true)
-  try {
-    // Get a fresh enquiry number at submission time to ensure uniqueness
-    const enquiryNumber = await getAndReserveNextEnquiryNumber();
-    
-    const currentDate = new Date()
-    const formattedDate = formatDateToDDMMYYYY(currentDate)
+  // UPDATED handleSubmit function - gets enquiry number only on submission
+  const handleSubmit = async () => {
+    setIsSubmitting(true)
+    try {
+      // Get a fresh enquiry number at submission time to ensure uniqueness
+      const enquiryNumber = await getAndReserveNextEnquiryNumber();
+      
+      const currentDate = new Date()
+      const formattedDate = formatDateToDDMMYYYY(currentDate)
 
-    // Prepare base row data (columns A-E) - use the fresh enquiry number
-    const rowData = [
-      formattedDate, // A: Current date
-      enquiryNumber, // B: Lead Number - use fresh number instead of newCallTrackerData.enquiryNo
-      newCallTrackerData.leadSource, // C: Lead Source
-      newCallTrackerData.companyName,
-      newCallTrackerData.phoneNumber, // G: Phone Number
-      newCallTrackerData.salesPersonName, // H: Sales Person Name
-      newCallTrackerData.location, // I: Location
-      newCallTrackerData.emailAddress, // J: Email Address
-      newCallTrackerData.shippingAddress, // K: Shipping Address
-      newCallTrackerData.enquiryReceiverName, // L: Enquiry Receiver Name
-      newCallTrackerData.enquiryAssignToProject, // M: Enquiry Assign to Project
-      newCallTrackerData.gstNumber, // N: GST Number
-    ]
+      // Prepare base row data (columns A-E) - use the fresh enquiry number
+      const rowData = [
+        formattedDate, // A: Current date
+        enquiryNumber, // B: Lead Number - use fresh number instead of newCallTrackerData.enquiryNo
+        newCallTrackerData.leadSource, // C: Lead Source
+        newCallTrackerData.companyName,
+        newCallTrackerData.phoneNumber, // G: Phone Number
+        newCallTrackerData.salesPersonName, // H: Sales Person Name
+        newCallTrackerData.location, // I: Location
+        newCallTrackerData.emailAddress, // J: Email Address
+        newCallTrackerData.shippingAddress, // K: Shipping Address
+        newCallTrackerData.enquiryReceiverName, // L: Enquiry Receiver Name
+        newCallTrackerData.enquiryAssignToProject, // M: Enquiry Assign to Project
+        newCallTrackerData.gstNumber, // N: GST Number
+      ]
 
-    // Add columns O-S for the enquiry form data
-    rowData.push(
-      enquiryFormData.enquiryDate ? formatDateToDDMMYYYY(enquiryFormData.enquiryDate) : "", // O: Enquiry Received Date
-      enquiryFormData.enquiryState, // P: Enquiry for State
-      enquiryFormData.projectName, // Q: Project Name (NOB)
-      enquiryFormData.salesType, // R: Sales Type
-      enquiryFormData.enquiryApproach, // S: Enquiry Approach
-    )
+      // Add columns O-S for the enquiry form data
+      rowData.push(
+        enquiryFormData.enquiryDate ? formatDateToDDMMYYYY(enquiryFormData.enquiryDate) : "", // O: Enquiry Received Date
+        enquiryFormData.enquiryState, // P: Enquiry for State
+        enquiryFormData.projectName, // Q: Project Name (NOB)
+        enquiryFormData.salesType, // R: Sales Type
+        enquiryFormData.enquiryApproach, // S: Enquiry Approach
+      )
 
-    // Handle first 10 items (columns T-AC)
-    const first10Items = items.slice(0, 10)
-    
-    // Add first 10 items in pairs (name, quantity)
-    first10Items.forEach((item) => {
-      rowData.push(item.name || "") // Product name
-      rowData.push(item.quantity || "0") // Quantity (0 if null/empty)
-    })
+      // Handle first 10 items (columns T-AC)
+      const first10Items = items.slice(0, 10)
+      
+      // Add first 10 items in pairs (name, quantity)
+      first10Items.forEach((item) => {
+        rowData.push(item.name || "") // Product name
+        rowData.push(item.quantity || "0") // Quantity (0 if null/empty)
+      })
 
-    // If less than 10 items, fill remaining slots with empty values
-    const remainingSlots = 10 - first10Items.length
-    for (let i = 0; i < remainingSlots; i++) {
-      rowData.push("", "0") // Empty name and 0 quantity
+      // If less than 10 items, fill remaining slots with empty values
+      const remainingSlots = 10 - first10Items.length
+      for (let i = 0; i < remainingSlots; i++) {
+        rowData.push("", "0") // Empty name and 0 quantity
+      }
+
+      // Add expected form data
+      rowData.push(
+        expectedFormData.nextAction || "", // Next Action
+        expectedFormData.nextCallDate || "", // Next Call Date
+        expectedFormData.nextCallTime || "" // Next Call Time
+      )
+
+      // Add empty columns up to column BX (index 75) to place SC Name in the correct position
+      // Calculate how many empty columns we need to add to reach column BX
+      const currentLength = rowData.length
+      const targetIndex = 75 // Column BX is index 75 (0-based)
+      
+      // Add empty columns if needed
+      while (rowData.length < targetIndex) {
+        rowData.push("")
+      }
+      
+      // Add SC Name at column BX (index 75)
+      rowData.push(newCallTrackerData.scName || "") // BX: SC Name
+
+      // Add empty columns up to column CB (index 81) for additional items JSON
+      while (rowData.length < 79) {
+        rowData.push("")
+      }
+
+      // Handle items 11 and onwards as JSON in column CB (index 81)
+      if (items.length > 10) {
+        const additionalItems = items.slice(10).map(item => ({
+          name: item.name || "",
+          quantity: item.quantity || "0"
+        }))
+        rowData.push(JSON.stringify(additionalItems)) // Column CB
+      } else {
+        rowData.push("") // Empty if no additional items
+      }
+
+      // Add total quantity in column CC (index 82)
+      rowData.push(calculateTotalQuantity().toString())
+
+      console.log("Row Data to be submitted:", rowData)
+      console.log("Generated Enquiry Number:", enquiryNumber)
+
+      // Submit data to Google Sheets using fetch
+      const scriptUrl = "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
+      
+      // Parameters for Google Apps Script
+      const params = {
+        sheetName: "ENQUIRY TO ORDER",
+        action: "insert",
+        rowData: JSON.stringify(rowData)
+      }
+
+      // Create URL-encoded string for the parameters
+      const urlParams = new URLSearchParams()
+      for (const key in params) {
+        urlParams.append(key, params[key])
+      }
+      
+      // Send the data
+      const response = await fetch(scriptUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: urlParams
+      })
+
+      const result = await response.json()
+      
+      if (result.success) {
+        alert(`Data submitted successfully! Enquiry Number: ${enquiryNumber}`)
+        onClose() // Close the form after successful submission
+      } else {
+        alert("Error submitting data: " + (result.error || "Unknown error"))
+      }
+    } catch (error) {
+      console.error("Error submitting form:", error)
+      alert("Error submitting form: " + error.message)
+    } finally {
+      setIsSubmitting(false)
     }
-
-    // Add expected form data
-    rowData.push(
-      expectedFormData.nextAction || "", // Next Action
-      expectedFormData.nextCallDate || "", // Next Call Date
-      expectedFormData.nextCallTime || "" // Next Call Time
-    )
-
-    // Add empty columns up to column BX (index 75) to place SC Name in the correct position
-    // Calculate how many empty columns we need to add to reach column BX
-    const currentLength = rowData.length
-    const targetIndex = 75 // Column BX is index 75 (0-based)
-    
-    // Add empty columns if needed
-    while (rowData.length < targetIndex) {
-      rowData.push("")
-    }
-    
-    // Add SC Name at column BX (index 75)
-    rowData.push(newCallTrackerData.scName || "") // BX: SC Name
-
-    // Add empty columns up to column CB (index 81) for additional items JSON
-    while (rowData.length < 79) {
-      rowData.push("")
-    }
-
-    // Handle items 11 and onwards as JSON in column CB (index 81)
-    if (items.length > 10) {
-      const additionalItems = items.slice(10).map(item => ({
-        name: item.name || "",
-        quantity: item.quantity || "0"
-      }))
-      rowData.push(JSON.stringify(additionalItems)) // Column CB
-    } else {
-      rowData.push("") // Empty if no additional items
-    }
-
-    // Add total quantity in column CC (index 82)
-    rowData.push(calculateTotalQuantity().toString())
-
-    console.log("Row Data to be submitted:", rowData)
-
-    // Submit data to Google Sheets using fetch
-    const scriptUrl = "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
-    
-    // Parameters for Google Apps Script
-    const params = {
-      sheetName: "ENQUIRY TO ORDER",
-      action: "insert",
-      rowData: JSON.stringify(rowData)
-    }
-
-    // Create URL-encoded string for the parameters
-    const urlParams = new URLSearchParams()
-    for (const key in params) {
-      urlParams.append(key, params[key])
-    }
-    
-    // Send the data
-    const response = await fetch(scriptUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: urlParams
-    })
-
-    const result = await response.json()
-    
-    if (result.success) {
-      alert("Data submitted successfully!")
-      onClose() // Close the form after successful submission
-    } else {
-      alert("Error submitting data: " + (result.error || "Unknown error"))
-    }
-  } catch (error) {
-    console.error("Error submitting form:", error)
-    alert("Error submitting form: " + error.message)
-  } finally {
-    setIsSubmitting(false)
   }
-}
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -502,6 +478,21 @@ const handleSubmit = async () => {
 
         <div className="p-6 space-y-6">
           <div className="space-y-4">
+            {/* Added Enquiry Number Display */}
+            <div className="space-y-2">
+              <label htmlFor="enquiryNo" className="block text-sm font-medium text-gray-700">
+                Enquiry Number
+              </label>
+              <input
+                id="enquiryNo"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600"
+                value={newCallTrackerData.enquiryNo}
+                readOnly
+                placeholder="Will be generated automatically"
+              />
+              <p className="text-xs text-gray-500">Enquiry number will be generated when you submit the form</p>
+            </div>
+
             <div className="space-y-2">
               <label htmlFor="leadSource" className="block text-sm font-medium text-gray-700">
                 Lead Source
