@@ -18,7 +18,7 @@ const CallTrackerForm = ({ onClose = () => window.history.back() }) => {
 const [assignToProjectOptions, setAssignToProjectOptions] = useState([])
 
   const [newCallTrackerData, setNewCallTrackerData] = useState({
-    enquiryNo: "",
+    enquiryNo: "Will be generated on submit", // Changed from "" to placeholder
     leadSource: "",
     scName: "", // Added SC Name field
     companyName: "",
@@ -50,72 +50,63 @@ const [assignToProjectOptions, setAssignToProjectOptions] = useState([])
     nextCallTime: "",
   })
 
-  // Fetch dropdown data, company data, and last enquiry number when component mounts
+  // Fetch dropdown data and company data when component mounts - REMOVED fetchLastEnquiryNumber
   useEffect(() => {
     fetchDropdownData()
     fetchCompanyData()
-    fetchLastEnquiryNumber()
+    // Removed: fetchLastEnquiryNumber()
   }, [])
 
-  // Function to fetch the last enquiry number from the spreadsheet
-  const fetchLastEnquiryNumber = async () => {
+  // Function to get and reserve next enquiry number atomically
+  const getAndReserveNextEnquiryNumber = async () => {
+    console.log('React: getAndReserveNextEnquiryNumber called at:', new Date());
+    
     try {
-      const publicUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=ENQUIRY TO ORDER"
+      const scriptUrl = "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec";
+      const params = {
+        action: "getAndReserveNextEnquiryNumber",
+        sheetName: "ENQUIRY TO ORDER",
+      };
+  
+      console.log('React: Sending request with params:', params);
+  
+      const urlParams = new URLSearchParams();
+      for (const key in params) {
+        urlParams.append(key, params[key]);
+      }
+  
+      console.log('React: Making fetch request...');
       
-      const response = await fetch(publicUrl)
-      const text = await response.text()
+      const response = await fetch(scriptUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: urlParams,
+      });
+  
+      console.log('React: Response status:', response.status);
       
-      const jsonStart = text.indexOf('{')
-      const jsonEnd = text.lastIndexOf('}') + 1
-      const jsonData = text.substring(jsonStart, jsonEnd)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+  
+      const result = await response.json();
+      console.log('React: Response result:', result);
       
-      const data = JSON.parse(jsonData)
-      
-      if (data && data.table && data.table.rows && data.table.rows.length > 0) {
-        // Get all enquiry numbers (column B, index 1) from non-empty rows
-        const enquiryNumbers = data.table.rows
-          .filter(row => row.c && row.c[1] && row.c[1].v)
-          .map(row => row.c[1].v.toString())
-        
-        // Find the highest enquiry number (assuming format "En-XX" where XX is a number)
-        let maxNumber = 0
-        enquiryNumbers.forEach(num => {
-          if (num.startsWith("En-")) {
-            const numPart = parseInt(num.substring(3), 10)
-            if (!isNaN(numPart) && numPart > maxNumber) {
-              maxNumber = numPart
-            }
-          }
-        })
-        
-        // Generate the next enquiry number
-        const nextNumber = maxNumber + 1
-        const nextEnquiryNo = `En-${nextNumber.toString().padStart(2, "0")}`
-        
-        // Set the next enquiry number
-        setLastEnquiryNo(nextEnquiryNo)
-        setNewCallTrackerData(prev => ({
-          ...prev,
-          enquiryNo: nextEnquiryNo
-        }))
+      if (result.success) {
+        console.log('React: Successfully got enquiry number:', result.enquiryNumber);
+        return result.enquiryNumber;
       } else {
-        // Default to "En-01" if no data found
-        setLastEnquiryNo("En-01")
-        setNewCallTrackerData(prev => ({
-          ...prev,
-          enquiryNo: "En-01"
-        }))
+        console.error('React: Server returned error:', result.error);
+        throw new Error(result.error || "Failed to get enquiry number");
       }
     } catch (error) {
-      console.error("Error fetching last enquiry number:", error)
-      // Default to "En-01" if there's an error
-      setLastEnquiryNo("En-01")
-      setNewCallTrackerData(prev => ({
-        ...prev,
-        enquiryNo: "En-01"
-      }))
+      console.error("React: Error getting next enquiry number:", error);
+      throw error;
     }
-  }
+  };
+  
 
   // Function to fetch dropdown data from DROPDOWN sheet with updated column references
   const fetchDropdownData = async () => {
@@ -335,21 +326,28 @@ const [assignToProjectOptions, setAssignToProjectOptions] = useState([])
     }, 0)
   }
 
-  // Function to handle form submission
-// Function to handle form submission
-// Replace the existing handleSubmit function with this modified version
+  // UPDATED handleSubmit function - gets enquiry number only on submission
+// Complete handleSubmit function - replace your existing handleSubmit function with this:
+
 const handleSubmit = async () => {
   setIsSubmitting(true)
+  console.log('Form submission started at:', new Date());
+  
   try {
+    console.log('Getting fresh enquiry number...');
+    // Get a fresh enquiry number at submission time to ensure uniqueness
+    const enquiryNumber = await getAndReserveNextEnquiryNumber();
+    console.log('Got enquiry number:', enquiryNumber);
+    
     const currentDate = new Date()
     const formattedDate = formatDateToDDMMYYYY(currentDate)
 
-    // Prepare base row data (columns A-E)
+    // Prepare base row data (columns A-E) - use the fresh enquiry number
     const rowData = [
       formattedDate, // A: Current date
-      newCallTrackerData.enquiryNo, // B: Lead Number
+      enquiryNumber, // B: Lead Number - use fresh number instead of newCallTrackerData.enquiryNo
       newCallTrackerData.leadSource, // C: Lead Source
-      newCallTrackerData.companyName, // F: Company Name
+      newCallTrackerData.companyName,
       newCallTrackerData.phoneNumber, // G: Phone Number
       newCallTrackerData.salesPersonName, // H: Sales Person Name
       newCallTrackerData.location, // I: Location
@@ -424,6 +422,7 @@ const handleSubmit = async () => {
     rowData.push(calculateTotalQuantity().toString())
 
     console.log("Row Data to be submitted:", rowData)
+    console.log("Generated Enquiry Number:", enquiryNumber)
 
     // Submit data to Google Sheets using fetch
     const scriptUrl = "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
@@ -441,6 +440,8 @@ const handleSubmit = async () => {
       urlParams.append(key, params[key])
     }
     
+    console.log('Submitting data to Google Sheets...');
+    
     // Send the data
     const response = await fetch(scriptUrl, {
       method: "POST",
@@ -453,9 +454,11 @@ const handleSubmit = async () => {
     const result = await response.json()
     
     if (result.success) {
-      alert("Data submitted successfully!")
+      console.log('Form submitted successfully with enquiry number:', enquiryNumber);
+      alert(`Data submitted successfully! Enquiry Number: ${enquiryNumber}`)
       onClose() // Close the form after successful submission
     } else {
+      console.error('Form submission failed:', result.error);
       alert("Error submitting data: " + (result.error || "Unknown error"))
     }
   } catch (error) {
@@ -503,6 +506,21 @@ const handleSubmit = async () => {
 
         <div className="p-6 space-y-6">
           <div className="space-y-4">
+            {/* Added Enquiry Number Display */}
+            <div className="space-y-2">
+              <label htmlFor="enquiryNo" className="block text-sm font-medium text-gray-700">
+                Enquiry Number
+              </label>
+              <input
+                id="enquiryNo"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600"
+                value={newCallTrackerData.enquiryNo}
+                readOnly
+                placeholder="Will be generated automatically"
+              />
+              <p className="text-xs text-gray-500">Enquiry number will be generated when you submit the form</p>
+            </div>
+
             <div className="space-y-2">
               <label htmlFor="leadSource" className="block text-sm font-medium text-gray-700">
                 Lead Source
