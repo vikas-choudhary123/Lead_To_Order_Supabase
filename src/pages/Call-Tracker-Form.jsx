@@ -347,7 +347,8 @@ const handleSubmit = async () => {
     // Prepare base row data (columns A-E)
     const rowData = [
       formattedDate, // A: Current date
-      newCallTrackerData.enquiryNo, // B: Lead Number
+      // newCallTrackerData.enquiryNo, // B: Lead Number
+      "",
       newCallTrackerData.leadSource, // C: Lead Source
       newCallTrackerData.companyName, // F: Company Name
       newCallTrackerData.phoneNumber, // G: Phone Number
