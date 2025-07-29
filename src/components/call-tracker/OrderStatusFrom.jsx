@@ -382,6 +382,34 @@ setCreditLimitOptions(["10000", "25000", "50000", "100000"])
             </div>
 
             <div className="space-y-2">
+              <label htmlFor="destination" className="block text-sm font-medium text-gray-700">
+                Destination
+              </label>
+              <input
+                id="destination"
+                name="destination"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="Enter destination"
+                value={formData.destination || ""}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="poNumber" className="block text-sm font-medium text-gray-700">
+                PO Number
+              </label>
+              <input
+                id="poNumber"
+                name="poNumber"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="Enter PO number"
+                value={formData.poNumber || ""}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="space-y-2">
               <label htmlFor="paymentTerms" className="block text-sm font-medium text-gray-700">
                 Payment Terms
               </label>

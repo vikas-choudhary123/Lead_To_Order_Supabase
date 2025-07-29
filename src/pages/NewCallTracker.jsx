@@ -414,6 +414,10 @@ const fetchLatestQuotationNumber = async (enquiryNo) => {
           rowData.push(""); 
           // Add the generated order number in column AQ (index 42)
           rowData.push(orderNumber); // Column AQ - Order Number
+          rowData.push(
+            orderStatusData.destination || "", // Column AR - Destination
+            orderStatusData.poNumber || "" // Column AS - PO Number
+          );
           // Add empty values for remaining columns (AF-AI)
           rowData.push(...new Array(4).fill(""));
         } else if (orderStatusData.orderStatus === "no") {
