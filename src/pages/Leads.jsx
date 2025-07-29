@@ -323,7 +323,8 @@ const handleSubmit = async (e) => {
     // Convert form data to array format for Google Sheets
     const rowData = [
       formattedDate, // Date in dd/mm/yyyy format
-      leadNumber, // Generated lead number based on current sheet data
+      // leadNumber, // Generated lead number based on current sheet data
+      "",
       formData.receiverName,
       formData.source,
       formData.companyName,
