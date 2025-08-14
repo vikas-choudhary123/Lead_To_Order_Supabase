@@ -65,7 +65,7 @@ function NewCallTracker() {
     acceptanceVia: "",
     paymentMode: "",
     paymentTerms: "",
-    tranportMode: "",
+    transportMode: "",
     creditDays: "",
     creditLimit: "",
     conveyedForRegistration: "",
@@ -400,7 +400,7 @@ const fetchLatestQuotationNumber = async (enquiryNo) => {
             orderStatusData.acceptanceVia, // Column X
             orderStatusData.paymentMode, // Column Y
             orderStatusData.paymentTerms, // Column Z
-            orderStatusData.tranportMode || "", // Column AD (new field)
+            orderStatusData.transportMode || "", // Column AD (new field)
             orderStatusData.conveyedForRegistration || "", // Column AE (new field)
             orderStatusData.orderVideo, // Column AA
             acceptanceFileUrl || "", // Column AB
