@@ -5,6 +5,7 @@ import { Link } from "react-router-dom"
 import { PlusIcon, SearchIcon, ArrowRightIcon, BuildingIcon } from "../components/Icons"
 import { AuthContext } from "../App" // Import AuthContext just like in the FollowUp component
 import CallTrackerForm from "./Call-Tracker-Form" // Add this import
+import supabase from "../supabaseClient"
 
 // Animation classes
 const slideIn = "animate-in slide-in-from-right duration-300"
@@ -19,6 +20,9 @@ function CallTracker() {
   const [pendingCallTrackers, setPendingCallTrackers] = useState([])
   const [historyCallTrackers, setHistoryCallTrackers] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [pendingData, setPendingData] = useState([])
+  const [historyData, setHistoryData] = useState([])
+  const [directEnquiryData, setDirectEnquiryData] = useState([])
   const [showNewCallTrackerForm, setShowNewCallTrackerForm] = useState(false)
   const [showPopup, setShowPopup] = useState(false)
   const [selectedTracker, setSelectedTracker] = useState(null)
@@ -27,7 +31,7 @@ function CallTracker() {
   const [enquiryNoFilter, setEnquiryNoFilter] = useState([])
   const [currentStageFilter, setCurrentStageFilter] = useState([])
   const [availableEnquiryNos, setAvailableEnquiryNos] = useState([])
-  
+  const [loading, setLoading] = useState(true)
   // Dropdown visibility states
   const [showCallingDaysDropdown, setShowCallingDaysDropdown] = useState(false)
   const [showEnquiryNoDropdown, setShowEnquiryNoDropdown] = useState(false)
@@ -315,6 +319,139 @@ const columnOptions = [
     }
   }, [])
 
+
+
+
+
+  // Function for fetching data
+  const fetchPendingData = async () => {
+    const { data, error } = await supabase
+       .from("leads_to_order")
+  .select("*")
+  .not("Planned", "is", null)  // planned IS NOT NULL
+  .is("Actual", null); 
+
+    if (error) {
+      console.error("Error fetching leads:", error.message);
+    } else {
+       const transformedData = data.map((item, index) => ({
+      id: index + 1,
+      Timestamp: item.Timestamp || "",
+      "lead_no": item["LD-Lead-No"] || "",
+      "Lead_Receiver_Name": item["Lead_Receiver_Name"] || "",
+      "Lead_Source": item["Lead_Source"] || "",
+      "Phone_Number": item["Phone_Number"] || "",
+      "salesperson_Name": item["Salesperson_Name"] || "",
+      "Company_Name": item["Company_Name"] || "",
+      "Current_Stage": item["Current_Stage"] || "",
+      "Calling_Days": item["Calling_Days"] || "",
+      priority: determinePriority(item["Lead_Source"] || ""),
+       itemQty: item['Item/qty'] || "",
+      sc_name: item['SC_Name'] || ""
+    }));
+      setPendingData(transformedData); 
+      console.log("lead",transformedData);
+      
+       return data;
+    }
+  
+    setLoading(false);
+  };
+
+  const fetchHistoryData = async () => {
+    const { data, error } = await supabase
+       .from("enquiry_tracker")
+  .select("*")
+ 
+    if (error) {
+      console.error("Error fetching leads:", error.message);
+    } else {
+      const transformedData = data.map((item, index) => ({
+  id: index + 1,
+  Timestamp: item.Timestamp || "",
+  enquiryNo: item["Enquiry No."] || "",
+  enquiryStatus: item["Enquiry Status"] || "",
+  customerFeedback: item["What Did Customer Say"] || "",
+  currentStage: item["Current Stage"] || "",
+  sendQuotationNo: item["Send Quotation No."] || "",
+  quotationSharedBy: item["Quotation Shared By"] || "",
+  quotationNumber: item["Quotation Number"] || "",
+  valueWithoutTax: item["Quotation Value Without Tax"] || "",
+  valueWithTax: item["Quotation Value With Tax"] || "",
+  quotationUpload: item["Quotation Upload"] || "",
+  quotationRemarks: item["Quotation Remarks"] || "",
+  validatorName: item["Quotation Validator Name"] || "",
+  sendStatus: item["Quotation Send Status"] || "",
+  validationRemark: item["Quotation Validation Remark"] || "",
+  faqVideo: item["Send Faq Video"] || "",
+  productVideo: item["Send Product Video"] || "",
+  offerVideo: item["Send Offer Video"] || "",
+  productCatalog: item["Send Product Catalog"] || "",
+  productImage: item["Send Product Image"] || "",
+  nextCallDate: item["Next Call Date"] || "",
+  nextCallTime: item["Next Call Time"] || "",
+  orderStatus: item["Is Order Received? Status"] || "",
+  acceptanceVia: item["Acceptance Via"] || "",
+  paymentMode: item["Payment Mode"] || "",
+  paymentTerms: item["Payment Terms (In Days)"] || "",
+  transportMode: item["Transport Mode"] || "",
+  registrationFrom: item["CONVEYED FOR REGISTRATION FORM"] || "",
+  offer: item["Offer"] || "",
+  acceptanceFile: item["Acceptance File Upload"] || "",
+  orderRemark: item["Remark"] || "",
+  apologyVideo: item["Order Lost Apology Video"] || "",
+  reasonStatus: item["If No Then Get Relevant Reason Status"] || "",
+  reasonRemark: item["If No Then Get Relevant Reason Remark"] || "",
+  holdReason: item["Customer Order Hold Reason Category"] || "",
+  holdingDate: item["Holding Date"] || "",
+  holdRemark: item["Hold Remark"] || "",
+  sales_coordinator: item["Sales Cordinator"] || "",
+  followup_status: item["Followup Status"] || "",
+  credit_days: item["Credit Days"] || "",
+  credit_limit: item["Credit Limit"] || "",
+  calling_days: item["Calling Days"] || "",
+  order_no: item["Order No."] || "",
+  sc_name: item["SC_Name"] || "",
+  destination: item["Destination"] || "",
+  po_number: item["PO Number"] || ""
+}));
+
+      setHistoryData(transformedData); 
+      console.log("History",transformedData);
+      
+       return transformedData;
+    }
+  
+    setLoading(false);
+  };
+
+    const fetchDirectEnquiryData = async () => {
+    const { data, error } = await supabase
+       .from("enquiry_to_order")
+  .select("*")
+  .not("planned1", "is", null)  // planned IS NOT NULL
+  .is("actual1", null); 
+    if (error) {
+      console.error("Error fetching leads:", error.message);
+    } else {
+    
+      setDirectEnquiryData(data); 
+      console.log("Direct Enquiry",data);
+      
+       return data;
+    }
+  
+    setLoading(false);
+  };
+
+  // Fetch on mount
+  useEffect(() => {
+    fetchPendingData();
+    fetchHistoryData();
+    fetchDirectEnquiryData();
+  }, []);
+
+
   // Function to fetch data from FMS and Enquiry Tracker sheets
   useEffect(() => {
     const fetchCallTrackerData = async () => {
@@ -402,7 +539,7 @@ const columnOptions = [
             }
           })
 
-          setPendingCallTrackers(pendingCallTrackerData)
+         // setPendingCallTrackers(pendingCallTrackerData)
         }
 
         // Process History Call Trackers from Enquiry Tracker sheet
@@ -635,15 +772,15 @@ if (historyData && historyData.table && historyData.table.rows) {
     return true
   }
 
-  const filteredPendingCallTrackers = pendingCallTrackers.filter((tracker) =>
+  const filteredPendingCallTrackers = pendingData.filter((tracker) =>
     filterTrackers(tracker, searchTerm, "pending"),
   )
 
-  const filteredHistoryCallTrackers = historyCallTrackers.filter((tracker) =>
+  const filteredHistoryCallTrackers = historyData.filter((tracker) =>
     filterTrackers(tracker, searchTerm, "history"),
   )
 
-  const filteredDirectEnquiryPendingTrackers = directEnquiryPendingTrackers.filter((tracker) =>
+  const filteredDirectEnquiryPendingTrackers = directEnquiryData.filter((tracker) =>
     filterTrackers(tracker, searchTerm, "directEnquiry"),
   )
 
@@ -1108,11 +1245,12 @@ const filterCounts = calculateFilterCounts();
             </div>
           </div>
 
-          {isLoading ? (
+          {/* {loading ? (
             <div className="p-8 text-center">
               <p className="text-slate-500">Loading Enquiry tracker data...</p>
             </div>
-          ) : (
+          ) : */}
+           (
             <>
               {activeTab === "pending" && (
                 <div className="rounded-md border overflow-x-auto">
@@ -1185,11 +1323,11 @@ const filterCounts = calculateFilterCounts();
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {filteredPendingCallTrackers.length > 0 ? (
-                        filteredPendingCallTrackers.map((tracker) => (
-                          <tr key={tracker.id} className="hover:bg-slate-50">
+                        filteredPendingCallTrackers.map((tracker,index) => (
+                          <tr key={index} className="hover:bg-slate-50">
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                               <div className="flex space-x-2">
-                                <Link to={`/call-tracker/new?leadId=${tracker.leadId}`}>
+                                <Link to={`/call-tracker/new?leadId=${tracker.lead_no}`}>
                                   <button className="px-3 py-1 text-xs border border-purple-200 text-purple-600 hover:bg-purple-50 rounded-md">
                                     Process <ArrowRightIcon className="ml-1 h-3 w-3 inline" />
                                   </button>
@@ -1206,13 +1344,13 @@ const filterCounts = calculateFilterCounts();
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-  {tracker.timestamp}
+  {tracker.Timestamp}
 </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {tracker.leadId}
+                              {tracker.lead_no}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {tracker.receiverName}
+                              {tracker.Lead_Receiver_Name}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span
@@ -1224,36 +1362,36 @@ const filterCounts = calculateFilterCounts();
                                       : "bg-slate-100 text-slate-800"
                                 }`}
                               >
-                                {tracker.leadSource}
+                                {tracker.Lead_Source}
                               </span>
                             </td>
-                            <td className="px-4 py-4 text-sm text-gray-500">{tracker.phoneNumber}</td>
+                            <td className="px-4 py-4 text-sm text-gray-500">{tracker.Phone_Number}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {tracker.salespersonName}
+                              {tracker.salesperson_Name}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               <div className="flex items-center">
                                 <BuildingIcon className="h-4 w-4 mr-2 text-slate-400" />
-                                {tracker.companyName}
+                                {tracker.Company_Name}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {tracker.currentStage}
+                              {tracker.Current_Stage}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {tracker.callingDate}
+                              {tracker.Calling_Days}
                             </td>
                             {isAdmin() && (
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {tracker.assignedTo}
+                                {tracker.sc_name}
                               </td>
                             )}
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
   <div
     className="min-w-[300px] break-words whitespace-normal"
-    title={formatItemQty(tracker.itemQty)}
+    title={(tracker.itemQty)}
   >
-    {formatItemQty(tracker.itemQty)}
+    {(tracker.itemQty)}
   </div>
 </td>
                           </tr>
@@ -1315,7 +1453,7 @@ const filterCounts = calculateFilterCounts();
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
-                          Calling Date
+                          Calling Days
                         </th>
                         <th
   scope="col"
@@ -1327,11 +1465,11 @@ const filterCounts = calculateFilterCounts();
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {filteredDirectEnquiryPendingTrackers.length > 0 ? (
-                        filteredDirectEnquiryPendingTrackers.map((tracker) => (
-                          <tr key={tracker.id} className="hover:bg-slate-50">
+                        filteredDirectEnquiryPendingTrackers.map((tracker,index) => (
+                          <tr key={index} className="hover:bg-slate-50">
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                               <div className="flex space-x-2">
-                                <Link to={`/call-tracker/new?leadId=${tracker.leadId}`}>
+                                <Link to={`/call-tracker/new?leadId=${tracker.enquiry_no}`}>
                                   <button className="px-3 py-1 text-xs border border-purple-200 text-purple-600 hover:bg-purple-50 rounded-md">
                                     Process <ArrowRightIcon className="ml-1 h-3 w-3 inline" />
                                   </button>
@@ -1351,10 +1489,13 @@ const filterCounts = calculateFilterCounts();
   {tracker.timestamp}
 </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {tracker.leadId}
+                              {tracker.enquiry_no}
+                            </td>
+                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {tracker.lead_source}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {tracker.receiverName}
+                              {tracker.company_name}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span
@@ -1366,21 +1507,19 @@ const filterCounts = calculateFilterCounts();
                                       : "bg-slate-100 text-slate-800"
                                 }`}
                               >
-                                {tracker.leadSource}
+                                {tracker.current_stage}
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {tracker.currentStage}
+                              {tracker.calling_days}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {tracker.callingDate1}
-                            </td>
+                           
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
   <div
     className="min-w-[300px] break-words whitespace-normal"
-    title={formatItemQty(tracker.itemQty)}
+    title={(tracker.item_qty)}
   >
-    {formatItemQty(tracker.itemQty)}
+    {(tracker.item_qty)}
   </div>
 </td>
                           </tr>
@@ -1517,10 +1656,10 @@ const filterCounts = calculateFilterCounts();
       </thead>
       <tbody className="bg-white divide-y divide-gray-200">
         {filteredHistoryCallTrackers.length > 0 ? (
-          filteredHistoryCallTrackers.map((tracker) => (
-            <tr key={tracker.id} className="hover:bg-slate-50">
+          filteredHistoryCallTrackers.map((tracker,index) => (
+            <tr key={index} className="hover:bg-slate-50">
               {visibleColumns.timestamp && (
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.timestamp}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tracker.Timestamp}</td>
               )}
               {visibleColumns.enquiryNo && (
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{tracker.enquiryNo}</td>
@@ -1684,7 +1823,7 @@ const filterCounts = calculateFilterCounts();
   </div>
 )}
             </>
-          )}
+          )
         </div>
       </div>
 

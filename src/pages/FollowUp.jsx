@@ -4,6 +4,7 @@ import { useState, useEffect, useContext } from "react"
 import { Link } from "react-router-dom"
 import { SearchIcon, ArrowRightIcon } from "../components/Icons"
 import { AuthContext } from "../App" // Import AuthContext
+import supabase from "../utils/supabase"
 
 const slideIn = "animate-in slide-in-from-right duration-300"
 const slideOut = "animate-out slide-out-to-right duration-300"
@@ -257,181 +258,146 @@ const formatItemQty = (itemQtyString) => {
   }
 
   // Function to fetch data from FMS and Leads Tracker sheets
-  useEffect(() => {
-    const fetchFollowUpData = async () => {
-      try {
-        setIsLoading(true)
+useEffect(() => {
+  let isMounted = true;
+  const abortController = new AbortController();
 
-        // Fetch data from FMS sheet for Pending Follow-ups
-        const pendingUrl =
-          "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=FMS"
-        const pendingResponse = await fetch(pendingUrl)
-        const pendingText = await pendingResponse.text()
+  const fetchFollowUpData = async () => {
+    try {
+      setIsLoading(true);
 
-        // Extract the JSON part from the FMS sheet response
-        const pendingJsonStart = pendingText.indexOf("{")
-        const pendingJsonEnd = pendingText.lastIndexOf("}") + 1
-        const pendingJsonData = pendingText.substring(pendingJsonStart, pendingJsonEnd)
+      // Fetch both data sources in parallel
+      const [pendingResponse, historyResponse] = await Promise.all([
+        supabase
+          .from('leads_to_order')
+          .select('*')
+          .not('Planned', 'is', null)
+          .is('Actual', null)
+          .abortSignal(abortController.signal),
+        supabase
+          .from('leads_tracker')
+          .select('*')
+          .abortSignal(abortController.signal)
+      ]);
 
-        const pendingData = JSON.parse(pendingJsonData)
+      if (!isMounted) return;
 
-        // Fetch data from Leads Tracker sheet for History
-        const historyUrl =
-          "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=Leads Tracker"
-        const historyResponse = await fetch(historyUrl)
-        const historyText = await historyResponse.text()
+      // Process pending data
+      const pendingData = pendingResponse.data || [];
+      const filteredPending = pendingData
+        .filter(row => isAdmin() || (currentUser && (row.assigned_user || "") === currentUser.username))
+        .map(row => ({
+          timestamp: row.Next_Call_Date ? formatDateToDDMMYYYY(row.Next_Call_Date) : "",
+          id: row.id || "",
+          leadId: row['LD-Lead-No'] || "",
+          companyName: row['Company_Name'] || "",
+          personName: row['Salesperson_Name'] || "",
+          phoneNumber: row['Phone_Number'] || "",
+          leadSource: row['Lead_Source'] || "",
+          location: row['Location'] || "",
+          customerSay: row['What_Did_Customer_say'] || "",
+          enquiryStatus: row['Enquiry_Status'] || "",
+          createdAt: row['Created_At'] || "",
+          nextCallDate: row['Next_Call_Date'] || "",
+          priority: determinePriority(row['Lead_Source'] || ""),
+          assignedTo: row['Sc_Name'] || "",
+          itemQty: row['Item_Qty'] || ""
+        }));
 
-        // Extract the JSON part from the Leads Tracker sheet response
-        const historyJsonStart = historyText.indexOf("{")
-        const historyJsonEnd = historyText.lastIndexOf("}") + 1
-        const historyJsonData = historyText.substring(historyJsonStart, historyJsonEnd)
+      // Process history data
+     const historyData = historyResponse.data || [];
+const filteredHistory = historyData
+  .filter(row => isAdmin() || (currentUser && (row.assigned_user || "") === currentUser.username))
+  .map(row => ({
+    timestamp: row["Timestamp"] ? formatDateToDDMMYYYY(row["Timestamp"]) : "",
+    leadNo: row["LD-Lead-No"] || "",
+    companyName: "", // No company name field in leads_tracker, will need to join or leave empty
+    customerSay: row["What_Did_The_Customer_say?"] || "",
+    status: row["Leads_Tracking_Status"] || "",
+    enquiryReceivedStatus: row["Enquiry_Received_Status"] || "",
+    enquiryReceivedDate: row["Enquiry_Received_Date"] ? formatDateToDDMMYYYY(row["Enquiry_Received_Date"]) : "",
+    enquiryState: row["Enquiry_for_State"] || "",
+    projectName: row["Project_Name"] || "",
+    salesType: row["Enquiry_Type"] || "",
+    requiredProductDate: "", // No required product date field in leads_tracker
+    projectApproxValue: row["Project_Approximate_Value"] || "",
+    itemName1: row["Item_Name1"] || "",
+    quantity1: row["Quantity1"] || "",
+    itemName2: row["Item_Name2"] || "",
+    quantity2: row["Quantity2"] || "",
+    itemName3: row["Item_Name3"] || "",
+    quantity3: row["Quantity3"] || "",
+    itemName4: row["Item_Name4"] || "",
+    quantity4: row["Quantity4"] || "",
+    itemName5: row["Item_Name5"] || "",
+    quantity5: row["Quantity5"] || "",
+    nextAction: row["Next_Action"] || "",
+    nextCallDate: row["Next_Call_Date"] ? formatDateToDDMMYYYY(row["Next_Call_Date"]) : "",
+    nextCallTime: row["Next_Call_Time"] ? formatNextCallTime(row["Next_Call_Time"]) : "",
+    historyDateFilter: "", // You may need to add this logic based on your requirements
+    assignedTo: row.assigned_user || "",
+    itemQty: row.item_qty || "" // Add this if it exists in your table
+  }));
 
-        const historyData = JSON.parse(historyJsonData)
+      if (isMounted) {
+        setPendingFollowUps(filteredPending);
+        setHistoryFollowUps(filteredHistory);
+        setIsLoading(false);
+      }
 
-        // Process Pending Follow-ups from FMS sheet
-        if (pendingData && pendingData.table && pendingData.table.rows) {
-          const pendingFollowUpData = []
+    } catch (error) {
+      if (error.name !== 'AbortError' && isMounted) {
+        console.error("Error fetching follow-up data:", error);
+        setIsLoading(false);
+        
+        // Fallback data
+        setPendingFollowUps([{
+          id: "1",
+          leadId: "LD-001",
+          companyName: "ABC Corp",
+          personName: "John Smith",
+          phoneNumber: "9876543210",
+          leadSource: "Indiamart",
+          location: "Mumbai",
+          customerSay: "Interested in product details",
+          enquiryStatus: "New",
+          createdAt: "2023-05-15",
+          nextCallDate: "Date(2025,4,27)",
+          priority: "High",
+          assignedTo: "",
+          itemQty: ""
+        }]);
 
-          // Skip the header row (index 0)
-          pendingData.table.rows.slice(0).forEach((row) => {
-            if (row.c) {
-              // Check if column K (index 10) has data and column L (index 11) is null
-              const hasColumnK = row.c[27] && row.c[27].v
-              const isColumnLEmpty = !row.c[28] || row.c[28].v === null || row.c[28].v === ""
-
-              // Get the assigned user
-              const assignedUser = row.c[88] ? row.c[88].v : ""
-
-              // For admin users, include all rows; for regular users, filter by their username
-              const shouldInclude = isAdmin() || (currentUser && assignedUser === currentUser.username)
-
-              // Only include rows where column K has data, column L is null/empty, and user has access
-              if (hasColumnK && isColumnLEmpty && shouldInclude) {
-                const followUpItem = {
-                  // timestamp: row.c[50] ? formatDateToDDMMYYYY(row.c[50].v) : "", // Column A (index 0)
-                  timestamp: row.c[50] ? formatDateToDDMMYYYY(row.c[50].v) : "", // Column A (index 0)
-                  id: row.c[0] ? row.c[0].v : "",
-                  leadId: row.c[1] ? row.c[1].v : "",
-                  companyName: row.c[4] ? row.c[4].v : "",
-                  personName: row.c[6] ? row.c[6].v : "",
-                  phoneNumber: row.c[5] ? row.c[5].v : "", // Added phone number from column F (index 5)
-                  leadSource: row.c[3] ? row.c[3].v : "",
-                  location: row.c[7] ? row.c[7].v : "",
-                  customerSay: row.c[31] ? row.c[31].v : "",
-                  enquiryStatus: row.c[32] ? row.c[32].v : "",
-                  createdAt: row.c[0] ? row.c[0].v : "",
-                  nextCallDate: row.c[89] ? row.c[89].v : "", // Column CL (index 89) for date filtering
-                  priority: determinePriority(row.c[3] ? row.c[3].v : ""),
-                  assignedTo: assignedUser, // Add assigned user to the follow-up item
-                  itemQty: row.c[96] ? row.c[96].v : "",
-                }
-
-                pendingFollowUpData.push(followUpItem)
-              }
-            }
-          })
-
-          setPendingFollowUps(pendingFollowUpData)
-        }
-
-        // Process History Follow-ups from Leads Tracker sheet
-        // Process History Follow-ups from Leads Tracker sheet
-        if (historyData && historyData.table && historyData.table.rows) {
-          const historyFollowUpData = []
-
-          historyData.table.rows.slice(0).forEach((row) => {
-            if (row.c) {
-              // Get the assigned user from column Y (index 24)
-              const assignedUser = row.c[24] ? row.c[24].v : ""
-
-              // For admin users, include all rows; for regular users, filter by their username
-              const shouldInclude = isAdmin() || (currentUser && assignedUser === currentUser.username)
-
-              if (shouldInclude) {
-                const followUpItem = {
-                  timestamp: row.c[0] ? formatDateToDDMMYYYY(row.c[0].v) : "", // Column A (index 0)
-                  leadNo: row.c[1] ? row.c[1].v : "",
-                  companyName: row.c[26] ? row.c[26].v : "", // Column AA (index 26)
-                  customerSay: row.c[2] ? row.c[2].v : "",
-                  status: row.c[3] ? row.c[3].v : "",
-                  enquiryReceivedStatus: row.c[4] ? row.c[4].v : "",
-                  enquiryReceivedDate: row.c[5] ? formatDateToDDMMYYYY(row.c[5] ? row.c[5].v : "") : "",
-                  enquiryState: row.c[6] ? row.c[6].v : "",
-                  projectName: row.c[7] ? row.c[7].v : "",
-                  salesType: row.c[8] ? row.c[8].v : "",
-                  requiredProductDate: row.c[9] ? formatDateToDDMMYYYY(row.c[9] ? row.c[9].v : "") : "",
-                  projectApproxValue: row.c[10] ? row.c[10].v : "",
-                  itemName1: row.c[11] ? row.c[11].v : "",
-                  quantity1: row.c[12] ? row.c[12].v : "",
-                  itemName2: row.c[13] ? row.c[13].v : "",
-                  quantity2: row.c[14] ? row.c[14].v : "",
-                  itemName3: row.c[15] ? row.c[15].v : "",
-                  quantity3: row.c[16] ? row.c[16].v : "",
-                  itemName4: row.c[17] ? row.c[17].v : "",
-                  quantity4: row.c[18] ? row.c[18].v : "",
-                  itemName5: row.c[19] ? row.c[19].v : "",
-                  quantity5: row.c[20] ? row.c[20].v : "",
-                  nextAction: row.c[21] ? row.c[21].v : "",
-                  nextCallDate: row.c[22] ? formatDateToDDMMYYYY(row.c[22] ? row.c[22].v : "") : "",
-                  nextCallTime: row.c[23] ? formatNextCallTime(row.c[23].v) : "",
-                  historyDateFilter: row.c[25] ? row.c[25].v : "",
-                  assignedTo: assignedUser, // Add assigned user to the history item
-                  itemQty: row.c[28] ? row.c[28].v : "", // Add this line - Column AC (index 28)
-                }
-
-                historyFollowUpData.push(followUpItem)
-              }
-            }
-          })
-
-          setHistoryFollowUps(historyFollowUpData)
-        }
-      } catch (error) {
-        console.error("Error fetching follow-up data:", error)
-        // Fallback to mock data if fetch fails
-        setPendingFollowUps([
-          {
-            id: "1",
-            leadId: "LD-001",
-            companyName: "ABC Corp",
-            personName: "John Smith",
-            phoneNumber: "9876543210", // Added sample phone number
-            leadSource: "Indiamart",
-            location: "Mumbai",
-            customerSay: "Interested in product details",
-            enquiryStatus: "New",
-            createdAt: "2023-05-15",
-            nextCallDate: "Date(2025,4,27)", // Sample date for testing
-            priority: "High",
-          },
-        ])
-
-        setHistoryFollowUps([
-          {
-            leadNo: "LD-001",
-            customerSay: "Interested in product details",
-            status: "Pending",
-            enquiryReceivedStatus: "New",
-            enquiryReceivedDate: "15/05/2023",
-            enquiryState: "Maharashtra",
-            projectName: "Sample Project",
-            salesType: "Direct",
-            requiredProductDate: "15/06/2023",
-            projectApproxValue: "₹500,000",
-            itemName1: "Product A",
-            quantity1: "10",
-            nextAction: "Follow-up call",
-            nextCallDate: "20/05/2023",
-            nextCallTime: "10:00 AM",
-          },
-        ])
-      } finally {
-        setIsLoading(false)
+        setHistoryFollowUps([{
+          leadNo: "LD-001",
+          customerSay: "Interested in product details",
+          status: "Pending",
+          enquiryReceivedStatus: "New",
+          enquiryReceivedDate: "15/05/2023",
+          enquiryState: "Maharashtra",
+          projectName: "Sample Project",
+          salesType: "Direct",
+          requiredProductDate: "15/06/2023",
+          projectApproxValue: "₹500,000",
+          itemName1: "Product A",
+          quantity1: "10",
+          nextAction: "Follow-up call",
+          nextCallDate: "20/05/2023",
+          nextCallTime: "10:00 AM",
+          assignedTo: "",
+          itemQty: ""
+        }]);
       }
     }
+  };
 
-    fetchFollowUpData()
-  }, [currentUser, isAdmin]) // Add isAdmin to dependencies
+  fetchFollowUpData();
+
+  return () => {
+    isMounted = false;
+    abortController.abort();
+  };
+}, [currentUser, isAdmin]); // Only re-run if currentUser or isAdmin changes
 
   // Add this function or modify the existing formatDateToDDMMYYYY function
   const formatPopupDate = (dateValue) => {

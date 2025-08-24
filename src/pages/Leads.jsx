@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useContext } from "react"
 import { AuthContext } from "../App"
+import supabase from "../utils/supabase" // Import your supabase client
 
 function Leads() {
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -13,32 +14,29 @@ function Leads() {
     salespersonName: "",
     location: "",
     email: "",
-    contactPersons: [{ name: "", designation: "", number: "" }], // New array for contact persons
-    state: "", // New field
-    address: "", // New field
-    customerRegistrationForm: "", // New field
-    creditAccess: "", // New field
-    creditDays: "", // New field
-    creditLimit: "", // New field
-    nob: "", // New field for Nature of Business
-    gst: "", // New field for GST
+    contactPersons: [{ name: "", designation: "", number: "" }],
+    state: "",
+    address: "",
+    customerRegistrationForm: "",
+    creditAccess: "",
+    creditDays: "",
+    creditLimit: "",
+    nob: "",
+    gst: "",
     notes: ""
   })
   const [receiverNames, setReceiverNames] = useState([])
   const [leadSources, setLeadSources] = useState([])
-  const [companyOptions, setCompanyOptions] = useState([]) // State for company dropdown
-  const [companyDetailsMap, setCompanyDetailsMap] = useState({}) // State to store company details
+  const [companyOptions, setCompanyOptions] = useState([])
+  const [companyDetailsMap, setCompanyDetailsMap] = useState({})
   const [nextLeadNumber, setNextLeadNumber] = useState("")
-  const [creditDaysOptions, setCreditDaysOptions] = useState([]) // New state for credit days dropdown
-  const [creditLimitOptions, setCreditLimitOptions] = useState([]) // New state for credit limit dropdown
+  const [creditDaysOptions, setCreditDaysOptions] = useState([])
+  const [creditLimitOptions, setCreditLimitOptions] = useState([])
   const { showNotification } = useContext(AuthContext)
   const [designationOptions, setDesignationOptions] = useState([])
-  const [nobOptions, setNobOptions] = useState([]) // New state for nature of business dropdown
-  const [stateOptions, setStateOptions] = useState([]) 
+  const [nobOptions, setNobOptions] = useState([])
+  const [stateOptions, setStateOptions] = useState([])
   
-  // Script URL
-  const scriptUrl = "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
-
   // Function to format date as dd/mm/yyyy
   const formatDate = (date) => {
     const day = String(date.getDate()).padStart(2, '0')
@@ -51,10 +49,12 @@ function Leads() {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        // Fetch dropdown values from DROPDOWNSHEET
+        // Fetch dropdown values from Google Sheets (keeping this as is)
         await fetchDropdownData()
         // Fetch company data for dropdown and auto-fill
         await fetchCompanyData()
+        // Generate next lead number from Supabase
+        await generateNextLeadNumber()
       } catch (error) {
         console.error("Error during initial data fetch:", error)
       }
@@ -63,139 +63,127 @@ function Leads() {
     fetchInitialData()
   }, [])
 
-  // Function to fetch dropdown data from DROPDOWNSHEET
-  const fetchDropdownData = async () => {
-    try {
-      // Call the Google Apps Script with query parameters to get public access to the DROPDOWNSHEET
-      const publicUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=DROPDOWN"
-      
-      const response = await fetch(publicUrl)
-      const text = await response.text()
-      
-      // The response is a callback with JSON data - extract just the JSON part
-      const jsonStart = text.indexOf('{')
-      const jsonEnd = text.lastIndexOf('}') + 1
-      const jsonData = text.substring(jsonStart, jsonEnd)
-      
-      const data = JSON.parse(jsonData)
-      
-      // Extract columns A, B, C (states), BQ (credit days), BR (credit limit), BV (designations), and AL (nature of business)
-      if (data && data.table && data.table.rows) {
-        const receivers = []
-        const sources = []
-        const states = []     // New array for state options
-        const creditDays = []
-        const creditLimits = []
-        const designations = [] // Array for designations
-        const nobs = [] // Array for nature of business options
-        
-        // Skip the first row (index 0) which contains headers
-        data.table.rows.slice(0).forEach(row => {
-          // Column A (receivers) - skip empty values
-          if (row.c && row.c[0] && row.c[0].v) {
-            receivers.push(row.c[0].v.toString())
-          }
-          
-          // Column B (sources) - skip empty values
-          if (row.c && row.c[1] && row.c[1].v) {
-            sources.push(row.c[1].v.toString())
-          }
-          
-          // Column C (states) - skip empty values
-          // Column index 2 (0-based, so C is 2)
-          if (row.c && row.c[2] && row.c[2].v) {
-            states.push(row.c[2].v.toString())
-          }
-          
-          // Column BQ (credit days) - skip empty values
-          // Column index 67 (0-based, so BQ is 67)
-          if (row.c && row.c[68] && row.c[68].v) {
-            creditDays.push(row.c[68].v.toString())
-          }
-          
-          // Column BR (credit limit) - skip empty values
-          // Column index 68 (0-based, so BR is 68)
-          if (row.c && row.c[69] && row.c[69].v) {
-            creditLimits.push(row.c[69].v.toString())
-          }
-          
-          // Column BV (designations) - skip empty values
-          // Column index 73 (0-based, so BV is 73)
-          if (row.c && row.c[73] && row.c[73].v) {
-            designations.push(row.c[73].v.toString())
-          }
-          
-          // Column AL (nature of business) - skip empty values
-          // Column index 37 (0-based, so AL is 37)
-          if (row.c && row.c[37] && row.c[37].v) {
-            nobs.push(row.c[37].v.toString())
-          }
-        })
-        
-        setReceiverNames(receivers)
-        setLeadSources(sources)
-        setStateOptions(states)     // Set the state options
-        setCreditDaysOptions(creditDays)
-        setCreditLimitOptions(creditLimits)
-        setDesignationOptions(designations) // Set the designation options
-        setNobOptions(nobs) // Set the nature of business options
-      }
-    } catch (error) {
-      console.error("Error fetching dropdown values:", error)
-      // Fallback to default values if needed
-      setReceiverNames(["John Smith", "Sarah Johnson", "Michael Brown"])
-      setLeadSources(["Indiamart", "Justdial", "Social Media", "Website", "Referral", "Other"])
-      setStateOptions(["Andhra Pradesh", "Assam", "Bihar", "Delhi", "Gujarat", "Haryana", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Punjab", "Rajasthan", "Tamil Nadu", "Telangana", "Uttar Pradesh", "West Bengal"]) // Default state options
-      setCreditDaysOptions(["7 days", "15 days", "30 days", "45 days", "60 days"])
-      setCreditLimitOptions(["₹50,000", "₹100,000", "₹500,000", "₹1,000,000"])
-      setDesignationOptions(["Manager", "Director", "CEO", "CFO", "Proprietor"]) // Default designations
-      setNobOptions(["Manufacturing", "Trading", "Service", "Retail"]) // Default NOB options
-    }
-  }
+  // NEW: Fetch dropdown data from Supabase dropdown table
+// NEW: Fetch dropdown data from Supabase dropdown table
+const fetchDropdownData = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('dropdown')
+      .select('*')
 
-  // Function to fetch company data from DROPDOWN sheet
+    if (error) {
+      throw error
+    }
+
+    if (data && data.length > 0) {
+      // Extract unique values for each dropdown using correct column names
+      const receivers = [...new Set(data.map(row => row.lead_receiver_name).filter(Boolean))]
+      const sources = [...new Set(data.map(row => row.lead_source).filter(Boolean))]
+      const states = [...new Set(data.map(row => row.state).filter(Boolean))]
+      const creditDays = [...new Set(data.map(row => row.credit_days).filter(Boolean))]
+      const creditLimits = [...new Set(data.map(row => row.credit_limit).filter(Boolean))]
+      const designations = [...new Set(data.map(row => row.designation).filter(Boolean))]
+      const nobs = [...new Set(data.map(row => row.nob).filter(Boolean))]
+      
+      // Filter out empty strings and null values, then sort
+      setReceiverNames(receivers.filter(item => item && item.trim() !== '').sort())
+      setLeadSources(sources.filter(item => item && item.trim() !== '').sort())
+      setStateOptions(states.filter(item => item && item.trim() !== '').sort())
+      setCreditDaysOptions(creditDays.filter(item => item && item.trim() !== '').sort())
+      setCreditLimitOptions(creditLimits.filter(item => item && item.trim() !== '').sort())
+      setDesignationOptions(designations.filter(item => item && item.trim() !== '').sort())
+      setNobOptions(nobs.filter(item => item && item.trim() !== '').sort())
+    }
+  } catch (error) {
+    console.error("Error fetching dropdown values:", error)
+    // Fallback to default values
+    setReceiverNames(["John Smith", "Sarah Johnson", "Michael Brown"])
+    setLeadSources(["Indiamart", "Justdial", "Social Media", "Website", "Referral", "Other"])
+    setStateOptions(["Andhra Pradesh", "Assam", "Bihar", "Delhi", "Gujarat", "Haryana", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Punjab", "Rajasthan", "Tamil Nadu", "Telangana", "Uttar Pradesh", "West Bengal"])
+    setCreditDaysOptions(["7 days", "15 days", "30 days", "45 days", "60 days"])
+    setCreditLimitOptions(["₹50,000", "₹100,000", "₹500,000", "₹1,000,000"])
+    setDesignationOptions(["Manager", "Director", "CEO", "CFO", "Proprietor"])
+    setNobOptions(["Manufacturing", "Trading", "Service", "Retail"])
+  }
+}
+
+  // NEW: Fetch company data from Supabase dropdown table
   const fetchCompanyData = async () => {
     try {
-      const publicUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=DROPDOWN"
-      
-      const response = await fetch(publicUrl)
-      const text = await response.text()
-      
-      const jsonStart = text.indexOf('{')
-      const jsonEnd = text.lastIndexOf('}') + 1
-      const jsonData = text.substring(jsonStart, jsonEnd)
-      
-      const data = JSON.parse(jsonData)
-      
-      if (data && data.table && data.table.rows) {
+      const { data, error } = await supabase
+        .from('dropdown')
+        .select('company_name, salesperson_name, phone_number, email, location')
+        .not('company_name', 'is', null)
+
+      if (error) {
+        throw error
+      }
+
+      if (data && data.length > 0) {
         const companies = []
         const detailsMap = {}
         
-        // Skip the header row
-        data.table.rows.slice(0).forEach(row => {
-          // Add null check for row.c[41] and row.c[41].v
-          if (row.c && row.c[40] && row.c[40].v !== null) {
-            const companyName = row.c[40].v.toString()
-            companies.push(companyName)
+        data.forEach(row => {
+          if (row.company_name) {
+            companies.push(row.company_name)
             
-            // Store company details for auto-fill - with null checks for each property
-            detailsMap[companyName] = {
-              salesPerson: (row.c[41] && row.c[41].v !== null) ? row.c[41].v.toString() : "", 
-              phoneNumber: (row.c[42] && row.c[42].v !== null) ? row.c[42].v.toString() : "", 
-              email: (row.c[43] && row.c[43].v !== null) ? row.c[43].v.toString() : "",
-              location: (row.c[44] && row.c[44].v !== null) ? row.c[44].v.toString() : ""
+            detailsMap[row.company_name] = {
+              salesPerson: row.salesperson_name || "",
+              phoneNumber: row.phone_number || "",
+              email: row.email || "",
+              location: row.location || ""
             }
           }
         })
         
-        setCompanyOptions(companies)
+        // Remove duplicates
+        const uniqueCompanies = [...new Set(companies)]
+        setCompanyOptions(uniqueCompanies)
         setCompanyDetailsMap(detailsMap)
       }
     } catch (error) {
       console.error("Error fetching company data:", error)
-      // Fallback to empty values
       setCompanyOptions([])
       setCompanyDetailsMap({})
+    }
+  }
+
+  // NEW: Generate next lead number from Supabase
+  const generateNextLeadNumber = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('leads_to_order')
+        .select('"LD-Lead-No"')
+        .order('id', { ascending: false })
+        .limit(1)
+
+      if (error) {
+        console.error('Error fetching last lead number:', error)
+        setNextLeadNumber("LD-001")
+        return
+      }
+
+      if (!data || data.length === 0) {
+        setNextLeadNumber("LD-001")
+        return
+      }
+
+      const lastLeadNumber = data[0]["LD-Lead-No"]
+      if (lastLeadNumber && lastLeadNumber.startsWith("LD-")) {
+        const match = lastLeadNumber.match(/LD-(\d+)/)
+        if (match) {
+          const lastNumber = parseInt(match[1], 10)
+          const nextNumber = lastNumber + 1
+          setNextLeadNumber(`LD-${String(nextNumber).padStart(3, '0')}`)
+        } else {
+          setNextLeadNumber("LD-001")
+        }
+      } else {
+        setNextLeadNumber("LD-001")
+      }
+    } catch (error) {
+      console.error("Error generating lead number:", error)
+      setNextLeadNumber("LD-001")
     }
   }
 
@@ -220,7 +208,6 @@ function Leads() {
     }
   }
 
-  // Function to handle change in contact person fields
   const handleContactPersonChange = (index, field, value) => {
     const updatedContactPersons = [...formData.contactPersons]
     updatedContactPersons[index] = {
@@ -234,7 +221,6 @@ function Leads() {
     })
   }
 
-  // Function to add a new contact person section (max 3)
   const addContactPerson = () => {
     if (formData.contactPersons.length < 3) {
       setFormData({
@@ -244,7 +230,6 @@ function Leads() {
     }
   }
 
-  // Function to remove a contact person section
   const removeContactPerson = (index) => {
     const updatedContactPersons = [...formData.contactPersons]
     updatedContactPersons.splice(index, 1)
@@ -255,183 +240,87 @@ function Leads() {
     })
   }
 
-  const generateLeadNumber = async () => {
-    try {
-      // Get the latest lead number from the FMS sheet
-      const publicUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=FMS"
-      
-      const response = await fetch(publicUrl)
-      const text = await response.text()
-      
-      // Extract the JSON part
-      const jsonStart = text.indexOf('{')
-      const jsonEnd = text.lastIndexOf('}') + 1
-      const jsonData = text.substring(jsonStart, jsonEnd)
-      
-      const data = JSON.parse(jsonData)
-      
-      // Default to LD-001 if no data exists
-      if (!data || !data.table || !data.table.rows || data.table.rows.length === 0) {
-        return "LD-001"
-      }
-      
-      // Find the last non-empty lead number in column B (index 1)
-      let lastLeadNumber = null
-      for (let i = data.table.rows.length - 1; i >= 0; i--) {
-        const row = data.table.rows[i]
-        if (row.c && row.c[1] && row.c[1].v) {
-          const cellValue = row.c[1].v.toString()
-          if (cellValue.startsWith("LD-")) {
-            lastLeadNumber = cellValue
-            break
-          }
-        }
-      }
-      
-      // If no lead number found, start with LD-001
-      if (!lastLeadNumber) {
-        return "LD-001"
-      }
-      
-      // Extract the numeric part and increment
-      const match = lastLeadNumber.match(/LD-(\d+)/)
-      if (match) {
-        const lastNumber = parseInt(match[1], 10)
-        const nextNumber = lastNumber + 1
-        return `LD-${String(nextNumber).padStart(3, '0')}`
-      } else {
-        return "LD-001"
-      }
-    } catch (error) {
-      console.error("Error generating lead number:", error)
-      return "LD-001" // Default if we can't determine
-    }
-  }
-
-  
+  // NEW: Submit to Supabase
+// NEW: Submit to Supabase - FIXED to match exact column names
 const handleSubmit = async (e) => {
   e.preventDefault()
   setIsSubmitting(true)
 
   try {
-    // Format current date as dd/mm/yyyy
-    const formattedDate = formatDate(new Date())
-    
-    // Generate the next lead number at submission time
-    const leadNumber = await generateLeadNumber()
-    
-    // Convert form data to array format for Google Sheets
-    const rowData = [
-      formattedDate, // Date in dd/mm/yyyy format
-      // leadNumber, // Generated lead number based on current sheet data
-      "",
-      formData.receiverName,
-      formData.source,
-      formData.companyName,
-      formData.phoneNumber,
-      formData.salespersonName,
-      formData.location,
-      formData.email,
-      formData.state,
-      formData.address,
-      // Submit each contact person's data individually in separate cells
-      formData.contactPersons[0]?.name || "", // First contact person name
-      formData.contactPersons[0]?.designation || "", // First contact person designation
-      formData.contactPersons[0]?.number || "", // First contact person number
-      formData.contactPersons[1]?.name || "", // Second contact person name (if exists)
-      formData.contactPersons[1]?.designation || "", // Second contact person designation
-      formData.contactPersons[1]?.number || "", // Second contact person number
-      formData.contactPersons[2]?.name || "", // Third contact person name (if exists)
-      formData.contactPersons[2]?.designation || "", // Third contact person designation
-      formData.contactPersons[2]?.number || "", // Third contact person number
-"", // Remove nob from here (originally line 30)
-  "", // Remove gst from here
-  "", // Remove customerRegistrationForm from here
-  "", // Remove creditAccess from here
-  "", // Remove creditDays from here
-  "", // Remove creditLimit from here
-  "", // Remove notes from here
-    ]
-  
-      // Add additional columns (W to AC) for the nature of business
-      // First, extend the rowData array with empty values to ensure it has enough cells
-      // Columns W to AC would be indices 22-28 (if starting from 0)
-      while (rowData.length < 27) {
-        rowData.push("")
-      }
-  
-      // If NOB (Nature of Business) is filled, add its value to additional columns
-      if (formData.nob) {
-        // Assuming columns W to AC need the NOB value or related information
-        // Columns W to AC correspond to indices 22 to 28 (0-based)
-        rowData[20] = formData.nob // Column W
-        rowData[21] = formData.gst // Column X
-        rowData[22] = formData.customerRegistrationForm // Column Y
-        rowData[23] = formData.creditAccess // Column Z
-        rowData[24] = formData.creditDays // Column AA
-        rowData[25] = formData.creditLimit // Column AB
-        rowData[26] = formData.notes // Column AC
-        
-        // Note: You can customize what goes into each column as needed
-        // For example, you might want different transformations of the NOB data
-      }
-  
-      // Parameters for Google Apps Script
-      const params = {
-        sheetName: "FMS",
-        action: "insert",
-        rowData: JSON.stringify(rowData)
-      }
-  
-      // Create URL-encoded string for the parameters
-      const urlParams = new URLSearchParams()
-      for (const key in params) {
-        urlParams.append(key, params[key])
-      }
-      
-      // Send the data
-      const response = await fetch(scriptUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: urlParams
-      })
-  
-      const result = await response.json()
-      
-      if (result.success) {
-        showNotification("Lead created successfully", "success")
-        
-        // Reset form
-        setFormData({
-          receiverName: "",
-          source: "",
-          companyName: "",
-          phoneNumber: "",
-          salespersonName: "",
-          location: "",
-          email: "",
-          contactPersons: [{ name: "", designation: "", number: "" }],
-          state: "",
-          address: "",
-          customerRegistrationForm: "",
-          creditAccess: "",
-          creditDays: "",
-          creditLimit: "",
-          nob: "",
-          gst: "",
-          notes: ""
-        })
-      } else {
-        showNotification("Error creating lead: " + (result.error || "Unknown error"), "error")
-      }
-    } catch (error) {
-      showNotification("Error submitting form: " + error.message, "error")
-    } finally {
-      setIsSubmitting(false)
+    // Prepare data for Supabase with EXACT column names from schema
+    const leadData = {
+      "Timestamp": formatDate(new Date()),
+      "LD-Lead-No": nextLeadNumber,
+      "Lead_Receiver_Name": formData.receiverName,
+      "Lead_Source": formData.source,
+      "Company_Name": formData.companyName,
+      "Phone_Number": formData.phoneNumber,
+      "Salesperson_Name": formData.salespersonName,
+      "Location": formData.location,
+      "Email_Address": formData.email,
+      "State": formData.state,
+      "Address": formData.address,
+      // Contact persons with exact column names
+      "Person_name_1": formData.contactPersons[0]?.name || "",
+      "Designation_1": formData.contactPersons[0]?.designation || "",
+      "Phone_Number_1": formData.contactPersons[0]?.number || "",
+      "Person_Name_2": formData.contactPersons[1]?.name || "",
+      "Designation_2": formData.contactPersons[1]?.designation || "",
+      "Phone_Number_2": formData.contactPersons[1]?.number || "",
+      "Person_Name_3": formData.contactPersons[2]?.name || "",
+      "Designation_3": formData.contactPersons[2]?.designation || "",
+      "Phone_Number_3": formData.contactPersons[2]?.number || "",
+      // Additional fields with exact column names
+      "NOB": formData.nob,
+      "GST_Number": formData.gst,
+      "Customer_Registration Form": formData.customerRegistrationForm,
+      "Credit _Access": formData.creditAccess, // Note the space in "Credit _Access"
+      "Credit_Days": formData.creditDays,
+      "Credit_Limit": formData.creditLimit,
+      "Additional_Notes": formData.notes
     }
+
+    const { data, error } = await supabase
+      .from('leads_to_order')
+      .insert([leadData])
+
+    if (error) {
+      throw error
+    }
+
+    showNotification("Lead created successfully", "success")
+    
+    // Reset form
+    setFormData({
+      receiverName: "",
+      source: "",
+      companyName: "",
+      phoneNumber: "",
+      salespersonName: "",
+      location: "",
+      email: "",
+      contactPersons: [{ name: "", designation: "", number: "" }],
+      state: "",
+      address: "",
+      customerRegistrationForm: "",
+      creditAccess: "",
+      creditDays: "",
+      creditLimit: "",
+      nob: "",
+      gst: "",
+      notes: ""
+    })
+
+    // Generate next lead number for the next submission
+    await generateNextLeadNumber()
+
+  } catch (error) {
+    console.error('Error submitting lead:', error)
+    showNotification("Error creating lead: " + error.message, "error")
+  } finally {
+    setIsSubmitting(false)
   }
+}
 
   return (
     <div className="container mx-auto py-10 px-4">
@@ -498,19 +387,18 @@ const handleSubmit = async (e) => {
                   Company Name
                 </label>
                 <input
-  list="companyOptions"
-  id="companyName"
-  value={formData.companyName}
-  onChange={handleChange}
-  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-  required
-/>
-<datalist id="companyOptions">
-  {companyOptions.map((company, index) => (
-    <option key={index} value={company} />
-  ))}
-</datalist>
-
+                  list="companyOptions"
+                  id="companyName"
+                  value={formData.companyName}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+                <datalist id="companyOptions">
+                  {companyOptions.map((company, index) => (
+                    <option key={index} value={company} />
+                  ))}
+                </datalist>
               </div>
 
               <div className="space-y-2">
@@ -523,8 +411,6 @@ const handleSubmit = async (e) => {
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Phone number will auto-fill"
-                  // readOnly={formData.companyName !== ""}
-                  // required
                 />
               </div>
 
@@ -538,8 +424,6 @@ const handleSubmit = async (e) => {
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Salesperson name will auto-fill"
-                  // readOnly={formData.companyName !== ""}
-                  // required
                 />
               </div>
 
@@ -553,8 +437,6 @@ const handleSubmit = async (e) => {
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Location will auto-fill"
-                  // readOnly={formData.companyName !== ""}
-                  // required
                 />
               </div>
 
@@ -569,26 +451,25 @@ const handleSubmit = async (e) => {
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Email will auto-fill"
-                  // readOnly={formData.companyName !== ""}
                 />
               </div>
 
               <div className="space-y-2">
-  <label htmlFor="state" className="block text-sm font-medium text-gray-700">
-    State
-  </label>
-  <select
-    id="state"
-    value={formData.state}
-    onChange={handleChange}
-    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-  >
-    <option value="">Select state</option>
-    {stateOptions.map((state, index) => (
-      <option key={index} value={state}>{state}</option>
-    ))}
-  </select>
-</div>
+                <label htmlFor="state" className="block text-sm font-medium text-gray-700">
+                  State
+                </label>
+                <select
+                  id="state"
+                  value={formData.state}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select state</option>
+                  {stateOptions.map((state, index) => (
+                    <option key={index} value={state}>{state}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Address Field */}
@@ -603,7 +484,6 @@ const handleSubmit = async (e) => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter complete address"
                 rows="2"
-                // required
               />
             </div>
 
@@ -644,23 +524,21 @@ const handleSubmit = async (e) => {
                         onChange={(e) => handleContactPersonChange(index, 'name', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="Contact name"
-                        // required
                       />
                     </div>
                     <div className="space-y-2">
-  <label className="block text-sm font-medium text-gray-700">Designation</label>
-  <select
-    value={person.designation}
-    onChange={(e) => handleContactPersonChange(index, 'designation', e.target.value)}
-    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-    required
-  >
-    <option value="">Select designation</option>
-    {designationOptions.map((designation, idx) => (
-      <option key={idx} value={designation}>{designation}</option>
-    ))}
-  </select>
-</div>
+                      <label className="block text-sm font-medium text-gray-700">Designation</label>
+                      <select
+                        value={person.designation}
+                        onChange={(e) => handleContactPersonChange(index, 'designation', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select designation</option>
+                        {designationOptions.map((designation, idx) => (
+                          <option key={idx} value={designation}>{designation}</option>
+                        ))}
+                      </select>
+                    </div>
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700">Phone Number</label>
                       <input
@@ -668,7 +546,6 @@ const handleSubmit = async (e) => {
                         onChange={(e) => handleContactPersonChange(index, 'number', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="Contact number"
-                        // required
                       />
                     </div>
                   </div>
@@ -678,23 +555,22 @@ const handleSubmit = async (e) => {
 
             {/* Additional Fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-  <label htmlFor="nob" className="block text-sm font-medium text-gray-700">
-    Nature of Business (NOB)
-  </label>
-  <select
-    id="nob"
-    value={formData.nob}
-    onChange={handleChange}
-    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-    // required
-  >
-    <option value="">Select nature of business</option>
-    {nobOptions.map((option, index) => (
-      <option key={index} value={option}>{option}</option>
-    ))}
-  </select>
-</div>
+              <div className="space-y-2">
+                <label htmlFor="nob" className="block text-sm font-medium text-gray-700">
+                  Nature of Business (NOB)
+                </label>
+                <select
+                  id="nob"
+                  value={formData.nob}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select nature of business</option>
+                  {nobOptions.map((option, index) => (
+                    <option key={index} value={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
 
               <div className="space-y-2">
                 <label htmlFor="gst" className="block text-sm font-medium text-gray-700">
@@ -706,7 +582,6 @@ const handleSubmit = async (e) => {
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="GST number"
-                  // required
                 />
               </div>
 
@@ -736,7 +611,6 @@ const handleSubmit = async (e) => {
                   value={formData.creditAccess}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  // required
                 >
                   <option value="">Select option</option>
                   <option value="Yes">Yes</option>
@@ -753,8 +627,6 @@ const handleSubmit = async (e) => {
                   value={formData.creditDays}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  // required={formData.creditAccess === "Yes"}
-                  // disabled={formData.creditAccess !== "Yes"}
                 >
                   <option value="">Select credit days</option>
                   {creditDaysOptions.map((option, index) => (
@@ -772,8 +644,6 @@ const handleSubmit = async (e) => {
                   value={formData.creditLimit}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  // required={formData.creditAccess === "Yes"}
-                  // disabled={formData.creditAccess !== "Yes"}
                 >
                   <option value="">Select credit limit</option>
                   {creditLimitOptions.map((option, index) => (
@@ -793,22 +663,22 @@ const handleSubmit = async (e) => {
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter any additional information"
-                />
-              </div>
+              />
             </div>
-            <div className="p-6 border-t flex justify-end">
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                {isSubmitting ? "Saving..." : "Save Lead"}
-              </button>
-            </div>
-          </form>
-        </div>
+          </div>
+          <div className="p-6 border-t flex justify-end">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              {isSubmitting ? "Saving..." : "Save Lead"}
+            </button>
+          </div>
+        </form>
       </div>
-    )
-  }
-  
-  export default Leads
+    </div>
+  )
+}
+
+export default Leads
