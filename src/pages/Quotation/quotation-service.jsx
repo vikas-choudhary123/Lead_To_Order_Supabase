@@ -9,79 +9,74 @@ import QuotationForm from "./quotation-form"
 import QuotationPreview from "./quotation-preview"
 import { generatePDFFromData } from "./pdf-generator"
 import { useQuotationData } from "./use-quotation-data"
+import supabase from "../../utils/supabase"
 
 export const getNextQuotationNumber = async (companyPrefix = "NBD") => {
-  const scriptUrl =
-    "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
-
   try {
-    const params = {
-      sheetName: "Make Quotation",
-      action: "getNextQuotationNumber",
-      companyPrefix: companyPrefix, // Pass the dynamic prefix
-    }
+    // Get the latest quotation number with the given prefix
+    const { data, error } = await supabase
+      .from('Make_Quotation')
+      .select('Quotation_No')
+      .ilike('Quotation_No', `${companyPrefix}-%`)
+      .order('Timestamp', { ascending: false })
+      .limit(1)
 
-    const urlParams = new URLSearchParams()
-    for (const key in params) {
-      urlParams.append(key, params[key])
-    }
-
-    const response = await fetch(scriptUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: urlParams,
-    })
-
-    const result = await response.json()
-
-    if (result.success) {
-      return result.nextQuotationNumber
-    } else {
+    if (error) {
+      console.error('Error fetching quotation numbers:', error)
       return `${companyPrefix}-001`
     }
+
+    if (!data || data.length === 0) {
+      return `${companyPrefix}-001`
+    }
+
+    const lastQuotationNo = data[0].Quotation_No
+    const parts = lastQuotationNo.split('-')
+    
+    if (parts.length >= 2) {
+      const lastNumber = parseInt(parts[parts.length - 1]) || 0
+      const newNumber = (lastNumber + 1).toString().padStart(3, '0')
+      return `${companyPrefix}-${newNumber}`
+    }
+
+    return `${companyPrefix}-001`
   } catch (error) {
     console.error("Error getting next quotation number:", error)
     return `${companyPrefix}-001`
   }
 }
 
-// NEW: Function to get company prefix from FMS sheet
-// NEW: Enhanced function to get company prefix from both FMS and ENQUIRY TO ORDER sheets
+// Function to get company prefix from leads_to_order or enquiry_to_order tables
 export const getCompanyPrefix = async (companyName) => {
-  const scriptUrl =
-    "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
-
   try {
-    const params = {
-      sheetName: "FMS", // This parameter is still needed but the script will check both sheets
-      action: "getCompanyPrefix",
-      companyName: companyName,
+    // First try leads_to_order table
+    const { data: leadsData, error: leadsError } = await supabase
+      .from('leads_to_order')
+      .select('Company_Name')
+      .eq('Company_Name', companyName)
+      .limit(1)
+
+    if (!leadsError && leadsData && leadsData.length > 0) {
+      // Generate prefix from company name (first 3 letters uppercase)
+      const prefix = companyName.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, '')
+      return prefix || "NBD"
     }
 
-    const urlParams = new URLSearchParams()
-    for (const key in params) {
-      urlParams.append(key, params[key])
+    // If not found, try enquiry_to_order table
+    const { data: enquiryData, error: enquiryError } = await supabase
+      .from('enquiry_to_order')
+      .select('company_name')
+      .eq('company_name', companyName)
+      .limit(1)
+
+    if (!enquiryError && enquiryData && enquiryData.length > 0) {
+      // Generate prefix from company name (first 3 letters uppercase)
+      const prefix = companyName.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, '')
+      return prefix || "NBD"
     }
 
-    const response = await fetch(scriptUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: urlParams,
-    })
-
-    const result = await response.json()
-
-    if (result.success && result.prefix) {
-      console.log("Retrieved company prefix:", result.prefix, "for company:", companyName)
-      return result.prefix
-    } else {
-      console.log("No prefix found, using default NBD")
-      return "NBD" // Default fallback
-    }
+    console.log("No company found, using default NBD prefix")
+    return "NBD" // Default fallback
   } catch (error) {
     console.error("Error getting company prefix:", error)
     return "NBD" // Default fallback

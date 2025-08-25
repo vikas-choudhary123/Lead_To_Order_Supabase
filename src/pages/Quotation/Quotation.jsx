@@ -10,6 +10,7 @@ import QuotationPreview from "./quotation-preview"
 import { generatePDFFromData } from "./pdf-generator"
 import { getNextQuotationNumber } from "./quotation-service"
 import { useQuotationData } from "./use-quotation-data"
+import supabase from "../../utils/supabase"
 
 function Quotation() {
   const [activeTab, setActiveTab] = useState("edit")
@@ -24,13 +25,68 @@ function Quotation() {
   const [specialDiscount, setSpecialDiscount] = useState(0)
   const [selectedReferences, setSelectedReferences] = useState([])
 
-  // NEW: Add hidden columns state
+  // Add hidden columns state
   const [hiddenColumns, setHiddenColumns] = useState({
     hideDisc: false,
     hideFlatDisc: false,
     hideTotalFlatDisc: false,
     hideSpecialDiscount: false,
   })
+
+  // Helper function to convert date format
+  const convertDateToISO = (dateString) => {
+    if (!dateString) return null
+    
+    // If already in ISO format (YYYY-MM-DD), return as is
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      return dateString
+    }
+    
+    // If in DD/MM/YYYY format, convert to YYYY-MM-DD
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
+      const [day, month, year] = dateString.split('/')
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+    }
+    
+    // Try to parse as Date object and convert
+    try {
+      const date = new Date(dateString)
+      if (!isNaN(date.getTime())) {
+        return date.toISOString().split('T')[0] // Returns YYYY-MM-DD
+      }
+    } catch (error) {
+      console.error('Error converting date:', error)
+    }
+    
+    return null
+  }
+
+  // Helper function to upload PDF to Supabase bucket
+  const uploadPDFToSupabase = async (pdfBlob, fileName) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('quotation_image')
+        .upload(fileName, pdfBlob, {
+          contentType: 'application/pdf',
+          upsert: true // This will overwrite if file exists
+        })
+
+      if (error) {
+        console.error('Error uploading PDF:', error)
+        throw error
+      }
+
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from('quotation_image')
+        .getPublicUrl(fileName)
+
+      return publicUrlData.publicUrl
+    } catch (error) {
+      console.error('Error in PDF upload:', error)
+      throw error
+    }
+  }
 
   // Check if we're in view mode
   const params = new URLSearchParams(window.location.search)
@@ -61,33 +117,24 @@ function Quotation() {
     handleSpecialDiscountChange(discount)
   }
 
-  // Fetch existing quotations when component mounts or when revising
+  // Fetch existing quotations from Supabase
   useEffect(() => {
     const fetchExistingQuotations = async () => {
       try {
         console.log("Fetching existing quotations...")
-        const scriptUrl =
-          "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
-        const response = await fetch(scriptUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: new URLSearchParams({
-            sheetName: "Make Quotation",
-            action: "getQuotationNumbers",
-          }),
-        })
+        const { data, error } = await supabase
+          .from('Make_Quotation')
+          .select('Quotation_No')
+          .order('Timestamp', { ascending: false })
 
-        const result = await response.json()
-        console.log("Quotation numbers result:", result)
-
-        if (result.success && Array.isArray(result.quotationNumbers)) {
-          setExistingQuotations(result.quotationNumbers)
-        } else {
-          console.error("Invalid response format:", result)
+        if (error) {
+          console.error("Error fetching quotation numbers:", error)
           setExistingQuotations([])
+          return
         }
+
+        const quotationNumbers = data ? data.map(row => row.Quotation_No).filter(Boolean) : []
+        setExistingQuotations(quotationNumbers)
       } catch (error) {
         console.error("Error fetching quotation numbers:", error)
         setExistingQuotations([])
@@ -153,28 +200,23 @@ function Quotation() {
     setSelectedQuotation(quotationNo)
 
     try {
-      const scriptUrl =
-        "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
-      const response = await fetch(scriptUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          sheetName: "Make Quotation",
-          action: "getQuotationData",
-          quotationNo: quotationNo,
-        }),
-      })
+      const { data, error } = await supabase
+        .from('Make_Quotation')
+        .select('*')
+        .eq('Quotation_No', quotationNo)
+        .single()
 
-      const result = await response.json()
-      console.log("Loaded quotation data:", result)
+      if (error) {
+        console.error("Error fetching quotation data:", error)
+        alert("Failed to load quotation data")
+        return
+      }
 
-      if (result.success) {
-        const loadedData = result.quotationData
+      if (data) {
+        const loadedData = data
 
-        const references = loadedData.consignorName
-          ? loadedData.consignorName
+        const references = loadedData.Reference_Name
+          ? loadedData.Reference_Name
               .split(",")
               .map((r) => r.trim())
               .filter((r) => r)
@@ -182,19 +224,19 @@ function Quotation() {
         setSelectedReferences(references)
 
         let items = []
-        const specialDiscountFromItems = loadedData.specialDiscount || 0
+        const specialDiscountFromItems = 0 // Will be calculated from items if needed
 
-        if (loadedData.items && Array.isArray(loadedData.items) && loadedData.items.length > 0) {
-          items = loadedData.items.map((item, index) => ({
+        if (loadedData.Items && Array.isArray(loadedData.Items) && loadedData.Items.length > 0) {
+          items = loadedData.Items.map((item, index) => ({
             id: index + 1,
             ...item,
           }))
         }
 
-        const subtotal = items.reduce((sum, item) => sum + Number(item.amount), 0)
-        const totalFlatDiscount = Number(loadedData.totalFlatDiscount) || 0
-        const cgstRate = Number(loadedData.cgstRate) || 9
-        const sgstRate = Number(loadedData.sgstRate) || 9
+        const subtotal = items.reduce((sum, item) => sum + Number(item.amount || 0), 0)
+        const totalFlatDiscount = 0 // Calculate from items if needed
+        const cgstRate = 9
+        const sgstRate = 9
         const taxableAmount = Math.max(0, subtotal - totalFlatDiscount)
         const cgstAmount = Number((taxableAmount * (cgstRate / 100)).toFixed(2))
         const sgstAmount = Number((taxableAmount * (sgstRate / 100)).toFixed(2))
@@ -202,18 +244,48 @@ function Quotation() {
 
         // Parse special offers from loaded data
         let specialOffers = [""]
-        if (loadedData.specialOffers) {
-          if (typeof loadedData.specialOffers === "string") {
-            // If it's a string, split by delimiter
-            specialOffers = loadedData.specialOffers.split("|").filter((offer) => offer.trim())
+        if (loadedData.Divine_Empire_10th_Anniversary_Special_Offer) {
+          if (typeof loadedData.Divine_Empire_10th_Anniversary_Special_Offer === "string") {
+            specialOffers = loadedData.Divine_Empire_10th_Anniversary_Special_Offer.split("|").filter((offer) => offer.trim())
             if (specialOffers.length === 0) specialOffers = [""]
-          } else if (Array.isArray(loadedData.specialOffers)) {
-            specialOffers = loadedData.specialOffers
+          } else if (Array.isArray(loadedData.Divine_Empire_10th_Anniversary_Special_Offer)) {
+            specialOffers = loadedData.Divine_Empire_10th_Anniversary_Special_Offer
           }
         }
 
         setQuotationData({
-          ...loadedData,
+          quotationNo: loadedData.Quotation_No || "",
+          date: loadedData.Quotation_Date || "",
+          preparedBy: loadedData.Prepared_By || "",
+          consignorState: loadedData.Consigner_State || "",
+          consignorName: loadedData.Reference_Name || "",
+          consignorAddress: loadedData.Address || "",
+          consignorMobile: loadedData.Mobile || "",
+          consignorPhone: loadedData.Phone || "",
+          consignorGSTIN: loadedData.GSTIN || "",
+          consignorStateCode: loadedData.State_Code || "",
+          consigneeName: loadedData.Company_Name || "",
+          consigneeAddress: loadedData.Consignee_Address || "",
+          shipTo: loadedData.Ship_To || "",
+          consigneeState: loadedData.State || "",
+          consigneeContactName: loadedData.Contact_Name || "",
+          consigneeContactNo: loadedData.Contact_No || "",
+          consigneeGSTIN: loadedData.Consignee_GSTIN || "",
+          consigneeStateCode: loadedData.Consignee_State_Code || "",
+          msmeNumber: loadedData.MSME_No || "",
+          validity: loadedData.Validity || "",
+          paymentTerms: loadedData.Payment_Terms || "",
+          delivery: loadedData.Delivery || "",
+          freight: loadedData.Freight || "",
+          insurance: loadedData.Insurance || "",
+          taxes: loadedData.Taxes || "",
+          accountNo: loadedData.Account_No || "",
+          bankName: loadedData.Bank_Name || "",
+          bankAddress: loadedData.Bank_Address || "",
+          ifscCode: loadedData.IFSC_Code || "",
+          email: loadedData.Email || "",
+          website: loadedData.Website || "",
+          pan: loadedData.Pan || "",
           items,
           subtotal,
           totalFlatDiscount,
@@ -222,32 +294,8 @@ function Quotation() {
           cgstAmount,
           sgstAmount,
           total,
-          accountNo: loadedData.accountNo || "",
-          bankName: loadedData.bankName || "",
-          bankAddress: loadedData.bankAddress || "",
-          ifscCode: loadedData.ifscCode || "",
-          email: loadedData.email || "",
-          website: loadedData.website || "",
-          pan: loadedData.pan || "",
-          consignorState: loadedData.consignorState || "",
-          consignorName: loadedData.consignorName || "",
-          consignorAddress: loadedData.consignorAddress || "",
-          consignorMobile: loadedData.consignorMobile || "",
-          consignorPhone: loadedData.consignorPhone || "",
-          consignorGSTIN: loadedData.consignorGSTIN || "",
-          consignorStateCode: loadedData.consignorStateCode || "",
-          consigneeName: loadedData.consigneeName || "",
-          consigneeAddress: loadedData.consigneeAddress || "",
-          shipTo: loadedData.shipTo || "",
-          consigneeState: loadedData.consigneeState || "",
-          consigneeContactName: loadedData.consigneeContactName || "",
-          consigneeContactNo: loadedData.consigneeContactNo || "",
-          consigneeGSTIN: loadedData.consigneeGSTIN || "",
-          consigneeStateCode: loadedData.consigneeStateCode || "",
-          msmeNumber: loadedData.msmeNumber || "",
-          preparedBy: loadedData.preparedBy || "",
           specialOffers: specialOffers,
-          notes: Array.isArray(loadedData.notes) ? loadedData.notes : loadedData.notes ? [loadedData.notes] : [""],
+          notes: loadedData.Notes ? loadedData.Notes.split("|").filter(note => note.trim()) : [""],
         })
 
         setSpecialDiscount(specialDiscountFromItems)
@@ -293,103 +341,25 @@ function Quotation() {
     }
   }
 
-const handleGenerateLink = async () => {
-  setIsGenerating(true);
+  const handleGenerateLink = async () => {
+    setIsGenerating(true)
 
-  try {
-    // First generate the PDF
-    const base64Data = generatePDFFromData(quotationData, selectedReferences, specialDiscount, hiddenColumns);
+    try {
+      // Create local storage link for your reference
+      const quotationId = `quotation_${Date.now()}`
+      localStorage.setItem(quotationId, JSON.stringify(quotationData))
+      const localLink = `${window.location.origin}${window.location.pathname}?view=${quotationId}`
 
-    const byteCharacters = atob(base64Data);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
+      setQuotationLink(localLink)
+      setIsGenerating(false)
+      
+      alert("Quotation link has been successfully generated and is ready to share.")
+    } catch (error) {
+      console.error("Error generating link:", error)
+      alert("Failed to generate link: " + error.message)
+      setIsGenerating(false)
     }
-    const byteArray = new Uint8Array(byteNumbers);
-    const blob = new Blob([byteArray], { type: "application/pdf" });
-
-    // Upload PDF to Google Drive (this creates a permanent copy)
-    const scriptUrl = "https://script.google.com/macros/s/AKfycbzVseC0GMn77c4hbt-caHpWgb4zmh99VByIaNfReJjBsR4eUZ63uaLJ670c3p116t3lcQ/exec";
-    const pdfFileName = `Quotation_${quotationData.quotationNo}.pdf`;
-
-    const pdfResponse = await fetch(scriptUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        sheetName: "Send",
-        action: "uploadPDF",
-        pdfData: base64Data,
-        fileName: pdfFileName,
-      }),
-    });
-
-    const pdfResult = await pdfResponse.json();
-
-    if (!pdfResult.success) {
-      throw new Error("Failed to upload PDF");
-    }
-
-    const permanentPdfUrl = pdfResult.fileUrl;
-    const permanentFileId = pdfResult.fileId; // NEW: Get the file ID
-
-    // FIXED: Pass the permanent file ID instead of base64Data to avoid duplicate PDF creation
-    const sendResponse = await fetch(scriptUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        sheetName: "Send",
-        action: "insertAndEmail",
-        quotationNo: quotationData.quotationNo,
-        consigneeContactName: quotationData.consigneeContactName,
-        permanentFileId: permanentFileId, // FIXED: Pass file ID instead of pdfData
-        fileName: pdfFileName,
-        consigneeName: quotationData.consigneeName || quotationData.consigneeContactName,
-      }),
-    });
-
-    const sendResult = await sendResponse.json();
-
-    if (!sendResult.success) {
-      throw new Error("Failed to save to Send sheet or send email: " + sendResult.error);
-    }
-
-    // Create local storage link (for your own reference)
-    const quotationId = `quotation_${Date.now()}`;
-    localStorage.setItem(quotationId, JSON.stringify(quotationData));
-    const localLink = `${window.location.origin}${window.location.pathname}?view=${quotationId}`;
-
-    // Set the permanent URL for your reference (not sent in email)
-    setQuotationLink(localLink);
-    setPdfUrl(permanentPdfUrl);
-    setIsGenerating(false);
-    
-    if (sendResult.emailSent) {
-      alert(
-        `✅ Email sent successfully!\n\n` +
-        `📧 Email sent to: ${sendResult.emailAddress}\n` +
-        `📄 Temporary PDF URL sent (expires in 10 days)\n` +
-        `⏰ PDF expires at: ${sendResult.pdfExpiresAt}\n\n` +
-        `🔗 Your permanent reference link: ${localLink}\n` +
-        `📎 Permanent PDF: ${permanentPdfUrl}`
-      );
-    } else {
-      alert(
-        `⚠️ Quotation link generated but email could not be sent.\n\n` +
-        `Error: ${sendResult.emailError || "No email address provided"}\n\n` +
-        `🔗 Your reference link: ${localLink}\n` +
-        `📎 Permanent PDF: ${permanentPdfUrl}`
-      );
-    }
-  } catch (error) {
-    console.error("Error generating link:", error);
-    alert("Failed to generate link: " + error.message);
-    setIsGenerating(false);
   }
-};
 
   const handleSaveQuotation = async () => {
     if (!quotationData.consigneeName) {
@@ -419,7 +389,6 @@ const handleGenerateLink = async () => {
       }
       
       const finalGrandTotal = Math.max(0, grandTotal).toFixed(2)
-      const base64Data = generatePDFFromData(quotationData, selectedReferences, specialDiscount, hiddenColumns)
 
       let finalQuotationNo = quotationData.quotationNo
       if (isRevising && selectedQuotation) {
@@ -435,185 +404,77 @@ const handleGenerateLink = async () => {
         }
       }
 
+      // Generate PDF and upload to Supabase bucket
+      const base64Data = generatePDFFromData(quotationData, selectedReferences, specialDiscount, hiddenColumns)
+      const byteCharacters = atob(base64Data)
+      const byteNumbers = new Array(byteCharacters.length)
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i)
+      }
+      const byteArray = new Uint8Array(byteNumbers)
+      const pdfBlob = new Blob([byteArray], { type: "application/pdf" })
+
+      // Upload PDF to Supabase bucket
       const fileName = `Quotation_${finalQuotationNo}.pdf`
-
-      const scriptUrl =
-        "https://script.google.com/macros/s/AKfycbzTPj_x_0Sh6uCNnMDi-KlwVzkGV3nC4tRF6kGUNA1vXG0Ykx4Lq6ccR9kYv6Cst108aQ/exec"
-
-      const pdfParams = {
-        action: "uploadPDF",
-        pdfData: base64Data,
-        fileName: fileName,
-      }
-
-      const pdfUrlParams = new URLSearchParams()
-      for (const key in pdfParams) {
-        pdfUrlParams.append(key, pdfParams[key])
-      }
-
-      const pdfResponse = await fetch(scriptUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: pdfUrlParams,
-      })
-
-      const pdfResult = await pdfResponse.json()
-
-      if (!pdfResult.success) {
-        throw new Error("Failed to upload PDF: " + (pdfResult.error || "Unknown error"))
-      }
-
-      const pdfUrl = pdfResult.fileUrl
-
-      const quotationDetails = [
-        new Date().toLocaleString(),
-        finalQuotationNo,
-        quotationData.date,
-        quotationData.preparedBy,
-      ]
-
-      const consignorDetails = [
-        quotationData.consignorState,
-        quotationData.consignorName,
-        quotationData.consignorAddress,
-        quotationData.consignorMobile,
-        quotationData.consignorPhone,
-        quotationData.consignorGSTIN,
-        quotationData.consignorStateCode,
-      ]
-
-      const consigneeDetails = [
-        quotationData.consigneeName,
-        quotationData.consigneeAddress,
-        quotationData.shipTo || quotationData.consigneeAddress,
-        quotationData.consigneeState,
-        quotationData.consigneeContactName,
-        quotationData.consigneeContactNo,
-        quotationData.consigneeGSTIN,
-        quotationData.consigneeStateCode,
-        quotationData.msmeNumber,
-      ]
-
-      const termsDetails = [
-        quotationData.validity,
-        quotationData.paymentTerms,
-        quotationData.delivery,
-        quotationData.freight,
-        quotationData.insurance,
-        quotationData.taxes,
-        quotationData.notes.filter((note) => note.trim()).join("|"),
-      ]
-
-      const bankDetails = [
-        quotationData.accountNo,
-        quotationData.bankName,
-        quotationData.bankAddress,
-        quotationData.ifscCode,
-        quotationData.email,
-        quotationData.website,
-        quotationData.pan,
-      ]
-
-      const itemsString = quotationData.items
-        .map((item) => {
-          return [
-            item.code || "",
-            item.name || "",
-            item.description || "",
-            item.gst || 0,
-            item.qty || 0,
-            item.units || "Nos",
-            item.rate || 0,
-            item.discount || 0,
-            item.flatDiscount || 0,
-            item.amount || 0,
-            specialDiscount.toString(),
-          ].join("|")
-        })
-        .join(";")
+      const uploadedPdfUrl = await uploadPDFToSupabase(pdfBlob, fileName)
 
       // Convert special offers array to string for database storage
       const specialOffersString = quotationData.specialOffers
         ? quotationData.specialOffers.filter((offer) => offer.trim()).join("|")
         : ""
 
-      const mainRowData = [
-        ...quotationDetails,
-        ...consignorDetails,
-        ...consigneeDetails,
-        ...termsDetails,
-        ...bankDetails,
-        itemsString,
-        specialOffersString, // Add special offers before PDF URL
-        pdfUrl,
-        finalGrandTotal,
-      ]
-
-      const sheetParams = {
-        sheetName: "Make Quotation",
-        action: "insert",
-        rowData: JSON.stringify(mainRowData),
+      // Prepare data for Supabase
+      const quotationRecord = {
+        Quotation_No: finalQuotationNo,
+        Quotation_Date: convertDateToISO(quotationData.date),
+        Prepared_By: quotationData.preparedBy,
+        Consigner_State: quotationData.consignorState,
+        Reference_Name: quotationData.consignorName,
+        Address: quotationData.consignorAddress,
+        Mobile: quotationData.consignorMobile,
+        Phone: quotationData.consignorPhone,
+        GSTIN: quotationData.consignorGSTIN,
+        State_Code: quotationData.consignorStateCode,
+        Company_Name: quotationData.consigneeName,
+        Consignee_Address: quotationData.consigneeAddress,
+        Ship_To: quotationData.shipTo || quotationData.consigneeAddress,
+        State: quotationData.consigneeState,
+        Contact_Name: quotationData.consigneeContactName,
+        Contact_No: quotationData.consigneeContactNo,
+        Consignee_GSTIN: quotationData.consigneeGSTIN,
+        Consignee_State_Code: quotationData.consigneeStateCode,
+        MSME_No: quotationData.msmeNumber,
+        Validity: quotationData.validity,
+        Payment_Terms: quotationData.paymentTerms,
+        Delivery: quotationData.delivery,
+        Freight: quotationData.freight,
+        Insurance: quotationData.insurance,
+        Taxes: quotationData.taxes,
+        Notes: quotationData.notes.filter((note) => note.trim()).join("|"),
+        Account_No: quotationData.accountNo,
+        Bank_Name: quotationData.bankName,
+        Bank_Address: quotationData.bankAddress,
+        IFSC_Code: quotationData.ifscCode,
+        Email: quotationData.email,
+        Website: quotationData.website,
+        Pan: quotationData.pan,
+        Items: quotationData.items,
+        Divine_Empire_10th_Anniversary_Special_Offer: specialOffersString,
+        Grand_Total: parseFloat(finalGrandTotal),
+        Pdf_Url: uploadedPdfUrl // Store the Supabase bucket URL
       }
 
-      const sheetUrlParams = new URLSearchParams()
-      for (const key in sheetParams) {
-        sheetUrlParams.append(key, sheetParams[key])
+      const { data, error } = await supabase
+        .from('Make_Quotation')
+        .insert([quotationRecord])
+        .select()
+
+      if (error) {
+        throw new Error("Error saving quotation: " + error.message)
       }
 
-      const sheetResponse = await fetch(scriptUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: sheetUrlParams,
-      })
-
-      const sheetResult = await sheetResponse.json()
-
-      if (!sheetResult.success) {
-        throw new Error("Error saving quotation: " + (sheetResult.error || "Unknown error"))
-      }
-
-      const itemPromises = quotationData.items.map(async (item) => {
-        const itemData = [
-          finalQuotationNo,
-          item.code,
-          item.name,
-          item.description,
-          item.gst,
-          item.qty,
-          item.units,
-          item.rate,
-          item.discount,
-          item.flatDiscount,
-          item.amount,
-        ]
-
-        const itemParams = {
-          sheetName: "Quotation Items",
-          action: "insert",
-          rowData: JSON.stringify(itemData),
-        }
-
-        const itemUrlParams = new URLSearchParams()
-        for (const key in itemParams) {
-          itemUrlParams.append(key, itemParams[key])
-        }
-
-        return fetch(scriptUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: itemUrlParams,
-        })
-      })
-
-      await Promise.all(itemPromises)
-
-      setPdfUrl(pdfUrl)
+      // Set the PDF URL for reference
+      setPdfUrl(uploadedPdfUrl)
 
       if (isRevising && selectedQuotation) {
         setQuotationData((prev) => ({
@@ -622,8 +483,9 @@ const handleGenerateLink = async () => {
         }))
       }
 
-      alert("Quotation saved successfully with all items!")
+      alert("Quotation saved successfully with PDF uploaded to Supabase!")
 
+      // Reset form for new quotation
       const nextQuotationNumber = await getNextQuotationNumber()
       setQuotationData({
         quotationNo: nextQuotationNumber,
@@ -721,34 +583,34 @@ const handleGenerateLink = async () => {
         <div className="p-4">
           {activeTab === "edit" ? (
             <QuotationForm
-            quotationData={quotationData}
-            handleInputChange={handleInputChange}
-            handleItemChange={handleItemChange}
-            handleFlatDiscountChange={handleFlatDiscountChange}
-            handleAddItem={handleAddItem}
-            handleNoteChange={handleNoteChange}
-            addNote={addNote}
-            removeNote={removeNote}
-            hiddenFields={hiddenFields}
-            toggleFieldVisibility={toggleFieldVisibility}
-            isRevising={isRevising}
-            existingQuotations={existingQuotations}
-            selectedQuotation={selectedQuotation}
-            handleQuotationSelect={handleQuotationSelect}
-            isLoadingQuotation={isLoadingQuotation}
-            handleSpecialDiscountChange={handleSpecialDiscountChangeWrapper}
-            specialDiscount={specialDiscount}
-            setSpecialDiscount={setSpecialDiscount}
-            selectedReferences={selectedReferences}
-            setSelectedReferences={setSelectedReferences}
-            imageform={imageform}
-            addSpecialOffer={addSpecialOffer}
-            removeSpecialOffer={removeSpecialOffer}
-            handleSpecialOfferChange={handleSpecialOfferChange}
-            setQuotationData={setQuotationData}   // ADD THIS LINE
-            hiddenColumns={hiddenColumns}         // ADD THIS LINE
-            setHiddenColumns={setHiddenColumns}   // ADD THIS LINE
-          />
+              quotationData={quotationData}
+              handleInputChange={handleInputChange}
+              handleItemChange={handleItemChange}
+              handleFlatDiscountChange={handleFlatDiscountChange}
+              handleAddItem={handleAddItem}
+              handleNoteChange={handleNoteChange}
+              addNote={addNote}
+              removeNote={removeNote}
+              hiddenFields={hiddenFields}
+              toggleFieldVisibility={toggleFieldVisibility}
+              isRevising={isRevising}
+              existingQuotations={existingQuotations}
+              selectedQuotation={selectedQuotation}
+              handleQuotationSelect={handleQuotationSelect}
+              isLoadingQuotation={isLoadingQuotation}
+              handleSpecialDiscountChange={handleSpecialDiscountChangeWrapper}
+              specialDiscount={specialDiscount}
+              setSpecialDiscount={setSpecialDiscount}
+              selectedReferences={selectedReferences}
+              setSelectedReferences={setSelectedReferences}
+              imageform={imageform}
+              addSpecialOffer={addSpecialOffer}
+              removeSpecialOffer={removeSpecialOffer}
+              handleSpecialOfferChange={handleSpecialOfferChange}
+              setQuotationData={setQuotationData}
+              hiddenColumns={hiddenColumns}
+              setHiddenColumns={setHiddenColumns}
+            />
           ) : (
             <QuotationPreview
               quotationData={quotationData}
