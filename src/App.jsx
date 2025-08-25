@@ -14,6 +14,7 @@ import Quotation from "./pages/Quotation/Quotation"
 import MainNav from "./components/MainNav"
 import Footer from "./components/Footer"
 import Notification from "./components/Notification"
+import supabase from "./utils/supabase" // Import supabase client
 
 // Create auth context
 export const AuthContext = createContext(null)
@@ -80,54 +81,39 @@ function App() {
 
   const login = async (username, password) => {
     try {
-      // Fetch user credentials from Google Sheet
-      const loginUrl = "https://docs.google.com/spreadsheets/d/1TZVWkmASF7tG-QER17588sl4SvRgY7knFKFDtYFjB0Q/gviz/tq?tqx=out:json&sheet=Login"
-      const response = await fetch(loginUrl)
-      const text = await response.text()
+      // Query Supabase login table
+      const { data, error } = await supabase
+        .from('login')
+        .select('username, usertype')
+        .eq('username', username)
+        .eq('password', password)
+        .single()
       
-      // Extract JSON from response
-      const jsonStart = text.indexOf('{')
-      const jsonEnd = text.lastIndexOf('}') + 1
-      const jsonData = text.substring(jsonStart, jsonEnd)
-      const data = JSON.parse(jsonData)
-      
-      if (!data || !data.table || !data.table.rows) {
-        showNotification("Failed to fetch user data", "error")
+      if (error) {
+        console.error("Login error:", error)
+        showNotification("Invalid credentials", "error")
         return false
       }
       
-      // Find matching user
-      let foundUser = null
-      data.table.rows.forEach(row => {
-        if (row.c && 
-            row.c[0] && row.c[0].v === username && 
-            row.c[1] && row.c[1].v === password) {
-          foundUser = {
-            username: row.c[0].v,
-            userType: row.c[2] ? row.c[2].v : "user" // Default to "user" if type is not specified
-          }
-        }
-      })
-      
-      if (foundUser) {
+      if (data) {
         // Store user info
         const userInfo = {
-          username: foundUser.username,
+          username: data.username,
           loginTime: new Date().toISOString()
         }
         
         setIsAuthenticated(true)
         setCurrentUser(userInfo)
-        setUserType(foundUser.userType)
+        setUserType(data.usertype)
         
         localStorage.setItem("isAuthenticated", "true")
         localStorage.setItem("currentUser", JSON.stringify(userInfo))
-        localStorage.setItem("userType", foundUser.userType)
+        localStorage.setItem("userType", data.usertype)
         
         // Fetch data based on user type
-        await fetchUserData(foundUser.username, foundUser.userType)
+        await fetchUserData(data.username, data.usertype)
         
-        showNotification(`Welcome, ${username}! (${foundUser.userType})`, "success")
+        showNotification(`Welcome, ${username}! (${data.usertype})`, "success")
         return true
       } else {
         showNotification("Invalid credentials", "error")
