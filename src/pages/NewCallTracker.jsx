@@ -7,7 +7,9 @@ import MakeQuotationForm from "../components/call-tracker/MakeQuotationFrom"
 import QuotationValidationForm from "../components/call-tracker/QuotationValidationForm"
 import OrderExpectedForm from "../components/call-tracker/OrderExpectedForm"
 import OrderStatusForm from "../components/call-tracker/OrderStatusFrom"
-import supabase from "../supabaseClient"
+// import supabase from "../supabaseClient"
+import supabase from "../utils/supabase"
+
 
 function NewCallTracker() {
   const navigate = useNavigate()

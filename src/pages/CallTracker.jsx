@@ -5,7 +5,9 @@ import { Link } from "react-router-dom"
 import { PlusIcon, SearchIcon, ArrowRightIcon, BuildingIcon } from "../components/Icons"
 import { AuthContext } from "../App" // Import AuthContext just like in the FollowUp component
 import CallTrackerForm from "./Call-Tracker-Form" // Add this import
-import supabase from "../supabaseClient"
+// import supabase from "../SupaBaseClient"
+import supabase from "../utils/supabase"
+
 
 // Animation classes
 const slideIn = "animate-in slide-in-from-right duration-300"
